@@ -8,13 +8,13 @@
  */
 
 /*
- * Copyright (c) 2013 Alan Cudmore.
+ *  Copyright (c) 2014 Andre Marques.
+ *  Copyright (c) 2013 Alan Cudmore.
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
  *
  *  http://www.rtems.org/license/LICENSE
- *
  */
 
 #ifndef LIBBSP_ARM_RASPBERRYPI_RASPBERRYPI_H
@@ -193,6 +193,71 @@
 #define BCM2835_GPU_TIMER_C3      (BCM2835_TIMER_BASE+0x18)
 
 /** @} */
+
+/**
+ * @name EMMC Registers
+ *
+ * @{
+ */
+
+#define BCM2835_EMMC_BASE              (0x20300000)
+
+#define BCM2835_EMMC_ARG2              (BCM2835_EMMC_BASE+0x00)
+#define BCM2835_EMMC_BLKSIZECNT        (BCM2835_EMMC_BASE+0x04)
+#define BCM2835_EMMC_ARG1              (BCM2835_EMMC_BASE+0x08)
+#define BCM2835_EMMC_CMDTM             (BCM2835_EMMC_BASE+0x0C)
+#define BCM2835_EMMC_RESP0             (BCM2835_EMMC_BASE+0x10)
+#define BCM2835_EMMC_RESP1             (BCM2835_EMMC_BASE+0x14)
+#define BCM2835_EMMC_RESP2             (BCM2835_EMMC_BASE+0x18)
+#define BCM2835_EMMC_RESP3             (BCM2835_EMMC_BASE+0x1C)
+#define BCM2835_EMMC_DATA              (BCM2835_EMMC_BASE+0x20)
+#define BCM2835_EMMC_STATUS            (BCM2835_EMMC_BASE+0x24)
+#define BCM2835_EMMC_CONTROL0          (BCM2835_EMMC_BASE+0x28)
+#define BCM2835_EMMC_CONTROL1          (BCM2835_EMMC_BASE+0x2C)
+#define BCM2835_EMMC_INTERRUPT         (BCM2835_EMMC_BASE+0x30)
+#define BCM2835_EMMC_IRPT_MASK         (BCM2835_EMMC_BASE+0x34)
+#define BCM2835_EMMC_IRPT_EN           (BCM2835_EMMC_BASE+0x38)
+#define BCM2835_EMMC_CONTROL2          (BCM2835_EMMC_BASE+0x3C)
+#define BCM2835_EMMC_CAPABILITIES_0    (BCM2835_EMMC_BASE+0x40)
+#define BCM2835_EMMC_CAPABILITIES_1    (BCM2835_EMMC_BASE+0x44)
+#define BCM2835_EMMC_FORCE_IRPT        (BCM2835_EMMC_BASE+0x50)
+#define BCM2835_EMMC_BOOT_TIMEOUT      (BCM2835_EMMC_BASE+0x70)
+#define BCM2835_EMMC_DBG_SEL           (BCM2835_EMMC_BASE+0x74)
+#define BCM2835_EMMC_EXRDFIFO_CFG      (BCM2835_EMMC_BASE+0x80)
+#define BCM2835_EMMC_EXRDFIFO_EN       (BCM2835_EMMC_BASE+0x84)
+#define BCM2835_EMMC_TUNE_STEP         (BCM2835_EMMC_BASE+0x88)
+#define BCM2835_EMMC_TUNE_STEPS_STD    (BCM2835_EMMC_BASE+0x8C)
+#define BCM2835_EMMC_TUNE_STEPS_DDR    (BCM2835_EMMC_BASE+0x90)
+#define BCM2835_EMMC_SPI_INT_SPT       (BCM2835_EMMC_BASE+0xF0)
+#define BCM2835_EMMC_SLOTISR_VER       (BCM2835_EMMC_BASE+0xFC)
+
+/** @} */
+
+/**
+ * @name MailBox Registers
+ *
+ * @{
+ */
+
+#define BCM2835_MBOX_BASE          (0x2000B880)
+
+#define BCM2835_MBOX_PEEK          (BCM2835_MBOX_BASE+0x10)
+#define BCM2835_MBOX_READ          (BCM2835_MBOX_BASE+0x00)
+#define BCM2835_MBOX_WRITE         (BCM2835_MBOX_BASE+0x20)
+#define BCM2835_MBOX_STATUS        (BCM2835_MBOX_BASE+0x18)
+#define BCM2835_MBOX_SENDER        (BCM2835_MBOX_BASE+0x14)
+#define BCM2835_MBOX_CONFIG        (BCM2835_MBOX_BASE+0x1C)
+
+/* Framebuffer channel */
+#define BCM2835_MBOX_CHANNEL_FB    1
+
+/* Property tags (ARM <-> Video Core) channel */
+#define BCM2835_MBOX_CHANNEL_PROP  8
+
+#define BCM2835_MBOX_SUCCESS       (BCM2835_MBOX_BASE+0x80000000)
+
+#define BCM2835_MBOX_FULL          (BCM2835_MBOX_BASE+0x80000000)
+#define BCM2835_MBOX_EMPTY         (BCM2835_MBOX_BASE+0x40000000)
 
 
 /** @} */
