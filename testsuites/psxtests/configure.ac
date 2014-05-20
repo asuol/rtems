@@ -194,5 +194,6 @@ psxtimer02/Makefile
 psxtimes01/Makefile
 psxualarm/Makefile
 psxusleep/Makefile
+GPIO_pierre/Makefile
 ])
 AC_OUTPUT
