@@ -45,6 +45,7 @@ include_bsp_HEADERS += include/irq.h
 include_bsp_HEADERS += include/mmu.h
 include_bsp_HEADERS += include/usart.h
 include_bsp_HEADERS += include/raspberrypi.h
+include_bsp_HEADERS += include/mbox.h
 
 include_libcpu_HEADERS = ../../../libcpu/arm/shared/include/cache_.h \
     ../../../libcpu/arm/shared/include/arm-cp15.h
@@ -125,6 +126,9 @@ libbsp_a_SOURCES += misc/timer.c
 # SSP
 
 # I2C
+
+# MailBox
+libbsp_a_SOURCES += misc/mbox.c
 
 # Cache
 libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c
