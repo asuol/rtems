@@ -404,6 +404,7 @@ libnetworking/Makefile
 librpc/Makefile
 libmisc/Makefile
 libi2c/Makefile
+libgpio/Makefile
 libmd/Makefile
 zlib/Makefile
 ftpd/Makefile

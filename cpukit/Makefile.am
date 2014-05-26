@@ -8,6 +8,7 @@ SUBDIRS = . score rtems sapi posix
 SUBDIRS += libcsupport libblock libfs
 SUBDIRS += libnetworking librpc
 SUBDIRS += libi2c
+SUBDIRS += libgpio
 SUBDIRS += libmisc
 SUBDIRS += libmd
 SUBDIRS += libgnat
