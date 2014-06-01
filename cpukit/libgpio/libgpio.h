@@ -1,66 +1,79 @@
 #ifndef _RTEMS_LIBGPIO_H
 #define _RTEMS_LIBGPIO_H
 
+#include <stdint.h>
+#include <stdbool.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define GPIO_INPUT 0
-#define GPIO_OUTPUT 1
-
-typedef struct rtems_gpio_pin_t_
+typedef enum
 {
-    /* GPIO pin address */
-    uint32_t address;
+  PULL_UP,
+  PULL_DOWN,
+  NO_PULL_RESISTOR
+} rtems_multiio_input_mode_t;
 
-    /* GPIO direction */
-    int direction;
-
-    /* GPIO pull resistor */
-    int pull;
-
-    /* GPIO pad drive strength (in mA) */
-    int drive_strength;
-
-    /* Enabled interrupts */
-    bool falling_edge;
-    bool rising_edge;
-    bool both_edges;
-
-    bool low_level;
-    bool high_level;
-    bool both_levels;
-
-    /* asynchronous rising/falling edge interrups -> not sure if RPi specific */
-} rtems_gpio_pin_t;
-
-typedef struct rtems_gpio_port_t_
+typedef enum
 {
-    /* GPIO pin count */
-    int pin_count;
- 
-    /* GPIO port */
-    rtems_gpio_pin_t *port;
-} rtems_gpio_port_t;
+  PUSH_PULL,
+  OPEN_DRAIN
+} rtems_multiio_output_mode_t;
 
-typedef struct rtems_gpio_config_t_
+typedef struct
+{ 
+  /* The address that controls the pin */ 
+  void *address;
+
+  /* The adc, dac, din, dout... identifier */ 
+  int pin_id;
+} rtems_multiio_pin_t;
+
+typedef struct
 {
-    /* GPIO port (group of GPIO pins) count */
-    int gpio_port_count;
- 
-    /* GPIO ports */
-    rtems_gpio_port_t *gpio_port;
-    
-} rtems_gpio_config_t;
+  /* Multiio pin */
+  rtems_multiio_pin_t pin;
 
-extern int rtems_gpio_initialize ( void );
+  /* Pin mode */
+  rtems_multiio_output_mode_t mode;
 
-extern void rtems_gpio_set_direction ( int pin, int dir );
+  /* Drive strength (in mA) */
+  int drive_strength;
+} rtems_dout_pin_t;
 
-extern void rtems_gpio_set ( int pin, int dir );
+typedef struct
+{
+  /* Multiio pin */
+  rtems_multiio_pin_t pin;
 
-extern void rtems_gpio_clear ( int pin, int dir );
+  /* Pin mode */
+  rtems_multiio_input_mode_t mode;
+
+  /* Enabled interrupts */
+  bool falling_edge;
+  bool rising_edge;
+  bool both_edges;
+
+  bool low_level;
+  bool high_level;
+  bool both_levels;
+} rtems_din_pin_t;
+
+/* Writes one to the masked pins on the given port */
+extern void rtems_gpio_set_mb ( int port, int mask );
+
+/* Writes one to the given pin */
+extern void rtems_gpio_set_sb ( int pin );
+
+/* Writes zero to the masked pins on the given port */
+extern void rtems_gpio_clear_mb ( int port, int mask );
+
+/* Writes zero to the given pin */
+extern void rtems_gpio_clear_sb ( int pin );
 
 #ifdef __cplusplus
     }
 #endif
+
+#endif /* _RTEMS_LIBGPIO_H */
