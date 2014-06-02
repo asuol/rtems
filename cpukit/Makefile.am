@@ -187,6 +187,9 @@ include_rtems_HEADERS += libmisc/stringto/stringto.h
 ## i2c
 include_rtems_HEADERS += libi2c/libi2c.h
 
+## gpio
+include_rtems_HEADERS += libgpio/libgpio.h
+
 ## serdbg
 if LIBSERDBG
 include_rtems_HEADERS += libmisc/serdbg/serdbgcnf.h
