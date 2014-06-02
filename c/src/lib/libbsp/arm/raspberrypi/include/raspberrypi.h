@@ -33,6 +33,8 @@
  * @{
  */
 
+#define RTEMS_GPIO_COUNT 26
+
 /**
  * @name Register Macros
  *
