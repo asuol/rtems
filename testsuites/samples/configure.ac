@@ -74,5 +74,6 @@ iostream/Makefile
 cdtest/Makefile
 pppd/Makefile
 capture/Makefile
+LIBGPIO_TEST/Makefile
 ])
 AC_OUTPUT
