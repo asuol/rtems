@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifndef RTEMS_GPIO_COUNT
+#error "GPIO pin count not defined."
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -18,35 +22,28 @@ typedef enum
 typedef enum
 {
   PUSH_PULL,
-  OPEN_DRAIN
+  OPEN_DRAIN,
+  NEUTRAL
 } rtems_multiio_output_mode_t;
 
-typedef struct
-{ 
-  /* The address that controls the pin */ 
-  void *address;
-
-  /* The adc, dac, din, dout... identifier */ 
-  int pin_id;
-} rtems_multiio_pin_t;
+typedef enum
+{
+  DIGITAL_INPUT,
+  DIGITAL_OUTPUT,
+  NOT_USED
+} rtems_pin_t;
 
 typedef struct
 {
-  /* Multiio pin */
-  rtems_multiio_pin_t pin;
-
   /* Pin mode */
   rtems_multiio_output_mode_t mode;
 
-  /* Drive strength (in mA) */
-  int drive_strength;
+  /* Drive strength */
+  void *drive_strength;
 } rtems_dout_pin_t;
 
 typedef struct
 {
-  /* Multiio pin */
-  rtems_multiio_pin_t pin;
-
   /* Pin mode */
   rtems_multiio_input_mode_t mode;
 
@@ -60,17 +57,45 @@ typedef struct
   bool both_levels;
 } rtems_din_pin_t;
 
-/* Writes one to the masked pins on the given port */
-extern void rtems_gpio_set_mb ( int port, int mask );
+typedef struct
+{ 
+  /* The address that controls the pin */ 
+  void *address;
 
-/* Writes one to the given pin */
-extern void rtems_gpio_set_sb ( int pin );
+  /* The pin type */
+  rtems_pin_t pin_type;
 
-/* Writes zero to the masked pins on the given port */
-extern void rtems_gpio_clear_mb ( int port, int mask );
+  /* The pin data */
+  union
+  {
+    rtems_din_pin_t din;
+    rtems_dout_pin_t dout;
+  }pin_data;
+} rtems_gpio_pin_t;
 
-/* Writes zero to the given pin */
-extern void rtems_gpio_clear_sb ( int pin );
+/* GPIO pin array */
+rtems_gpio_pin_t gpio_pin[RTEMS_GPIO_COUNT];
+
+/* Initializes the API */
+extern void rtems_gpio_initialize (void);
+
+/* Turns on the masked pins on the given port */
+extern int rtems_gpio_set_mb (int port, int mask);
+
+/* Turns on the given pin */
+extern int rtems_gpio_set_sb (int pin);
+
+/* Turns off the masked pins on the given port */
+extern int rtems_gpio_clear_mb (int port, int mask);
+
+/* Turns off the given pin */
+extern int rtems_gpio_clear_sb (int pin);
+
+/* Configures a GPIO pin to a given setup */
+extern int rtems_gpio_config_pin (int pin, rtems_pin_t type);
+
+/* Configures a GPIO pin as NOT_USED */
+extern void rtems_gpio_disable_pin (int pin);
 
 #ifdef __cplusplus
     }
