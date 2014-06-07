@@ -83,16 +83,25 @@ extern void rtems_gpio_initialize (void);
 extern int rtems_gpio_set_mb (int port, int mask);
 
 /* Turns on the given pin */
-extern int rtems_gpio_set_sb (int pin);
+extern int rtems_gpio_set (int pin);
 
 /* Turns off the masked pins on the given port */
 extern int rtems_gpio_clear_mb (int port, int mask);
 
 /* Turns off the given pin */
-extern int rtems_gpio_clear_sb (int pin);
+extern int rtems_gpio_clear (int pin);
+
+/* Returns the current value of a GPIO pin */
+extern int rtems_gpio_get_val (int pin);
 
 /* Configures a GPIO pin to a given setup */
-extern int rtems_gpio_config_pin (int pin, rtems_pin_t type);
+extern int rtems_gpio_setup_pin (int pin, rtems_pin_t type);
+
+/* Sets a GPIO input pin mode */
+extern int rtems_gpio_input_mode (int pin, rtems_multiio_input_mode_t mode);
+
+/* Sets a GPIO output pin mode */
+extern int rtems_gpio_output_mode (int pin, rtems_multiio_output_mode_t mode);
 
 /* Configures a GPIO pin as NOT_USED */
 extern void rtems_gpio_disable_pin (int pin);

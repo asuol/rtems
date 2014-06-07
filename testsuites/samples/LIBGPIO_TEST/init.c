@@ -27,19 +27,40 @@ rtems_task Init(
   
   rtems_gpio_initialize ();
 
-  rv = rtems_gpio_config_pin (25, DIGITAL_OUTPUT);
+  rv = rtems_gpio_setup_pin (3, DIGITAL_OUTPUT);
   RTEMS_CHECK_RV( rv, "rtems_gpio_config_pin");
 
-  rv = rtems_gpio_set_sb (25);
-  RTEMS_CHECK_RV( rv, "rtems_gpio_set_sb");
+  int val;
+  
+  while(1)
+  {
 
+  val = rtems_gpio_get_val (3);
+  printf("\n val = %d\n", val);
+
+  rv = rtems_gpio_clear (3);
+  RTEMS_CHECK_RV( rv, "rtems_gpio_clear");
+  
+  if (rtems_task_wake_after (RTEMS_MICROSECONDS_TO_TICKS (5000000)) != RTEMS_SUCCESSFUL)
+    printf("\n wake fail\n");
+
+  val = rtems_gpio_get_val (3);
+  printf("\n val = %d\n", val);
+
+  rv = rtems_gpio_set (3);
+  RTEMS_CHECK_RV( rv, "rtems_gpio_set");
+
+  if (rtems_task_wake_after (RTEMS_MICROSECONDS_TO_TICKS (5000000)) != RTEMS_SUCCESSFUL)
+    printf("\n wake fail\n");
+    }
   rtems_test_end();
   exit( 0 );
 }
 
 
 /* NOTICE: the clock driver is explicitly disabled */
-#define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
+//#define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
+#define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS            1
