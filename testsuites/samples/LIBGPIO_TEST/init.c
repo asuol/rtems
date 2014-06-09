@@ -28,31 +28,38 @@ rtems_task Init(
   rtems_gpio_initialize ();
 
   rv = rtems_gpio_setup_pin (3, DIGITAL_OUTPUT);
-  RTEMS_CHECK_RV( rv, "rtems_gpio_config_pin");
+  RTEMS_CHECK_RV( rv, "rtems_gpio_config_pin output");
+
+  rv = rtems_gpio_setup_pin (2, DIGITAL_INPUT);
+  RTEMS_CHECK_RV( rv, "rtems_gpio_config_pin input");
+
+  rv = rtems_gpio_input_mode (2, PULL_UP);
+  RTEMS_CHECK_RV( rv, "rtems_gpio_input_mode");
 
   int val;
   
-  while(1)
-  {
-
-  val = rtems_gpio_get_val (3);
-  printf("\n val = %d\n", val);
-
   rv = rtems_gpio_clear (3);
   RTEMS_CHECK_RV( rv, "rtems_gpio_clear");
+
+  while(1)
+  {
+    val = rtems_gpio_get_val (2);
   
-  if (rtems_task_wake_after (RTEMS_MICROSECONDS_TO_TICKS (5000000)) != RTEMS_SUCCESSFUL)
-    printf("\n wake fail\n");
-
-  val = rtems_gpio_get_val (3);
-  printf("\n val = %d\n", val);
-
-  rv = rtems_gpio_set (3);
-  RTEMS_CHECK_RV( rv, "rtems_gpio_set");
-
-  if (rtems_task_wake_after (RTEMS_MICROSECONDS_TO_TICKS (5000000)) != RTEMS_SUCCESSFUL)
-    printf("\n wake fail\n");
+    if(val == 0)
+    {
+      rv = rtems_gpio_set (3);
+      RTEMS_CHECK_RV( rv, "rtems_gpio_set");
     }
+
+    else
+    {
+      rv = rtems_gpio_clear (3);
+      RTEMS_CHECK_RV( rv, "rtems_gpio_clear");
+  
+      continue;
+    }
+  }
+
   rtems_test_end();
   exit( 0 );
 }
