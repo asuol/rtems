@@ -17,35 +17,41 @@ typedef enum
   PULL_UP,
   PULL_DOWN,
   NO_PULL_RESISTOR
-} rtems_multiio_input_mode_t;
+} rtems_multiio_input_mode;
 
 typedef enum
 {
   PUSH_PULL,
   OPEN_DRAIN,
   NEUTRAL
-} rtems_multiio_output_mode_t;
+} rtems_multiio_output_mode;
 
 typedef enum
 {
   DIGITAL_INPUT,
   DIGITAL_OUTPUT,
+  ALT_FUNC_0,
+  ALT_FUNC_1,
+  ALT_FUNC_2,
+  ALT_FUNC_3,
+  ALT_FUNC_4,
+  ALT_FUNC_5,
   NOT_USED
-} rtems_pin_t;
+} rtems_pin;
 
 typedef struct
 {
   /* Pin mode */
-  rtems_multiio_output_mode_t mode;
+  rtems_multiio_output_mode mode;
 
   /* Drive strength */
   void *drive_strength;
-} rtems_dout_pin_t;
+} rtems_dout_pin;
 
 typedef struct
 {
   /* Pin mode */
-  rtems_multiio_input_mode_t mode;
+  rtems_multiio_input_mode mode;
 
   /* Enabled interrupts */
   bool falling_edge;
@@ -55,7 +61,7 @@ typedef struct
   bool low_level;
   bool high_level;
   bool both_levels;
-} rtems_din_pin_t;
+} rtems_din_pin;
 
 typedef struct
 { 
@@ -63,18 +69,18 @@ typedef struct
   void *address;
 
   /* The pin type */
-  rtems_pin_t pin_type;
+  rtems_pin pin_type;
 
   /* The pin data */
   union
   {
-    rtems_din_pin_t din;
-    rtems_dout_pin_t dout;
+    rtems_din_pin din;
+    rtems_dout_pin dout;
   }pin_data;
-} rtems_gpio_pin_t;
+} rtems_gpio_pin;
 
 /* GPIO pin array */
-rtems_gpio_pin_t gpio_pin[RTEMS_GPIO_COUNT];
+rtems_gpio_pin gpio_pin[RTEMS_GPIO_COUNT];
 
 /* Initializes the API */
 extern void rtems_gpio_initialize (void);
@@ -95,16 +101,28 @@ extern int rtems_gpio_clear (int pin);
 extern int rtems_gpio_get_val (int pin);
 
 /* Configures a GPIO pin to a given setup */
-extern int rtems_gpio_setup_pin (int pin, rtems_pin_t type);
+extern int rtems_gpio_setup_pin (int pin, rtems_pin type);
 
 /* Sets a GPIO input pin mode */
-extern int rtems_gpio_input_mode (int pin, rtems_multiio_input_mode_t mode);
+extern int rtems_gpio_input_mode (int pin, rtems_multiio_input_mode mode);
 
 /* Sets a GPIO output pin mode */
-extern int rtems_gpio_output_mode (int pin, rtems_multiio_output_mode_t mode);
+extern int rtems_gpio_output_mode (int pin, rtems_multiio_output_mode mode);
 
 /* Configures a GPIO pin as NOT_USED */
 extern void rtems_gpio_disable_pin (int pin);
+
+/* Creates an UART configuration with GPIO pins */
+extern int rtems_gpio_set_UART (void);
+
+/* Creates an I2C configuration with GPIO pins */
+extern int rtems_gpio_set_I2C (void);
+
+/* Creates an SPI configuration with GPIO pins */
+extern int rtems_gpio_set_SPI (void);
+
+/* Creates a JTAG configuration with GPIO pins */
+extern int rtems_gpio_set_JTAG (void);
 
 #ifdef __cplusplus
     }
