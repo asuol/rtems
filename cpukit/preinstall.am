@@ -387,6 +387,10 @@ $(PROJECT_INCLUDE)/rtems/libi2c.h: libi2c/libi2c.h $(PROJECT_INCLUDE)/rtems/$(di
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/libi2c.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/libi2c.h
 
+$(PROJECT_INCLUDE)/rtems/libgpio.h: libgpio/libgpio.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/libgpio.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/libgpio.h
+
 if LIBSERDBG
 $(PROJECT_INCLUDE)/rtems/serdbgcnf.h: libmisc/serdbg/serdbgcnf.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/serdbgcnf.h
