@@ -6,7 +6,7 @@
 
 #include <bsp.h> /* for device driver prototypes */
 
-#include <rtems/libgpio.h>
+#include <bsp/gpio.h>
 #include <rtems/status-checks.h>
 
 #include <stdio.h>
@@ -27,9 +27,14 @@ rtems_task Init(
   
   rtems_gpio_initialize ();
 
-  rv = rtems_gpio_set_JTAG ();
-  RTEMS_CHECK_RV ( rv, "rtems_gpio_set_JTAG");
+  int pins[] = {4,22,24,25,27};
 
+  rv = rtems_gpio_setup_input_mode (pins, 5, NO_PULL_RESISTOR);
+  RTEMS_CHECK_RV ( rv, "rtems_gpio_setup_input_mode");
+  
+  rv = rtems_gpio_setup_config (JTAG_CONFIG, JTAG_PIN_COUNT);
+  RTEMS_CHECK_RV ( rv, "rtems_gpio_setup_config");
+  
   rtems_test_end ();
   exit ( 0 );
 }

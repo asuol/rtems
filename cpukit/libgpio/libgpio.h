@@ -4,10 +4,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#ifndef RTEMS_GPIO_COUNT
-#error "GPIO pin count not defined."
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -79,8 +75,15 @@ typedef struct
   }pin_data;
 } rtems_gpio_pin;
 
-/* GPIO pin array */
-rtems_gpio_pin gpio_pin[RTEMS_GPIO_COUNT];
+typedef struct
+{
+  int pin_number;
+  
+  rtems_pin pin_function;
+}rtems_gpio_configuration;
+
+/* GPIO pin array, to be setup on the rtems_gpio_initialize function */
+extern rtems_gpio_pin *gpio_pin;
 
 /* Initializes the API */
 extern void rtems_gpio_initialize (void);
@@ -103,26 +106,20 @@ extern int rtems_gpio_get_val (int pin);
 /* Configures a GPIO pin to a given setup */
 extern int rtems_gpio_setup_pin (int pin, rtems_pin type);
 
+/* Setups a number of GPIO pins, each with a specific function */
+extern int rtems_gpio_setup_config (rtems_gpio_configuration *pin_setup, int pin_count);
+
 /* Sets a GPIO input pin mode */
 extern int rtems_gpio_input_mode (int pin, rtems_multiio_input_mode mode);
+
+/* Sets a GPIO input pin mode for a number of pins */
+extern int rtems_gpio_setup_input_mode (int *pin, int pin_count, rtems_multiio_input_mode mode);
 
 /* Sets a GPIO output pin mode */
 extern int rtems_gpio_output_mode (int pin, rtems_multiio_output_mode mode);
 
 /* Configures a GPIO pin as NOT_USED */
 extern void rtems_gpio_disable_pin (int pin);
-
-/* Creates an UART configuration with GPIO pins */
-extern int rtems_gpio_set_UART (void);
-
-/* Creates an I2C configuration with GPIO pins */
-extern int rtems_gpio_set_I2C (void);
-
-/* Creates an SPI configuration with GPIO pins */
-extern int rtems_gpio_set_SPI (void);
-
-/* Creates a JTAG configuration with GPIO pins */
-extern int rtems_gpio_set_JTAG (void);
 
 #ifdef __cplusplus
     }
