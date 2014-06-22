@@ -6,7 +6,7 @@
 
 #include <bsp.h> /* for device driver prototypes */
 
-#include <rtems/libgpio.h>
+#include <bsp/gpio.h> /* Calls the BSP gpio library */
 #include <rtems/status-checks.h>
 
 #include <stdio.h>
@@ -22,52 +22,55 @@ rtems_task Init(
 )
 {
   int rv = 0;
-
-  rtems_test_begin();
-  
-  rtems_gpio_initialize ();
-
-  rv = rtems_gpio_setup_pin (3, DIGITAL_OUTPUT);
-  RTEMS_CHECK_RV( rv, "rtems_gpio_config_pin output");
-
-  rv = rtems_gpio_setup_pin (2, DIGITAL_INPUT);
-  RTEMS_CHECK_RV( rv, "rtems_gpio_config_pin input");
-
-  rv = rtems_gpio_input_mode (2, PULL_UP);
-  RTEMS_CHECK_RV( rv, "rtems_gpio_input_mode");
-
   int val;
+
+  rtems_test_begin ();
+  
+  /* Initializes the GPIO API */
+  rtems_gpio_initialize (GPIO_PIN_COUNT);
+
+  rv = rtems_gpio_select_pin (3, DIGITAL_OUTPUT);
+  RTEMS_CHECK_RV ( rv, "rtems_gpio_config_pin output") ;
+
+  rv = rtems_gpio_select_pin (2, DIGITAL_INPUT);
+  RTEMS_CHECK_RV ( rv, "rtems_gpio_config_pin input");
+
+  /* Enables the internal pull up resistor on the GPIO 2 pin */
+  rv = rtems_gpio_input_mode (2, PULL_UP);
+  RTEMS_CHECK_RV ( rv, "rtems_gpio_input_mode");
   
   rv = rtems_gpio_clear (3);
-  RTEMS_CHECK_RV( rv, "rtems_gpio_clear");
+  RTEMS_CHECK_RV ( rv, "rtems_gpio_clear");
 
-  while(1)
+  /* Polls the GPIO 2 pin.
+   * 
+   * If pressed sets the GPIO 3 pin (lits the connects LED), 
+   * else clears the pin (turns off the LED). 
+   */
+  while (1)
   {
     val = rtems_gpio_get_val (2);
   
-    if(val == 0)
+    if (val == 0)
     {
       rv = rtems_gpio_set (3);
-      RTEMS_CHECK_RV( rv, "rtems_gpio_set");
+      RTEMS_CHECK_RV ( rv, "rtems_gpio_set");
     }
 
     else
     {
       rv = rtems_gpio_clear (3);
-      RTEMS_CHECK_RV( rv, "rtems_gpio_clear");
+      RTEMS_CHECK_RV ( rv, "rtems_gpio_clear");
   
       continue;
     }
   }
 
-  rtems_test_end();
-  exit( 0 );
+  rtems_test_end ();
+  exit ( 0 );
 }
 
-
-/* NOTICE: the clock driver is explicitly disabled */
-//#define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
-#define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
+#define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_MAXIMUM_TASKS            1
