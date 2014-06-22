@@ -1,3 +1,21 @@
+/**
+ * @file
+ *
+ * @ingroup LibGPIO
+ *
+ * @brief libgpio API.
+ *
+ * Provides an API to control GPIO hardware
+ */
+
+/*
+ * Copyright (c) 2014 Andre Marques.
+ *
+ * The license and distribution terms for this file may be
+ * found in the file LICENSE in this distribution or at
+ * http://www.rtems.org/license/LICENSE.
+ */
+
 #ifndef _RTEMS_LIBGPIO_H
 #define _RTEMS_LIBGPIO_H
 
@@ -6,8 +24,13 @@
 
 #ifdef __cplusplus
 extern "C" {
-#endif
+#endif /* __cplusplus */
 
+/**
+ * @brief The set of possible input drive modes.
+ *
+ * Enumerated type to define the drive modes for an input pin.
+ */
 typedef enum
 {
   PULL_UP,
@@ -15,6 +38,11 @@ typedef enum
   NO_PULL_RESISTOR
 } rtems_multiio_input_mode;
 
+/**
+ * @brief The set of possible output drive modes.
+ *
+ * Enumerated type to define the drive modes for an output pin.
+ */
 typedef enum
 {
   PUSH_PULL,
@@ -22,6 +50,11 @@ typedef enum
   NEUTRAL
 } rtems_multiio_output_mode;
 
+/**
+ * @brief The set of possible functions a pin can have.
+ *
+ * Enumerated type to define a pin function.
+ */
 typedef enum
 {
   DIGITAL_INPUT,
@@ -35,6 +68,11 @@ typedef enum
   NOT_USED
 } rtems_pin;
 
+/**
+ * @brief Object containing an output pin information.
+ *
+ * Encapsulates the needed information about an output pin.
+ */
 typedef struct
 {
   /* Pin mode */
@@ -44,6 +82,11 @@ typedef struct
   void *drive_strength;
 } rtems_dout_pin;
 
+/**
+ * @brief Object containing an input pin information.
+ *
+ * Encapsulates the needed information about an input pin.
+ */
 typedef struct
 {
   /* Pin mode */
@@ -59,11 +102,13 @@ typedef struct
   bool both_levels;
 } rtems_din_pin;
 
+/**
+ * @brief Object containing information on a generic pin.
+ *
+ * Encapsulates relevant data about any type of pin.
+ */
 typedef struct
 { 
-  /* The address that controls the pin */ 
-  void *address;
-
   /* The pin type */
   rtems_pin pin_type;
 
@@ -75,54 +120,81 @@ typedef struct
   }pin_data;
 } rtems_gpio_pin;
 
+/**
+ * @brief Object defining a specific pin arrangement.
+ *
+ * Defines a pin setup.
+ */
 typedef struct
 {
   int pin_number;
   
   rtems_pin pin_function;
-}rtems_gpio_configuration;
+} rtems_gpio_configuration;
+
+/**
+ * @name External variables.
+ *
+ * @{
+ */
 
 /* GPIO pin array, to be setup on the rtems_gpio_initialize function */
 extern rtems_gpio_pin *gpio_pin;
 
+/** @} */
+
+/**
+ * @name libgpio Usage
+ *
+ * @{
+ */
+
+/**
+ * @brief libgpio initialization.
+ * 
+ * @param[in] gpio_count The total ammount of GPIO pins in the target hardware.
+ */
+
 /* Initializes the API */
-extern void rtems_gpio_initialize (void);
+extern void rtems_gpio_initialize(int gpio_count);
 
 /* Turns on the masked pins on the given port */
-extern int rtems_gpio_set_mb (int port, int mask);
+extern int rtems_gpio_set_mb(int port, int mask);
 
 /* Turns on the given pin */
-extern int rtems_gpio_set (int pin);
+extern int rtems_gpio_set(int pin);
 
 /* Turns off the masked pins on the given port */
-extern int rtems_gpio_clear_mb (int port, int mask);
+extern int rtems_gpio_clear_mb(int port, int mask);
 
 /* Turns off the given pin */
-extern int rtems_gpio_clear (int pin);
+extern int rtems_gpio_clear(int pin);
 
 /* Returns the current value of a GPIO pin */
-extern int rtems_gpio_get_val (int pin);
+extern int rtems_gpio_get_val(int pin);
 
-/* Configures a GPIO pin to a given setup */
-extern int rtems_gpio_setup_pin (int pin, rtems_pin type);
+/* Selects a GPIO pin for a specific type */
+extern int rtems_gpio_select_pin(int pin, rtems_pin type);
 
 /* Setups a number of GPIO pins, each with a specific function */
-extern int rtems_gpio_setup_config (rtems_gpio_configuration *pin_setup, int pin_count);
+extern int rtems_gpio_select_config(rtems_gpio_configuration *pin_setup, int pin_count);
 
 /* Sets a GPIO input pin mode */
-extern int rtems_gpio_input_mode (int pin, rtems_multiio_input_mode mode);
+extern int rtems_gpio_input_mode(int pin, rtems_multiio_input_mode mode);
 
 /* Sets a GPIO input pin mode for a number of pins */
-extern int rtems_gpio_setup_input_mode (int *pin, int pin_count, rtems_multiio_input_mode mode);
+extern int rtems_gpio_setup_input_mode(int *pin, int pin_count, rtems_multiio_input_mode mode);
 
 /* Sets a GPIO output pin mode */
-extern int rtems_gpio_output_mode (int pin, rtems_multiio_output_mode mode);
+extern int rtems_gpio_output_mode(int pin, rtems_multiio_output_mode mode);
 
 /* Configures a GPIO pin as NOT_USED */
-extern void rtems_gpio_disable_pin (int pin);
+extern void rtems_gpio_disable_pin(int pin);
+
+/** @} */
 
 #ifdef __cplusplus
     }
-#endif
+#endif /* __cplusplus */
 
 #endif /* _RTEMS_LIBGPIO_H */

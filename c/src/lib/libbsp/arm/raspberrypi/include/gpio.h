@@ -1,3 +1,19 @@
+/**
+ * @file
+ *
+ * @ingroup raspberrypi_gpio
+ *
+ * @brief Raspberry Pi specific GPIO information.
+ */
+
+/*
+ * Copyright (c) 2014 Andre Marques.
+ *
+ * The license and distribution terms for this file may be
+ * found in the file LICENSE in this distribution or at
+ * http://www.rtems.org/license/LICENSE.
+ */
+
 #ifndef LIBBSP_ARM_RASPBERRYPI_GPIO_H
 #define LIBBSP_ARM_RASPBERRYPI_GPIO_H
 
@@ -6,6 +22,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+
+#define GPIO_PIN_COUNT 54
 
 #define JTAG_PIN_COUNT 5
 
