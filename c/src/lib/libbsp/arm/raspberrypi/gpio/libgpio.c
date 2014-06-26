@@ -22,8 +22,6 @@
 
 #define select_pin_function(fn, pn) (fn<<(((pn)%10)*3))
 
-static volatile unsigned int *gpio_regs_base = (unsigned int *)BCM2835_GPIO_REGS_BASE;
-
 static bool is_initialized = false;
 
 rtems_gpio_pin *gpio_pin;
@@ -63,7 +61,7 @@ int rtems_gpio_set(int pin)
   if (gpio_pin[pin-1].pin_type != DIGITAL_OUTPUT)
     return -1;
 
-  *(gpio_regs_base+7) = (1 << pin);
+  BCM2835_REG(BCM2835_GPIO_GPSET0) = (1 << pin);
 
   return 0;
 }
@@ -74,7 +72,7 @@ int rtems_gpio_clear(int pin)
   if (gpio_pin[pin-1].pin_type != DIGITAL_OUTPUT)
     return -1;
 
-  *(gpio_regs_base+10) = (1 << pin);
+  BCM2835_REG(BCM2835_GPIO_GPCLR0) = (1 << pin);
 
   return 0;
 }
@@ -82,13 +80,13 @@ int rtems_gpio_clear(int pin)
 /* Gets the level, or value, of a GPIO input pin */
 int rtems_gpio_get_val(int pin)
 {
-  return *(gpio_regs_base+13) &= (1 << (pin));
+  return BCM2835_REG(BCM2835_GPIO_GPLEV0) &= (1 << (pin));
 }
 
 /* Selects a GPIO pin operation or function */
 int rtems_gpio_select_pin(int pin, rtems_pin type)
 {
-  volatile unsigned int *pin_addr = gpio_regs_base + (pin / 10);
+  volatile unsigned int *pin_addr = (unsigned int *)BCM2835_GPIO_REGS_BASE + (pin / 10);
   
   if ( gpio_pin[pin-1].pin_type != NOT_USED )
     return -1;
@@ -232,4 +230,3 @@ int rtems_gpio_select_config(rtems_gpio_configuration *pin_setup, int pin_count)
     
   return 0;
 }
-

@@ -44,7 +44,7 @@ rtems_task Init(
 
   /* Polls the GPIO 2 pin.
    * 
-   * If pressed sets the GPIO 3 pin (lits the connects LED), 
+   * If pressed sets the GPIO 3 pin (lits the connected LED), 
    * else clears the pin (turns off the LED). 
    */
   while (1)
@@ -61,8 +61,6 @@ rtems_task Init(
     {
       rv = rtems_gpio_clear (3);
       RTEMS_CHECK_RV ( rv, "rtems_gpio_clear");
-  
-      continue;
     }
   }
 
