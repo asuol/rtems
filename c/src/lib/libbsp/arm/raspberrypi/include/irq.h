@@ -62,6 +62,7 @@
 
 #define BSP_IRQ_COUNT               (BCM2835_INTC_TOTAL_IRQ)
 
+rtems_status_code bsp_interrupt_vector_enable(rtems_vector_number vector);
 
 void raspberrypi_set_exception_handler(Arm_symbolic_exception_name exception,
                                          void (*handler)(void));

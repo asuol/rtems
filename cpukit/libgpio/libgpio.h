@@ -69,6 +69,21 @@ typedef enum
 } rtems_pin;
 
 /**
+ * @brief The set of possible interrupts an input pin can generate.
+ *
+ * Enumerated type to define an input pin interrupt.
+ */
+typedef enum
+{
+  FALLING_EDGE,
+  RISING_EDGE,
+  BOTH_EDGES,
+  LOW_LEVEL,
+  HIGH_LEVEL,
+  BOTH_LEVELS
+} rtems_din_interrupt;
+
+/**
  * @brief Object containing an output pin information.
  *
  * Encapsulates the needed information about an output pin.
@@ -190,6 +205,9 @@ extern int rtems_gpio_output_mode(int pin, rtems_multiio_output_mode mode);
 
 /* Configures a GPIO pin as NOT_USED */
 extern void rtems_gpio_disable_pin(int pin);
+
+/* Enables interrupts on the given GPIO pin */
+extern int rtems_gpio_enable_interrupt(int pin, rtems_din_interrupt interrupt);
 
 /** @} */
 

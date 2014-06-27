@@ -16,6 +16,8 @@
  */
 
 #include <bsp/raspberrypi.h>
+#include <bsp/irq.h>
+
 #include <rtems/libgpio.h>
 
 #include <stdlib.h>
@@ -228,5 +230,50 @@ int rtems_gpio_select_config(rtems_gpio_configuration *pin_setup, int pin_count)
     if (rtems_gpio_select_pin(pin_setup[i].pin_number, pin_setup[i].pin_function) < 0)
       return -1;
     
+  return 0;
+}
+
+static void handler (void* arg)
+{
+  BCM2835_REG(BCM2835_GPIO_GPEDS0) &= (1 << 2);
+
+  int val;
+
+  val = rtems_gpio_get_val (3);
+
+  if(val == 0)
+    rtems_gpio_set (3);
+  else
+    rtems_gpio_clear(3);
+}
+
+int rtems_gpio_enable_interrupt(int pin, rtems_din_interrupt interrupt)
+{
+  rtems_status_code sc;  
+
+  if ( pin > 31 )
+    return -1;
+
+  switch (interrupt)
+  {
+    case BOTH_EDGES:
+
+      /* Enables asynchronous falling edge detection */
+      BCM2835_REG(BCM2835_GPIO_GPAFEN0) = (1 << pin);
+
+      /* Enables asynchronous rising edge detection */
+      BCM2835_REG(BCM2835_GPIO_GPAREN0) = (1 << pin);
+
+      sc = rtems_interrupt_handler_install(BCM2835_IRQ_ID_GPIO_0, "TESTING_INTERRUPTS", RTEMS_INTERRUPT_UNIQUE, (rtems_interrupt_handler) handler, NULL);
+
+      if(sc != RTEMS_SUCCESSFUL)
+        return -1;
+
+      break;
+
+    default:
+      return -1; 
+  }
+
   return 0;
 }

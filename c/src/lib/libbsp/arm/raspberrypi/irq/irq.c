@@ -52,15 +52,32 @@ void bsp_interrupt_dispatch(void)
   rtems_vector_number vector = 255;
 
   /* ARM timer */
-  if (BCM2835_REG(BCM2835_IRQ_BASIC) && 0x1)
+  if (BCM2835_REG(BCM2835_IRQ_BASIC) & 0x1)
   {
       vector = BCM2835_IRQ_ID_TIMER_0;
 
   }
   /* UART 0 */
-  else if ( BCM2835_REG(BCM2835_IRQ_BASIC) && BCM2835_BIT(19))
+  else if ( BCM2835_REG(BCM2835_IRQ_BASIC) & BCM2835_BIT(19))
   {
       vector = BCM2835_IRQ_ID_UART;
+  }
+  /* GPIO 0*/
+  else if ( BCM2835_REG(BCM2835_IRQ_ENABLE2) & BCM2835_BIT(17))
+  {
+      vector = BCM2835_IRQ_ID_GPIO_0;
+  }
+  else if ( BCM2835_REG(BCM2835_IRQ_ENABLE2) & BCM2835_BIT(18))
+  {
+      vector = BCM2835_IRQ_ID_GPIO_1;
+  }
+  else if ( BCM2835_REG(BCM2835_IRQ_ENABLE2) & BCM2835_BIT(19))
+  {
+      vector = BCM2835_IRQ_ID_GPIO_2;
+  }
+  else if ( BCM2835_REG(BCM2835_IRQ_ENABLE2) & BCM2835_BIT(20))
+  {
+      vector = BCM2835_IRQ_ID_GPIO_3;
   }
 
   if ( vector < 255 )
@@ -76,7 +93,7 @@ rtems_status_code bsp_interrupt_vector_enable(rtems_vector_number vector)
 
   rtems_interrupt_disable(level);
 
-   /* ARM Timer */
+  /* ARM Timer */
   if ( vector == BCM2835_IRQ_ID_TIMER_0 )
   {
       BCM2835_REG(BCM2835_IRQ_ENABLE_BASIC) = 0x1;
@@ -85,8 +102,28 @@ rtems_status_code bsp_interrupt_vector_enable(rtems_vector_number vector)
   else if ( vector == BCM2835_IRQ_ID_UART )
   {
       BCM2835_REG(BCM2835_IRQ_ENABLE2) =  BCM2835_BIT(25);
-
   }
+  /* GPIO 0 */
+  else if ( vector == BCM2835_IRQ_ID_GPIO_0 )
+  {
+      BCM2835_REG(BCM2835_IRQ_ENABLE2) = BCM2835_BIT(17);
+  }
+  /* GPIO 1 */
+  else if ( vector == BCM2835_IRQ_ID_GPIO_1 )
+  {
+      BCM2835_REG(BCM2835_IRQ_ENABLE2) = BCM2835_BIT(18);
+  }
+  /* GPIO 2 */
+  else if ( vector == BCM2835_IRQ_ID_GPIO_2 )
+  {
+      BCM2835_REG(BCM2835_IRQ_ENABLE2) = BCM2835_BIT(19);
+  }
+  /* GPIO 3 */
+  else if ( vector == BCM2835_IRQ_ID_GPIO_3 )
+  {
+      BCM2835_REG(BCM2835_IRQ_ENABLE2) = BCM2835_BIT(20);
+  }
+
   rtems_interrupt_enable(level);
 
   return RTEMS_SUCCESSFUL;
