@@ -97,6 +97,15 @@ typedef struct
   void *drive_strength;
 } rtems_dout_pin;
 
+typedef struct
+{
+  int pin_number;
+
+  void (*handler) (void);
+
+  rtems_interval last_isr_tick;
+} handler_arguments;
+
 /**
  * @brief Object containing an input pin information.
  *
@@ -106,6 +115,9 @@ typedef struct
 {
   /* Pin mode */
   rtems_multiio_input_mode mode;
+
+  /* Interrupt handler arguments*/
+  handler_arguments h_args;
 
   /* Enabled interrupts */
   bool falling_edge;
@@ -207,7 +219,7 @@ extern int rtems_gpio_output_mode(int pin, rtems_multiio_output_mode mode);
 extern void rtems_gpio_disable_pin(int pin);
 
 /* Enables interrupts on the given GPIO pin */
-extern int rtems_gpio_enable_interrupt(int pin, rtems_din_interrupt interrupt);
+extern int rtems_gpio_enable_interrupt(int pin, rtems_din_interrupt interrupt, void (*handler) (void));
 
 /** @} */
 
