@@ -15,12 +15,13 @@
 /* forward declarations to avoid warnings */
 rtems_task Init(rtems_task_argument argument);
 
-void test_1(void);
-void test_2(void);
+void edge_test_1(void);
+void edge_test_2(void);
+void level_test(void);
 
 const char rtems_test_name[] = "LIBGPIO_TEST";
 
-void test_1(void)
+void edge_test_1(void)
 {
   int rv;
   int val;
@@ -29,7 +30,7 @@ void test_1(void)
 
   if ( val == 0 )
   {
-    rv =rtems_gpio_set(3);
+    rv = rtems_gpio_set(3);
     RTEMS_CHECK_RV(rv, "rtems_gpio_set");
   }
   else
@@ -39,7 +40,7 @@ void test_1(void)
   }
 }
 
-void test_2(void)
+void edge_test_2(void)
 {
   int rv;
   int val;
@@ -48,7 +49,7 @@ void test_2(void)
 
   if ( val == 0 )
   {
-    rv =rtems_gpio_set(7);
+    rv = rtems_gpio_set(7);
     RTEMS_CHECK_RV(rv, "rtems_gpio_set");
   }
   else
@@ -58,6 +59,11 @@ void test_2(void)
   }
 }
 
+void level_test(void)
+{
+  printk("\nLED ON!\n");
+}
+
 rtems_task Init(
   rtems_task_argument ignored
 )
@@ -65,7 +71,7 @@ rtems_task Init(
   int rv = 0;
 
   rtems_test_begin ();
-  
+
   /* Initializes the GPIO API */
   rtems_gpio_initialize (GPIO_PIN_COUNT);
   
@@ -95,12 +101,17 @@ rtems_task Init(
   rv = rtems_gpio_input_mode (17, PULL_UP);
   RTEMS_CHECK_RV(rv, "rtems_gpio_input_mode");
   
-  rv = rtems_gpio_enable_interrupt (2, BOTH_EDGES, test_1);
-  RTEMS_CHECK_RV(rv, "rtems_gpio_enable_interrupt");
-
-  rv = rtems_gpio_enable_interrupt (17, BOTH_EDGES, test_2);
+  /* Enable interrupts, and assign handler functions */ 
+  rv = rtems_gpio_enable_interrupt (2, BOTH_EDGES, edge_test_1);
   RTEMS_CHECK_RV(rv, "rtems_gpio_enable_interrupt");
   
+  rv = rtems_gpio_enable_interrupt (17, BOTH_EDGES, edge_test_2);
+  RTEMS_CHECK_RV(rv, "rtems_gpio_enable_interrupt");
+  
+  rv = rtems_gpio_enable_interrupt (7, HIGH_LEVEL, level_test);
+  RTEMS_CHECK_RV(rv, "rtems_gpio_enable_interrupt");
+  
+  /* Keeps the program running, so interrupts can be tested */
   while (1);
   
   rtems_test_end ();

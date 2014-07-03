@@ -80,22 +80,9 @@ typedef enum
   BOTH_EDGES,
   LOW_LEVEL,
   HIGH_LEVEL,
-  BOTH_LEVELS
-} rtems_din_interrupt;
-
-/**
- * @brief Object containing an output pin information.
- *
- * Encapsulates the needed information about an output pin.
- */
-typedef struct
-{
-  /* Pin mode */
-  rtems_multiio_output_mode mode;
-
-  /* Drive strength */
-  void *drive_strength;
-} rtems_dout_pin;
+  BOTH_LEVELS,
+  NONE
+} rtems_gpio_interrupt;
 
 typedef struct
 {
@@ -107,29 +94,6 @@ typedef struct
 } handler_arguments;
 
 /**
- * @brief Object containing an input pin information.
- *
- * Encapsulates the needed information about an input pin.
- */
-typedef struct
-{
-  /* Pin mode */
-  rtems_multiio_input_mode mode;
-
-  /* Interrupt handler arguments*/
-  handler_arguments h_args;
-
-  /* Enabled interrupts */
-  bool falling_edge;
-  bool rising_edge;
-  bool both_edges;
-
-  bool low_level;
-  bool high_level;
-  bool both_levels;
-} rtems_din_pin;
-
-/**
  * @brief Object containing information on a generic pin.
  *
  * Encapsulates relevant data about any type of pin.
@@ -139,12 +103,17 @@ typedef struct
   /* The pin type */
   rtems_pin pin_type;
 
-  /* The pin data */
+  /* Interrupt handler arguments*/
+  handler_arguments h_args;
+
+  rtems_gpio_interrupt enabled_interrupt;
+
+  /* The pin mode */
   union
   {
-    rtems_din_pin din;
-    rtems_dout_pin dout;
-  }pin_data;
+    rtems_multiio_input_mode input;
+    rtems_multiio_output_mode output;
+  }mode;
 } rtems_gpio_pin;
 
 /**
@@ -219,7 +188,10 @@ extern int rtems_gpio_output_mode(int pin, rtems_multiio_output_mode mode);
 extern void rtems_gpio_disable_pin(int pin);
 
 /* Enables interrupts on the given GPIO pin */
-extern int rtems_gpio_enable_interrupt(int pin, rtems_din_interrupt interrupt, void (*handler) (void));
+extern int rtems_gpio_enable_interrupt(int dev_pin, rtems_gpio_interrupt interrupt, void (*handler) (void));
+
+/* Disables any interrupt enabled on the given GPIO pin */
+extern int rtems_gpio_disable_interrupt(int dev_pin);
 
 /** @} */
 
