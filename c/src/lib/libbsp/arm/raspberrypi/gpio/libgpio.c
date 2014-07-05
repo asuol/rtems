@@ -24,8 +24,6 @@
 
 #define select_pin_function(fn, pn) (fn<<(((pn)%10)*3))
 
-static rtems_interval ticks = 0;
-
 static bool is_initialized = false;
 
 void generic_handler(void *arg);
@@ -55,14 +53,14 @@ void rtems_gpio_initialize(int gpio_count)
 
   is_initialized = true;
 
-  ticks = rtems_clock_get_ticks_per_second();
-
   gpio_pin = (rtems_gpio_pin *) malloc(gpio_count * sizeof(rtems_gpio_pin));
 
   for ( i = 0; i < gpio_count; i++ )
   {
     gpio_pin[i].pin_type = NOT_USED;
     gpio_pin[i].enabled_interrupt = NONE;
+
+    gpio_pin[i].h_args.debouncing_tick_count = 0;
   }
 }
 
@@ -165,8 +163,10 @@ int rtems_gpio_select_pin(int pin, rtems_pin type)
 }
 
 /* Sets the operating mode of one or more GPIO input pins */
-static int rpi_gpio_input_mode(int pin_mask, rtems_multiio_input_mode mode)
+static int rpi_gpio_input_mode(int *pins, int pin_count, int pin_mask, rtems_multiio_input_mode mode)
 {
+  int i;
+
   /* Set control signal */
   switch(mode)
   {
@@ -200,15 +200,8 @@ static int rpi_gpio_input_mode(int pin_mask, rtems_multiio_input_mode mode)
   /* Remove the clock */
   BCM2835_REG(BCM2835_GPIO_GPPUDCLK0) = 0;
 
-  
-
-
-
-
-  // Process pin mask and attribute to pin below
-  //gpio_pin[pin-1].mode.input = mode
-
-
+  for ( i = 0; i < pin_count; i++ )
+    gpio_pin[pins[i]-1].mode.input = mode;
 
   return 0;
 }
@@ -217,21 +210,44 @@ static int rpi_gpio_input_mode(int pin_mask, rtems_multiio_input_mode mode)
 int rtems_gpio_input_mode(int pin, rtems_multiio_input_mode mode)
 {
   int pin_mask = (1 << pin);
+  int pins[1];
 
-  return rpi_gpio_input_mode(pin_mask, mode);
+  /* If trying to use the same mode, silently exits */
+  if ( gpio_pin[pin-1].mode.input == mode )
+    return 0;
+
+  pins[0] = pin;
+
+  return rpi_gpio_input_mode(pins, 1, pin_mask, mode);
 }
 
-/* Sets the operating mode of multiple GPIO input pins */
-int rtems_gpio_setup_input_mode(int *pin, int pin_count, rtems_multiio_input_mode mode)
+/* Sets the operating mode of multiple GPIO input pins (max of 32 pins at a time) */
+int rtems_gpio_setup_input_mode(int *pins, int pin_count, rtems_multiio_input_mode mode)
 {
+  uint32_t pin_mask = 0;
+  int diff_mode_counter = 0;
   int i;
 
-  int pin_mask = 0;
+  if ( pin_count > 32 )
+    return -1;
 
   for ( i = 0; i < pin_count; i++ )
-    pin_mask |= (1 << pin[i]);
+  {
+    if ( gpio_pin[pins[i]-1].mode.input != mode )
+      pin_mask |= (1 << pins[i]);
+    
+    else
+      diff_mode_counter++;
+  }
 
-  return rpi_gpio_input_mode(pin_mask, mode);
+  /* If trying to set the same mode each pin already has, silently exits.
+   * If at least one pin is to be set a different mode than it currently has continues, 
+   * as it will take almost the same time to set 1 or 32 pins.
+   */
+  if ( diff_mode_counter == 0 )
+    return 0;
+
+  return rpi_gpio_input_mode(pins, pin_count, pin_mask, mode);
 }
 
 /* Disables a GPIO pin, making it available to be used by anyone */
@@ -252,16 +268,19 @@ int rtems_gpio_select_config(rtems_gpio_configuration *pin_setup, int pin_count)
   return 0;
 }
 
-static int debounce_switch(int pin)
+static int debounce_switch(int dev_pin)
 {
   rtems_interval time;
+  rtems_gpio_pin *pin;
+
+  pin = &gpio_pin[dev_pin-1];
 
   time = rtems_clock_get_ticks_since_boot();
 
-  if ( time - gpio_pin[pin-1].h_args.last_isr_tick < (ticks * 0.05) )
+  if ( (time - pin->h_args.last_isr_tick) < pin->h_args.debouncing_tick_count )
     return -1;
 
-  gpio_pin[pin-1].h_args.last_isr_tick = time;
+  pin->h_args.last_isr_tick = time;
 
   return 0;
 }
@@ -287,16 +306,26 @@ void generic_handler (void* arg)
   /* If not lets the next ISR process the interrupt */
   else
     return;
-  /*
-  if ( gpio_pin[pin-1].pin_type == DIGITAL_INPUT )
+  
+  if ( handler_args->debouncing_tick_count > 0 )
   {
     rv = debounce_switch(pin);
    
     if ( rv < 0 )
       return;
   }
-  */
+  
   (handler_args->handler) ();
+}
+
+int rtems_gpio_debounce_switch(int dev_pin, int ticks)
+{
+  if ( gpio_pin[dev_pin-1].pin_type != DIGITAL_INPUT )
+    return -1;
+
+  gpio_pin[dev_pin-1].h_args.debouncing_tick_count = ticks;
+
+  return 0;
 }
 
 int rtems_gpio_enable_interrupt(int dev_pin, rtems_gpio_interrupt interrupt, void (*handler) (void))
@@ -398,7 +427,7 @@ int rtems_gpio_disable_interrupt(int dev_pin)
 
   pin = &gpio_pin[dev_pin-1];
 
-   switch (pin->enabled_interrupt)
+  switch (pin->enabled_interrupt)
   {
     case FALLING_EDGE:
 
@@ -455,7 +484,7 @@ int rtems_gpio_disable_interrupt(int dev_pin)
       return -1;  
   }
 
-  /* Removes the old handler */
+  /* Removes the handler */
   sc = rtems_interrupt_handler_remove(BCM2835_IRQ_ID_GPIO_0, (rtems_interrupt_handler) generic_handler, &(pin->h_args));
 
   if ( sc != RTEMS_SUCCESSFUL )

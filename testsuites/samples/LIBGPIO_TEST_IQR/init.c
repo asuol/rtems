@@ -68,7 +68,10 @@ rtems_task Init(
   rtems_task_argument ignored
 )
 {
+  rtems_interval ticks = 0;
   int rv = 0;
+
+  ticks = rtems_clock_get_ticks_per_second();
 
   rtems_test_begin ();
 
@@ -101,6 +104,10 @@ rtems_task Init(
   rv = rtems_gpio_input_mode (17, PULL_UP);
   RTEMS_CHECK_RV(rv, "rtems_gpio_input_mode");
   
+  /* Debouces gpio pin 2 switch by requiring ~50 miliseconds between interrupts */
+  rv = rtems_gpio_debounce_switch (2, (ticks * 0.05));
+  RTEMS_CHECK_RV(rv, "rtems_gpio_debounce_switch");
+
   /* Enable interrupts, and assign handler functions */ 
   rv = rtems_gpio_enable_interrupt (2, BOTH_EDGES, edge_test_1);
   RTEMS_CHECK_RV(rv, "rtems_gpio_enable_interrupt");

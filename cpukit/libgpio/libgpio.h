@@ -20,7 +20,6 @@
 #define _RTEMS_LIBGPIO_H
 
 #include <stdint.h>
-#include <stdbool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,6 +88,8 @@ typedef struct
   int pin_number;
 
   void (*handler) (void);
+
+  int debouncing_tick_count;
 
   rtems_interval last_isr_tick;
 } handler_arguments;
@@ -186,6 +187,9 @@ extern int rtems_gpio_output_mode(int pin, rtems_multiio_output_mode mode);
 
 /* Configures a GPIO pin as NOT_USED */
 extern void rtems_gpio_disable_pin(int pin);
+
+/* Debouces a switch by requiring a number of clock ticks to pass between interruts */
+extern int rtems_gpio_debounce_switch(int pin, int ticks);
 
 /* Enables interrupts on the given GPIO pin */
 extern int rtems_gpio_enable_interrupt(int dev_pin, rtems_gpio_interrupt interrupt, void (*handler) (void));
