@@ -26,17 +26,17 @@ rtems_task Init(
   rtems_test_begin ();
   
   /* Initializes the GPIO API */
-  rtems_gpio_initialize (GPIO_PIN_COUNT);
+  gpio_initialize ();
 
   /* Disables the setup pins internal pull resistor */
   int pins[] = {4,22,24,25,27};
 
-  rv = rtems_gpio_setup_input_mode (pins, 5, NO_PULL_RESISTOR);
-  RTEMS_CHECK_RV ( rv, "rtems_gpio_setup_input_mode");
+  rv = gpio_setup_input_mode (pins, 5, NO_PULL_RESISTOR);
+  RTEMS_CHECK_RV ( rv, "gpio_setup_input_mode");
   
-  /* Enables the defined JTAG config */
-  rv = rtems_gpio_select_config (JTAG_CONFIG, JTAG_PIN_COUNT);
-  RTEMS_CHECK_RV ( rv, "rtems_gpio_setup_config");
+  /* Setups the JTAG pin interface */
+  rv = gpio_select_jtag ();
+  RTEMS_CHECK_RV ( rv, "gpio_setup_config");
   
   rtems_test_end ();
   exit ( 0 );

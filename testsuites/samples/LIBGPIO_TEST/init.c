@@ -22,25 +22,38 @@ rtems_task Init(
 )
 {
   int rv = 0;
-  int val;
+  int val, val2;
 
   rtems_test_begin ();
   
   /* Initializes the GPIO API */
-  rtems_gpio_initialize (GPIO_PIN_COUNT);
+  gpio_initialize ();
 
-  rv = rtems_gpio_select_pin (3, DIGITAL_OUTPUT);
-  RTEMS_CHECK_RV ( rv, "rtems_gpio_config_pin output") ;
+  rv = gpio_select_pin (3, DIGITAL_OUTPUT);
+  RTEMS_CHECK_RV ( rv, "gpio_config_pin output") ;
 
-  rv = rtems_gpio_select_pin (2, DIGITAL_INPUT);
-  RTEMS_CHECK_RV ( rv, "rtems_gpio_config_pin input");
+  rv = gpio_select_pin (7, DIGITAL_OUTPUT);
+  RTEMS_CHECK_RV ( rv, "gpio_config_pin output") ;
+
+  rv = gpio_select_pin (2, DIGITAL_INPUT);
+  RTEMS_CHECK_RV ( rv, "gpio_config_pin input");
+
+  rv = gpio_select_pin (8, DIGITAL_INPUT);
+  RTEMS_CHECK_RV ( rv, "gpio_config_pin input");
 
   /* Enables the internal pull up resistor on the GPIO 2 pin */
-  rv = rtems_gpio_input_mode (2, PULL_UP);
-  RTEMS_CHECK_RV ( rv, "rtems_gpio_input_mode");
+  rv = gpio_input_mode (2, PULL_UP);
+  RTEMS_CHECK_RV ( rv, "gpio_input_mode");
+
+  /* Enables the internal pull up resistor on the GPIO 2 pin */
+  rv = gpio_input_mode (8, PULL_UP);
+  RTEMS_CHECK_RV ( rv, "gpio_input_mode");
   
-  rv = rtems_gpio_clear (3);
-  RTEMS_CHECK_RV ( rv, "rtems_gpio_clear");
+  rv = gpio_clear (3);
+  RTEMS_CHECK_RV ( rv, "gpio_clear");
+
+  rv = gpio_clear (7);
+  RTEMS_CHECK_RV ( rv, "gpio_clear");
 
   /* Polls the GPIO 2 pin.
    * 
@@ -49,18 +62,31 @@ rtems_task Init(
    */
   while (1)
   {
-    val = rtems_gpio_get_val (2);
+    val = gpio_get_val (2);
+    val2 = gpio_get_val (8);
   
     if (val == 0)
     {
-      rv = rtems_gpio_set (3);
-      RTEMS_CHECK_RV ( rv, "rtems_gpio_set");
+      rv = gpio_set (3);
+      RTEMS_CHECK_RV ( rv, "gpio_set");
     }
 
     else
     {
-      rv = rtems_gpio_clear (3);
-      RTEMS_CHECK_RV ( rv, "rtems_gpio_clear");
+      rv = gpio_clear (3);
+      RTEMS_CHECK_RV ( rv, "gpio_clear");
+    }
+
+    if (val2 == 0)
+    {
+      rv = gpio_set (7);
+      RTEMS_CHECK_RV ( rv, "gpio_set");
+    }
+
+    else
+    {
+      rv = gpio_clear (7);
+      RTEMS_CHECK_RV ( rv, "gpio_clear");
     }
   }
 

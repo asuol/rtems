@@ -8,7 +8,6 @@ SUBDIRS = . score rtems sapi posix
 SUBDIRS += libcsupport libblock libfs
 SUBDIRS += libnetworking librpc
 SUBDIRS += libi2c
-SUBDIRS += libgpio
 SUBDIRS += libmisc
 SUBDIRS += libmd
 SUBDIRS += libgnat
@@ -186,9 +185,6 @@ include_rtems_HEADERS += libmisc/stringto/stringto.h
 
 ## i2c
 include_rtems_HEADERS += libi2c/libi2c.h
-
-## gpio
-include_rtems_HEADERS += libgpio/libgpio.h
 
 ## serdbg
 if LIBSERDBG

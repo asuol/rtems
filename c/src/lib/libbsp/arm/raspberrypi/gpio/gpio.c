@@ -1,9 +1,9 @@
 /**
  * @file
  *
- * @ingroup raspberrypi_libgpio
+ * @ingroup raspberrypi_gpio
  *
- * @brief Raspberry Pi libgpio API implementation.
+ * @brief Raspberry Pi gpio API implementation.
  *
  */
 
@@ -17,8 +17,7 @@
 
 #include <bsp/raspberrypi.h>
 #include <bsp/irq.h>
-
-#include <rtems/libgpio.h>
+#include <bsp/gpio.h>
 
 #include <stdlib.h>
 
@@ -28,7 +27,7 @@ static bool is_initialized = false;
 
 void generic_handler(void *arg);
 
-rtems_gpio_pin *gpio_pin;
+rpi_gpio_pin *gpio_pin;
 
 /* Waits a number of CPU cycles */
 static void arm_delay (int cycles)
@@ -44,7 +43,7 @@ static void arm_delay (int cycles)
  * Allocates space to the gpio_pin array and sets every pin as NOT_USED.
  * If the API has already been initialized silently exits.
  */
-void rtems_gpio_initialize(int gpio_count)
+void gpio_initialize(void)
 {
   int i;
 
@@ -53,9 +52,9 @@ void rtems_gpio_initialize(int gpio_count)
 
   is_initialized = true;
 
-  gpio_pin = (rtems_gpio_pin *) malloc(gpio_count * sizeof(rtems_gpio_pin));
+  gpio_pin = (rpi_gpio_pin *) malloc(GPIO_PIN_COUNT * sizeof(rpi_gpio_pin));
 
-  for ( i = 0; i < gpio_count; i++ )
+  for ( i = 0; i < GPIO_PIN_COUNT; i++ )
   {
     gpio_pin[i].pin_type = NOT_USED;
     gpio_pin[i].enabled_interrupt = NONE;
@@ -65,7 +64,7 @@ void rtems_gpio_initialize(int gpio_count)
 }
 
 /* Gives an output GPIO pin the logical value of 1 */
-int rtems_gpio_set(int pin)
+int gpio_set(int pin)
 {
   if (gpio_pin[pin-1].pin_type != DIGITAL_OUTPUT)
     return -1;
@@ -76,7 +75,7 @@ int rtems_gpio_set(int pin)
 }
 
 /* Gives an output GPIO pin the logical value of 0 */
-int rtems_gpio_clear(int pin)
+int gpio_clear(int pin)
 {
   if (gpio_pin[pin-1].pin_type != DIGITAL_OUTPUT)
     return -1;
@@ -87,13 +86,13 @@ int rtems_gpio_clear(int pin)
 }
 
 /* Gets the level, or value, of a GPIO input pin */
-int rtems_gpio_get_val(int pin)
+int gpio_get_val(int pin)
 {
   return BCM2835_REG(BCM2835_GPIO_GPLEV0) &= (1 << (pin));
 }
 
 /* Selects a GPIO pin operation or function */
-int rtems_gpio_select_pin(int pin, rtems_pin type)
+int gpio_select_pin(int pin, rpi_pin type)
 {
   volatile unsigned int *pin_addr = (unsigned int *)BCM2835_GPIO_REGS_BASE + (pin / 10);
   
@@ -163,7 +162,7 @@ int rtems_gpio_select_pin(int pin, rtems_pin type)
 }
 
 /* Sets the operating mode of one or more GPIO input pins */
-static int rpi_gpio_input_mode(int *pins, int pin_count, int pin_mask, rtems_multiio_input_mode mode)
+static int set_input_mode(int *pins, int pin_count, int pin_mask, rpi_gpio_input_mode mode)
 {
   int i;
 
@@ -207,7 +206,7 @@ static int rpi_gpio_input_mode(int *pins, int pin_count, int pin_mask, rtems_mul
 }
 
 /* Sets the operating mode for only one GPIO input pin */
-int rtems_gpio_input_mode(int pin, rtems_multiio_input_mode mode)
+int gpio_input_mode(int pin, rpi_gpio_input_mode mode)
 {
   int pin_mask = (1 << pin);
   int pins[1];
@@ -218,11 +217,11 @@ int rtems_gpio_input_mode(int pin, rtems_multiio_input_mode mode)
 
   pins[0] = pin;
 
-  return rpi_gpio_input_mode(pins, 1, pin_mask, mode);
+  return set_input_mode(pins, 1, pin_mask, mode);
 }
 
 /* Sets the operating mode of multiple GPIO input pins (max of 32 pins at a time) */
-int rtems_gpio_setup_input_mode(int *pins, int pin_count, rtems_multiio_input_mode mode)
+int gpio_setup_input_mode(int *pins, int pin_count, rpi_gpio_input_mode mode)
 {
   uint32_t pin_mask = 0;
   int diff_mode_counter = 0;
@@ -247,22 +246,30 @@ int rtems_gpio_setup_input_mode(int *pins, int pin_count, rtems_multiio_input_mo
   if ( diff_mode_counter == 0 )
     return 0;
 
-  return rpi_gpio_input_mode(pins, pin_count, pin_mask, mode);
+  return set_input_mode(pins, pin_count, pin_mask, mode);
 }
 
 /* Disables a GPIO pin, making it available to be used by anyone */
-void rtems_gpio_disable_pin(int pin)
+void gpio_disable_pin(int pin)
 {
   gpio_pin[pin-1].pin_type = NOT_USED;
 }
 
-/* Allows to setup multiple GPIO pins to a specific configuration */
-int rtems_gpio_select_config(rtems_gpio_configuration *pin_setup, int pin_count)
+/* Allows to setup a JTAG interface using the main GPIO pin header */
+int gpio_select_jtag(void)
 {
   int i;
 
-  for ( i = 0; i < pin_count; i++ )
-    if ( rtems_gpio_select_pin(pin_setup[i].pin_number, pin_setup[i].pin_function) < 0 )
+  gpio_configuration JTAG_CONFIG[5] = {
+    { 4, ALT_FUNC_5 },  /* setup gpio 4 alt5 ARM_TDI */
+    { 22, ALT_FUNC_4 }, /* setup gpio 22 alt4 ARM_TRST */
+    { 24, ALT_FUNC_4 }, /* setup gpio 24 alt4 ARM_TDO */
+    { 25, ALT_FUNC_4 }, /* setup gpio 25 alt4 ARM_TCK */
+    { 27, ALT_FUNC_4 }  /* setup gpio 27 alt4 ARM_TMS */
+  };
+
+  for ( i = 0; i < 5; i++ )
+    if ( gpio_select_pin(JTAG_CONFIG[i].pin_number, JTAG_CONFIG[i].pin_function) < 0 )
       return -1;
     
   return 0;
@@ -271,7 +278,7 @@ int rtems_gpio_select_config(rtems_gpio_configuration *pin_setup, int pin_count)
 static int debounce_switch(int dev_pin)
 {
   rtems_interval time;
-  rtems_gpio_pin *pin;
+  rpi_gpio_pin *pin;
 
   pin = &gpio_pin[dev_pin-1];
 
@@ -318,7 +325,7 @@ void generic_handler (void* arg)
   (handler_args->handler) ();
 }
 
-int rtems_gpio_debounce_switch(int dev_pin, int ticks)
+int gpio_debounce_switch(int dev_pin, int ticks)
 {
   if ( gpio_pin[dev_pin-1].pin_type != DIGITAL_INPUT )
     return -1;
@@ -328,10 +335,10 @@ int rtems_gpio_debounce_switch(int dev_pin, int ticks)
   return 0;
 }
 
-int rtems_gpio_enable_interrupt(int dev_pin, rtems_gpio_interrupt interrupt, void (*handler) (void))
+int gpio_enable_interrupt(int dev_pin, gpio_interrupt interrupt, void (*handler) (void))
 {
   rtems_status_code sc; 
-  rtems_gpio_pin *pin;
+  rpi_gpio_pin *pin;
 
   /* Only consider GPIO pins up to 31 */
   if ( dev_pin > 31 )
@@ -342,7 +349,7 @@ int rtems_gpio_enable_interrupt(int dev_pin, rtems_gpio_interrupt interrupt, voi
   /* If the pin already has an enabled interrupt */
   if ( pin->enabled_interrupt != NONE )
   {
-    sc = rtems_gpio_disable_interrupt(dev_pin);
+    sc = gpio_disable_interrupt(dev_pin);
     
     if ( sc != RTEMS_SUCCESSFUL )
       return -1;
@@ -420,10 +427,10 @@ int rtems_gpio_enable_interrupt(int dev_pin, rtems_gpio_interrupt interrupt, voi
   return 0;
 }
 
-int rtems_gpio_disable_interrupt(int dev_pin)
+int gpio_disable_interrupt(int dev_pin)
 {
   rtems_status_code sc;
-  rtems_gpio_pin *pin;
+  rpi_gpio_pin *pin;
 
   pin = &gpio_pin[dev_pin-1];
 

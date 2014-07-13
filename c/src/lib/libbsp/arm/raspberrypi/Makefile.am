@@ -123,7 +123,7 @@ libbsp_a_SOURCES += misc/timer.c
 
 # GPIO
 
-libbsp_a_SOURCES += gpio/libgpio.c
+libbsp_a_SOURCES += gpio/gpio.c
 
 # RTC
 

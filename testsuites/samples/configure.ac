@@ -75,7 +75,7 @@ cdtest/Makefile
 pppd/Makefile
 capture/Makefile
 LIBGPIO_TEST/Makefile
-LIBGPIO_TEST_IQR/Makefile
+LIBGPIO_TEST_IRQ/Makefile
 LIBGPIO_JTAG/Makefile
 ])
 AC_OUTPUT
