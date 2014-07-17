@@ -250,26 +250,73 @@ int gpio_setup_input_mode(int *pins, int pin_count, rpi_gpio_input_mode mode)
 }
 
 /* Disables a GPIO pin, making it available to be used by anyone */
-void gpio_disable_pin(int pin)
+int gpio_disable_pin(int dev_pin)
 {
-  gpio_pin[pin-1].pin_type = NOT_USED;
+  rtems_status_code sc;
+  rpi_gpio_pin *pin;
+
+  pin = &gpio_pin[dev_pin-1];
+
+  pin->pin_type = NOT_USED;
+
+  if ( pin->enabled_interrupt != NONE )
+  {
+    sc = gpio_disable_interrupt(dev_pin);
+    
+    if ( sc != RTEMS_SUCCESSFUL )
+      return -1;
+  }
+    
+  return sc;
 }
 
-/* Allows to setup a JTAG interface using the main GPIO pin header */
+/* Allows to setup a JTAG interface using the main (P1) GPIO pin header */
 int gpio_select_jtag(void)
 {
-  int i;
+  /* setup gpio 4 alt5 ARM_TDI */
+  if ( gpio_select_pin(4, ALT_FUNC_5) < 0 )
+      return -1;
 
-  gpio_configuration JTAG_CONFIG[5] = {
-    { 4, ALT_FUNC_5 },  /* setup gpio 4 alt5 ARM_TDI */
-    { 22, ALT_FUNC_4 }, /* setup gpio 22 alt4 ARM_TRST */
-    { 24, ALT_FUNC_4 }, /* setup gpio 24 alt4 ARM_TDO */
-    { 25, ALT_FUNC_4 }, /* setup gpio 25 alt4 ARM_TCK */
-    { 27, ALT_FUNC_4 }  /* setup gpio 27 alt4 ARM_TMS */
-  };
+  /* setup gpio 22 alt4 ARM_TRST */
+  if ( gpio_select_pin(22, ALT_FUNC_4) < 0 )
+      return -1;
 
-  for ( i = 0; i < 5; i++ )
-    if ( gpio_select_pin(JTAG_CONFIG[i].pin_number, JTAG_CONFIG[i].pin_function) < 0 )
+  /* setup gpio 24 alt4 ARM_TDO */
+  if ( gpio_select_pin(24, ALT_FUNC_4) < 0 )
+      return -1;
+
+  /* setup gpio 25 alt4 ARM_TCK */
+  if ( gpio_select_pin(25, ALT_FUNC_4) < 0 )
+      return -1;
+
+  /* setup gpio 27 alt4 ARM_TMS */
+  if ( gpio_select_pin(27, ALT_FUNC_4) < 0 )
+      return -1;
+    
+  return 0;
+}
+
+/* Allows to setup the SPI interface on the main (P1) GPIO pin header */
+int gpio_select_spi_p1(void)
+{
+  /* SPI master 0 MISO data line */
+  if ( gpio_select_pin(9, ALT_FUNC_0) < 0 )
+      return -1;
+
+  /* SPI master 0 MOSI data line */
+  if ( gpio_select_pin(10, ALT_FUNC_0) < 0 )
+      return -1;
+
+  /* SPI master 0 SCLK clock line */
+  if ( gpio_select_pin(11, ALT_FUNC_0) < 0 )
+      return -1;
+
+  /* SPI master 0 CE_0 chip enable line */
+  if ( gpio_select_pin(8, ALT_FUNC_0) < 0 )
+      return -1;
+
+  /* SPI master 0 CE_1 chip enable line */
+  if ( gpio_select_pin(7, ALT_FUNC_0) < 0 )
       return -1;
     
   return 0;

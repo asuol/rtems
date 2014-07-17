@@ -17,6 +17,8 @@
 #ifndef LIBBSP_ARM_RASPBERRYPI_GPIO_H
 #define LIBBSP_ARM_RASPBERRYPI_GPIO_H
 
+#include <rtems.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
@@ -116,19 +118,7 @@ typedef struct
     rpi_gpio_output_mode output;
   }mode;
 } rpi_gpio_pin;
-
-/**
- * @brief Object defining a specific pin arrangement.
- *
- * Defines a pin setup.
- */
-typedef struct
-{
-  int pin_number;
-  
-  rpi_pin pin_function;
-} gpio_configuration;
-
+ 
 /** @} */
 
 /**
@@ -159,6 +149,9 @@ extern int gpio_select_pin(int pin, rpi_pin type);
 /* Setups a JTAG pin configuration */
 extern int gpio_select_jtag(void);
 
+/* Setups the SPI interface on the RPI P1 GPIO header */
+extern int gpio_select_spi_p1(void);
+
 /* Sets a GPIO input pin mode */
 extern int gpio_input_mode(int pin, rpi_gpio_input_mode mode);
 
@@ -169,7 +162,7 @@ extern int gpio_setup_input_mode(int *pin, int pin_count, rpi_gpio_input_mode mo
 extern int gpio_output_mode(int pin, rpi_gpio_output_mode mode);
 
 /* Configures a GPIO pin as NOT_USED */
-extern void gpio_disable_pin(int pin);
+extern int gpio_disable_pin(int dev_pin);
 
 /* Debouces a switch by requiring a number of clock ticks to pass between interruts */
 extern int gpio_debounce_switch(int pin, int ticks);
