@@ -153,9 +153,49 @@
 #define BCM2835_UART0_ICR_RX    0x10
 #define BCM2835_UART0_ICR_TX    0x20
 
+/** @} */
+
+/**
+ * @name SPI Registers
+ *
+ * @{
+ */
+
+#define BCM2835_SPI_BASE           (0x20204000)
+
+#define BCM2835_SPI_CS             (BCM2835_SPI_BASE+0x00)
+#define BCM2835_SPI_FIFO           (BCM2835_SPI_BASE+0x04)
+#define BCM2835_SPI_CLK            (BCM2835_SPI_BASE+0x08)
+#define BCM2835_SPI_DLEN           (BCM2835_SPI_BASE+0x0C)
+#define BCM2835_SPI_LTOH           (BCM2835_SPI_BASE+0x10)
+#define BCM2835_SPI_DC             (BCM2835_SPI_BASE+0x14)
 
 /** @} */
 
+/**
+ * @name I2C/SPI BSC Registers
+ *
+ * @{
+ */
+
+#define BCM2835_I2C_SPI_BASE       (0x20214000)
+
+#define BCM2835_I2C_SPI_DR         (BCM2835_I2C_SPI_BASE+0x00)
+#define BCM2835_I2C_SPI_RSR        (BCM2835_I2C_SPI_BASE+0x04)
+#define BCM2835_I2C_SPI_SLV        (BCM2835_I2C_SPI_BASE+0x08)
+#define BCM2835_I2C_SPI_CR         (BCM2835_I2C_SPI_BASE+0x0C)
+#define BCM2835_I2C_SPI_FR         (BCM2835_I2C_SPI_BASE+0x10)
+#define BCM2835_I2C_SPI_IFLS       (BCM2835_I2C_SPI_BASE+0x14)
+#define BCM2835_I2C_SPI_IMSC       (BCM2835_I2C_SPI_BASE+0x18)
+#define BCM2835_I2C_SPI_RIS        (BCM2835_I2C_SPI_BASE+0x1C)
+#define BCM2835_I2C_SPI_MIS        (BCM2835_I2C_SPI_BASE+0x20)
+#define BCM2835_I2C_SPI_ICR        (BCM2835_I2C_SPI_BASE+0x24)
+#define BCM2835_I2C_SPI_DMACR      (BCM2835_I2C_SPI_BASE+0x28)
+#define BCM2835_I2C_SPI_TDR        (BCM2835_I2C_SPI_BASE+0x2C)
+#define BCM2835_I2C_SPI_GPUSTAT    (BCM2835_I2C_SPI_BASE+0x30)
+#define BCM2835_I2C_SPI_HCTRL      (BCM2835_I2C_SPI_BASE+0x34)
+
+/** @} */
 
 /**
  * @name IRQ Registers
