@@ -1,5 +1,6 @@
 #include <bsp/raspberrypi.h>
 #include <bsp/gpio.h>
+#include <bsp/irq.h>
 #include <bsp/i2c.h>
 
 #include "23k256.h"
@@ -164,6 +165,16 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 18)) == 0 )
       ;
 
+  else if ( softc_ptr->transfer_mode == SPI_IRQ )
+  {
+    softc_ptr->irq_write = 1;
+
+    BCM2835_REG(BCM2835_SPI_CS) |= (3 << 9);
+
+    if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,1) != RTEMS_SUCCESSFUL )
+      return -1;
+  }
+
   /* While there is data to be transferred */
   while ( buffer_size >= bytes_per_char )
   {
@@ -229,6 +240,16 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
         ;
     }
 
+    else if ( softc_ptr->transfer_mode == SPI_IRQ )
+    {
+      softc_ptr->irq_write = 0;
+
+      BCM2835_REG(BCM2835_SPI_CS) |= (3 << 9);
+
+      if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,1) != RTEMS_SUCCESSFUL )
+        return -1;
+    }
+
     /* Read byte from the RX FIFO */
     fifo_data = BCM2835_REG(BCM2835_SPI_FIFO) & 0xFF;
 
@@ -287,9 +308,41 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 16)) == 0 )
       ;
 
+
+  else if ( softc_ptr->transfer_mode == SPI_IRQ )
+  {
+    softc_ptr->irq_write = 1;
+
+    BCM2835_REG(BCM2835_SPI_CS) |= (3 << 9);
+
+    if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,1) != RTEMS_SUCCESSFUL )
+      return -1;
+  }
+
   bytes_sent -= buffer_size;
   
   return bytes_sent;
+}
+
+void spi_handler(void* arg)
+{
+  bcm2835_spi_softc_t *softc_ptr = (bcm2835_spi_softc_t *) arg;
+
+  /* If waiting to write to the bus, expect DONE and TXD bits to be set to release the irq semaphore 
+   * If waiting to read from the bus, expect DONE and RXD bits to be set before releasing the irq semaphore
+   */
+  if (
+      ( softc_ptr->irq_write == 1 && (BCM2835_REG(BCM2835_SPI_CS) & (1 << 16)) != 0 && (BCM2835_REG(BCM2835_SPI_CS) & (1 << 18)) != 0 )
+      ||
+      ( softc_ptr->irq_write == 0 && (BCM2835_REG(BCM2835_SPI_CS) & (1 << 16)) != 0 && (BCM2835_REG(BCM2835_SPI_CS) & (1 << 17)) != 0 )
+     )
+  {
+    /* Disable the SPI interrupt generation */
+    BCM2835_REG(BCM2835_SPI_CS) &= ~(3 << 9);
+
+    /* Release the irq semaphore */
+    rtems_semaphore_release(softc_ptr->irq_sema_id);
+  }
 }
 
 rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl)
@@ -302,6 +355,17 @@ rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl)
 
   softc_ptr->initialized = 1;
 
+  //softc_ptr->transfer_mode = SPI_POLLED;
+
+  softc_ptr->transfer_mode = SPI_IRQ;
+
+  if ( softc_ptr->transfer_mode == SPI_IRQ )
+  {
+    sc = rtems_semaphore_create(rtems_build_name('s','p','i','s'), 0, RTEMS_FIFO | RTEMS_SIMPLE_BINARY_SEMAPHORE, 0, &softc_ptr->irq_sema_id);
+
+    sc = rtems_interrupt_handler_install(BCM2835_IRQ_ID_SPI, NULL, RTEMS_INTERRUPT_SHARED, (rtems_interrupt_handler) spi_handler, softc_ptr);
+  }
+  
   return sc;
 }
 		        
@@ -424,7 +488,6 @@ rtems_status_code bcm2835_register_spi(void)
   spi_bus_no = rv;
 
   rv = rtems_libi2c_register_drv("23k256",&bcm2835_rw_drv_t, spi_bus_no,0x00);
-				 //bcm2835_rw_driver_descriptor,
                                       
   if ( rv < 0 )
     return -rv;

@@ -343,7 +343,7 @@ static int debounce_switch(int dev_pin)
  * Generic ISR that clears the event register on the Raspberry Pi and calls 
  * the user defined ISR.
  */
-void generic_handler (void* arg)
+void generic_handler(void* arg)
 {
   handler_arguments* handler_args;
   int rv = 0;
@@ -412,7 +412,7 @@ int gpio_enable_interrupt(int dev_pin, gpio_interrupt interrupt, void (*handler)
   if ( sc != RTEMS_SUCCESSFUL )
     return -1;
 
-  switch (interrupt)
+  switch ( interrupt )
   {
     case FALLING_EDGE:
 
@@ -481,7 +481,7 @@ int gpio_disable_interrupt(int dev_pin)
 
   pin = &gpio_pin[dev_pin-1];
 
-  switch (pin->enabled_interrupt)
+  switch ( pin->enabled_interrupt )
   {
     case FALLING_EDGE:
 

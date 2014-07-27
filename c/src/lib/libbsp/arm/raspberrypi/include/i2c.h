@@ -15,6 +15,7 @@ typedef struct {
   int                 transfer_mode;
   uint32_t            current_slave_addr;
   rtems_id            irq_sema_id;
+  int                 irq_write;
 } bcm2835_spi_softc_t;
 
 typedef struct {
