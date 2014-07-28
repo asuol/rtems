@@ -3,6 +3,9 @@
 
 #include <rtems/libio.h>
 
+#ifndef LIBI2C_23k256_H
+#define LIBI2C_23k256_H
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,3 +20,5 @@ extern rtems_libi2c_drv_t bcm2835_rw_drv_t;
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* LIBI2C_23k256_H */

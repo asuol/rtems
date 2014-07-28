@@ -132,8 +132,6 @@ libbsp_a_SOURCES += gpio/gpio.c
 
 # I2C
 libbsp_a_SOURCES += i2c/spi.c
-libbsp_a_SOURCES += i2c/23k256.h
-libbsp_a_SOURCES += i2c/23k256.c
 
 # Cache
 libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c

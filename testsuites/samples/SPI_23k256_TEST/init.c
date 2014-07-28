@@ -47,9 +47,13 @@ rtems_task Init(
   rv = gpio_set (2);
   RTEMS_CHECK_RV(rv, "gpio_set");
 
-  /* Register SPI bus and 23k256 device driver */
-  if (bcm2835_register_spi() != RTEMS_SUCCESSFUL)
-    printf("\nregister fail\n");
+  /* Register SPI bus  */
+  if ( bcm2835_register_spi() != RTEMS_SUCCESSFUL )
+    printf("\nSPI bus register failed\n");
+
+  /* Register 23k256 device driver */
+  if ( bcm2835_23k256_init() < 0 )
+    printf("\n23k256 driver init failed\n");
 
   fd = open("/dev/spi.23k256", O_RDWR);
   RTEMS_CHECK_RV(rv, "Open /dev/spi.23k256");

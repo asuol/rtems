@@ -1,4 +1,4 @@
-#include "23k256.h"
+#include <libchip/23k256.h>
 
 #define SPI_MEM_CMD_WRITE 0x02 /* Write */
 #define SPI_MEM_CMD_READ  0x03 /* Read */
@@ -231,8 +231,8 @@ rtems_status_code spi_23k256_read(rtems_device_major_number major, rtems_device_
 
 rtems_driver_address_table spi_23k256_rw_ops = 
 {
-  .read_entry =  spi_23k256_read,
-  .write_entry = spi_23k256_write
+  .read_entry           = spi_23k256_read,
+  .write_entry          = spi_23k256_write
 };
 
 rtems_libi2c_drv_t bcm2835_rw_drv_t =

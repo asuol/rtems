@@ -3,7 +3,7 @@
 #include <bsp/irq.h>
 #include <bsp/i2c.h>
 
-#include "23k256.h"
+#include <libchip/23k256.h>
 
 /* GPU processor core clock rate in MHz */ //MK: probe this value?
 #define GPU_CORE_CLOCK_RATE 250
@@ -27,6 +27,8 @@ static bcm2835_spi_desc_t bcm2835_spi_bus_desc = {
     initialized:    0
   }
 };
+
+int spi_bus_no_p1;
 
 /* Calculates the clock divider that provides the closest (<=) clock rate to the desired */
 static rtems_status_code bcm2835_spi_calculate_clock_divider(uint32_t clock_mhz, uint16_t *clock_divider)
@@ -178,6 +180,11 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
   /* While there is data to be transferred */
   while ( buffer_size >= bytes_per_char )
   {
+    /* If using bi-directional SPI */
+    if ( softc_ptr->wire_mode == SPI_2_WIRE )
+      /* Change bus direction to write to the slave */
+      BCM2835_REG(BCM2835_SPI_CS) &= ~(1 << 12);
+
     /* If reading from the bus, send a dummy character to the device */
     if ( rd_buf != NULL )
       BCM2835_REG(BCM2835_SPI_FIFO) = dummy_char;
@@ -228,6 +235,11 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
       }
     }
     
+    /* If using bi-directional SPI */
+    if ( softc_ptr->wire_mode == SPI_2_WIRE )
+      /* Change bus direction to read from the slave */
+      BCM2835_REG(BCM2835_SPI_CS) |= (1 << 12);
+
     /* If in polling mode */
     if ( softc_ptr->transfer_mode == SPI_POLLED )
     {
@@ -324,7 +336,7 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
   return bytes_sent;
 }
 
-void spi_handler(void* arg)
+static void spi_handler(void* arg)
 {
   bcm2835_spi_softc_t *softc_ptr = (bcm2835_spi_softc_t *) arg;
 
@@ -355,9 +367,13 @@ rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl)
 
   softc_ptr->initialized = 1;
 
-  //softc_ptr->transfer_mode = SPI_POLLED;
+  // FIXME: this should be selectable elsewhere
 
-  softc_ptr->transfer_mode = SPI_IRQ;
+  softc_ptr->transfer_mode = SPI_POLLED;
+
+  //softc_ptr->transfer_mode = SPI_IRQ;
+
+  softc_ptr->wire_mode = SPI_3_WIRE;
 
   if ( softc_ptr->transfer_mode == SPI_IRQ )
   {
@@ -465,7 +481,6 @@ int bcm2835_spi_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg)
 rtems_status_code bcm2835_register_spi(void)
 {
   int rv = 0;
-  int spi_bus_no;
 
   /* Initialize the libi2c API */
   rtems_libi2c_initialize ();
@@ -485,12 +500,12 @@ rtems_status_code bcm2835_register_spi(void)
   if ( rv < 0 )
     return -rv;
   
-  spi_bus_no = rv;
+  spi_bus_no_p1 = rv;
 
-  rv = rtems_libi2c_register_drv("23k256",&bcm2835_rw_drv_t, spi_bus_no,0x00);
-                                      
-  if ( rv < 0 )
-    return -rv;
-  
   return 0;
+}
+
+int bcm2835_23k256_init(void)
+{
+  return rtems_libi2c_register_drv("23k256",&bcm2835_rw_drv_t, spi_bus_no_p1,0x00);
 }

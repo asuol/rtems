@@ -80,7 +80,8 @@ include_libchip_HEADERS += i2c/i2c-ds1621.h \
 	i2c/spi-memdrv.h \
 	i2c/spi-flash-m25p40.h \
 	i2c/spi-fram-fm25l256.h \
-	i2c/spi-sd-card.h
+	i2c/spi-sd-card.h \
+        i2c/23k256.h
 
 noinst_LIBRARIES += libi2cio.a
 
@@ -96,7 +97,8 @@ libi2cio_a_SOURCES = i2c/i2c-ds1621.h \
 	i2c/spi-memdrv.c \
 	i2c/spi-flash-m25p40.c \
 	i2c/spi-fram-fm25l256.c \
-	i2c/spi-sd-card.c
+	i2c/spi-sd-card.c \
+        i2c/23k256.c
 
 # serial
 include_libchip_HEADERS += serial/mc68681.h serial/ns16550.h serial/z85c30.h \

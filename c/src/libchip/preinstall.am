@@ -150,6 +150,10 @@ $(PROJECT_INCLUDE)/libchip/spi-sd-card.h: i2c/spi-sd-card.h $(PROJECT_INCLUDE)/l
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/libchip/spi-sd-card.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/libchip/spi-sd-card.h
 
+$(PROJECT_INCLUDE)/libchip/23k256.h: i2c/23k256.h $(PROJECT_INCLUDE)/libchip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/libchip/23k256.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/libchip/23k256.h
+
 $(PROJECT_INCLUDE)/libchip/mc68681.h: serial/mc68681.h $(PROJECT_INCLUDE)/libchip/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/libchip/mc68681.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/libchip/mc68681.h
