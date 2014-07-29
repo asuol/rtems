@@ -50,3 +50,19 @@ int bcm2835_spi_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg);
 rtems_status_code bcm2835_register_spi(void);
 
 int bcm2835_23k256_init(void);
+
+/* I2C directives */
+
+rtems_status_code bcm2835_i2c_init(rtems_libi2c_bus_t * bushdl);
+
+rtems_status_code bcm2835_i2c_send_start(rtems_libi2c_bus_t * bushdl);
+
+rtems_status_code bcm2835_i2c_stop(rtems_libi2c_bus_t * bushdl);
+
+rtems_status_code bcm2835_i2c_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t addr, int rw);
+
+int bcm2835_i2c_read_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, int nbytes);
+
+int bcm2835_i2c_write_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, int nbytes);
+
+int bcm2835_i2c_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg);

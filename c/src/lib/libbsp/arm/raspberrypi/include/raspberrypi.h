@@ -156,6 +156,25 @@
 /** @} */
 
 /**
+ * @name I2C (BSC) Registers
+ *
+ * @{
+ */
+
+#define BCM2835_I2C_BASE           (0x20804000)
+
+#define BCM2835_I2C_C              (BCM2835_I2C_BASE+0x00)
+#define BCM2835_I2C_S              (BCM2835_I2C_BASE+0x04)
+#define BCM2835_I2C_DLEN           (BCM2835_I2C_BASE+0x08)
+#define BCM2835_I2C_A              (BCM2835_I2C_BASE+0x0C)
+#define BCM2835_I2C_FIFO           (BCM2835_I2C_BASE+0x10)
+#define BCM2835_I2C_DIV            (BCM2835_I2C_BASE+0x14)
+#define BCM2835_I2C_DEL            (BCM2835_I2C_BASE+0x18)
+#define BCM2835_I2C_CLKT           (BCM2835_I2C_BASE+0x1C)
+
+/** @} */
+
+/**
  * @name SPI Registers
  *
  * @{
@@ -173,7 +192,7 @@
 /** @} */
 
 /**
- * @name I2C/SPI BSC Registers
+ * @name I2C/SPI slave BSC Registers
  *
  * @{
  */

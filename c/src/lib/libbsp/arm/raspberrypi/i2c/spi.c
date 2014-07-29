@@ -173,18 +173,13 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
 
     BCM2835_REG(BCM2835_SPI_CS) |= (3 << 9);
 
-    if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,1) != RTEMS_SUCCESSFUL )
+    if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,50) != RTEMS_SUCCESSFUL )
       return -1;
   }
 
   /* While there is data to be transferred */
   while ( buffer_size >= bytes_per_char )
   {
-    /* If using bi-directional SPI */
-    if ( softc_ptr->wire_mode == SPI_2_WIRE )
-      /* Change bus direction to write to the slave */
-      BCM2835_REG(BCM2835_SPI_CS) &= ~(1 << 12);
-
     /* If reading from the bus, send a dummy character to the device */
     if ( rd_buf != NULL )
       BCM2835_REG(BCM2835_SPI_FIFO) = dummy_char;
@@ -197,12 +192,12 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
         case 1:
 
           BCM2835_REG(BCM2835_SPI_FIFO) = (((*(uint8_t *)wr_buf) << bit_shift));
-	  break;
+          break;
 
         case 2:
 
           BCM2835_REG(BCM2835_SPI_FIFO) = ((*(uint16_t *)wr_buf) << bit_shift);
-	  break;
+          break;
 
         case 3:
 
@@ -216,12 +211,12 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
 
           buffer_size -= 3;
 
-	  break;
+          break;
 
         case 4:
 
           BCM2835_REG(BCM2835_SPI_FIFO) = ((*(uint32_t *)wr_buf) << bit_shift);
-	  break;
+          break;
 
         default:
           return -1;
@@ -258,7 +253,7 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
 
       BCM2835_REG(BCM2835_SPI_CS) |= (3 << 9);
 
-      if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,1) != RTEMS_SUCCESSFUL )
+      if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,50) != RTEMS_SUCCESSFUL )
         return -1;
     }
 
@@ -273,12 +268,12 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
         case 1:
 
           (*(uint8_t *)rd_buf) = (fifo_data >> bit_shift);
-	  break;
+          break;
 
         case 2:
 
-	  (*(uint16_t *)rd_buf) = (fifo_data >> bit_shift);
-	  break;
+          (*(uint16_t *)rd_buf) = (fifo_data >> bit_shift);
+          break;
 
         case 3:
 
@@ -292,12 +287,12 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
  
           buffer_size -= 3;
 
-	  break;
+          break;
 
         case 4:
 
-	  (*(uint32_t *)rd_buf) = (fifo_data >> bit_shift);
-	  break;
+          (*(uint32_t *)rd_buf) = (fifo_data >> bit_shift);
+          break;
 
         default:
           return -1;
@@ -310,6 +305,11 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
         buffer_size -= bytes_per_char;
       }
     }
+
+    /* If using bi-directional SPI */
+    if ( softc_ptr->wire_mode == SPI_2_WIRE )
+      /* Restore bus direction to write to the slave */
+      BCM2835_REG(BCM2835_SPI_CS) &= ~(1 << 12);
   }
 
   if ( softc_ptr->transfer_mode == SPI_POLLED )
@@ -327,7 +327,7 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
 
     BCM2835_REG(BCM2835_SPI_CS) |= (3 << 9);
 
-    if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,1) != RTEMS_SUCCESSFUL )
+    if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,50) != RTEMS_SUCCESSFUL )
       return -1;
   }
 
@@ -384,7 +384,7 @@ rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl)
   
   return sc;
 }
-		        
+
 rtems_status_code bcm2835_spi_send_start(rtems_libi2c_bus_t * bushdl)
 {
   return RTEMS_SUCCESSFUL;
@@ -467,9 +467,9 @@ int bcm2835_spi_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg)
     case RTEMS_LIBI2C_IOCTL_READ_WRITE:
     
       return bcm2835_spi_read_write(bushdl,  
-				   ((rtems_libi2c_read_write_t *)arg)->rd_buf,
-				   ((rtems_libi2c_read_write_t *)arg)->wr_buf,
-				   ((rtems_libi2c_read_write_t *)arg)->byte_cnt);
+                                   ((rtems_libi2c_read_write_t *)arg)->rd_buf,
+                                   ((rtems_libi2c_read_write_t *)arg)->wr_buf,
+                                   ((rtems_libi2c_read_write_t *)arg)->byte_cnt);
 
     default:
       return -1;
