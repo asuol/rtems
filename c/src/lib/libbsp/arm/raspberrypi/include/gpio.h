@@ -152,6 +152,9 @@ extern int gpio_select_jtag(void);
 /* Setups the SPI interface on the RPI P1 GPIO header */
 extern int gpio_select_spi_p1(void);
 
+/* Allows to setup the I2C interface on the main (P1) GPIO pin header (rev2) */
+extern int gpio_select_i2c_p1_rev2(void); 
+
 /* Sets a GPIO input pin mode */
 extern int gpio_input_mode(int pin, rpi_gpio_input_mode mode);
 

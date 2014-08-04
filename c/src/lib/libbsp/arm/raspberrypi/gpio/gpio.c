@@ -322,6 +322,26 @@ int gpio_select_spi_p1(void)
   return 0;
 }
 
+/* Allows to setup the I2C interface on the main (P1) GPIO pin header (rev2) */ //MK
+int gpio_select_i2c_p1_rev2(void)
+{
+  int pins[] = {2,3};
+
+  /* I2C BSC1 SDA data line */
+  if ( gpio_select_pin(2, ALT_FUNC_0) < 0 )
+      return -1;
+
+  /* I2C BSC1 SCL clock line */
+  if ( gpio_select_pin(3, ALT_FUNC_0) < 0 )
+      return -1;
+
+  /* Enable pins 2 and 3 pull-up resistors */
+  if ( gpio_setup_input_mode(pins, 2, PULL_UP) < 0 )
+    return -1;
+    
+  return 0;
+}
+
 static int debounce_switch(int dev_pin)
 {
   rtems_interval time;

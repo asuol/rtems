@@ -51,6 +51,20 @@ rtems_status_code bcm2835_register_spi(void);
 
 int bcm2835_23k256_init(void);
 
+/* I2C data structures */
+
+typedef struct {
+  int                 initialized;
+} bcm2835_i2c_softc_t;
+
+typedef struct {
+  rtems_libi2c_bus_t  bus_desc;
+  bcm2835_i2c_softc_t softc;
+} bcm2835_i2c_desc_t;
+
+/* I2C bus number for the GPIO P1 header I2C interface */
+extern int i2c_bus_no_p1;
+
 /* I2C directives */
 
 rtems_status_code bcm2835_i2c_init(rtems_libi2c_bus_t * bushdl);
@@ -66,3 +80,7 @@ int bcm2835_i2c_read_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, in
 int bcm2835_i2c_write_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, int nbytes);
 
 int bcm2835_i2c_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg);
+
+rtems_status_code bcm2835_register_i2c(void);
+
+int bcm2835_mcp23008_init(void);
