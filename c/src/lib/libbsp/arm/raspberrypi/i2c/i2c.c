@@ -274,5 +274,5 @@ rtems_status_code bcm2835_register_i2c(void)
 
 int bcm2835_mcp23008_init(void)
 {
-  return rtems_libi2c_register_drv("mcp23008",&i2c_mcp23008_rw_drv_t, i2c_bus_no_p1,MCP23008_ADDR);
+  return rtems_libi2c_register_drv("mcp23008", &i2c_mcp23008_drv_t, i2c_bus_no_p1, MCP23008_ADDR);
 }

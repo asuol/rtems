@@ -5,23 +5,23 @@
 
 #include <libchip/23k256.h>
 
-/* GPU processor core clock rate in MHz */ //MK: probe this value?
-#define GPU_CORE_CLOCK_RATE 250
+/* GPU processor core clock rate in Hz */ //MK: probe this value?
+#define GPU_CORE_CLOCK_RATE 250000000
 
 rtems_libi2c_bus_ops_t bcm2835_spi_ops = {
-  init:             bcm2835_spi_init,
-  send_start:       bcm2835_spi_send_start,
-  send_stop:        bcm2835_spi_stop,
-  send_addr:        bcm2835_spi_send_addr,
-  read_bytes:       bcm2835_spi_read_bytes,
-  write_bytes:      bcm2835_spi_write_bytes,
-  ioctl:            bcm2835_spi_ioctl
+  init:        bcm2835_spi_init,
+  send_start:  bcm2835_spi_send_start,
+  send_stop:   bcm2835_spi_stop,
+  send_addr:   bcm2835_spi_send_addr,
+  read_bytes:  bcm2835_spi_read_bytes,
+  write_bytes: bcm2835_spi_write_bytes,
+  ioctl:       bcm2835_spi_ioctl
 };
 
 static bcm2835_spi_desc_t bcm2835_spi_bus_desc = {
   {
-    ops:            &bcm2835_spi_ops,
-    size:           sizeof(bcm2835_spi_bus_desc)
+    ops:  &bcm2835_spi_ops,
+    size: sizeof(bcm2835_spi_bus_desc)
   },
   {
     initialized:    0
@@ -31,13 +31,13 @@ static bcm2835_spi_desc_t bcm2835_spi_bus_desc = {
 int spi_bus_no_p1;
 
 /* Calculates the clock divider that provides the closest (<=) clock rate to the desired */
-static rtems_status_code bcm2835_spi_calculate_clock_divider(uint32_t clock_mhz, uint16_t *clock_divider)
+static rtems_status_code bcm2835_spi_calculate_clock_divider(uint32_t clock_hz, uint16_t *clock_divider)
 {
   uint16_t divider;
   uint32_t clock_rate;
 
   /* Calculate the appropriate clock divider */
-  divider = GPU_CORE_CLOCK_RATE / clock_mhz;
+  divider = GPU_CORE_CLOCK_RATE / clock_hz;
 
   if ( divider < 0 || divider > 65536 )
     return RTEMS_INVALID_NUMBER;
@@ -55,7 +55,7 @@ static rtems_status_code bcm2835_spi_calculate_clock_divider(uint32_t clock_mhz,
   clock_rate = GPU_CORE_CLOCK_RATE / divider;
 
   /* If the resulting clock rate is greater than desired, try the next greater power of two divider  */
-  while ( clock_rate > clock_mhz )
+  while ( clock_rate > clock_hz )
   {
     divider = (divider << 1);
 
@@ -191,43 +191,32 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
       {
         case 1:
 
-          BCM2835_REG(BCM2835_SPI_FIFO) = (((*(uint8_t *)wr_buf) << bit_shift));
+          BCM2835_REG(BCM2835_SPI_FIFO) = (((*wr_buf) & 0xFF) << bit_shift);
           break;
 
         case 2:
 
-          BCM2835_REG(BCM2835_SPI_FIFO) = ((*(uint16_t *)wr_buf) << bit_shift);
+          BCM2835_REG(BCM2835_SPI_FIFO) = (((*wr_buf) & 0xFFFF) << bit_shift);
           break;
 
         case 3:
 
-          BCM2835_REG(BCM2835_SPI_FIFO) = ((*(uint16_t *)wr_buf) << bit_shift);
-
-          wr_buf += 2;
-
-          BCM2835_REG(BCM2835_SPI_FIFO) = ((*(uint8_t *)wr_buf) << bit_shift);
-
-          wr_buf++;
-
-          buffer_size -= 3;
+          BCM2835_REG(BCM2835_SPI_FIFO) = (((*wr_buf) & 0xFFFFFF) << bit_shift);
 
           break;
 
         case 4:
 
-          BCM2835_REG(BCM2835_SPI_FIFO) = ((*(uint32_t *)wr_buf) << bit_shift);
+          BCM2835_REG(BCM2835_SPI_FIFO) = ((*wr_buf) << bit_shift);
           break;
 
         default:
           return -1;
       }
 
-      if (bytes_per_char != 3 )
-      {
-        wr_buf += bytes_per_char;
+      wr_buf += bytes_per_char;
 
-        buffer_size -= bytes_per_char;
-      }
+      buffer_size -= bytes_per_char;
     }
     
     /* If using bi-directional SPI */
@@ -257,53 +246,46 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
         return -1;
     }
 
-    /* Read byte from the RX FIFO */
-    fifo_data = BCM2835_REG(BCM2835_SPI_FIFO) & 0xFF;
+    /* If writting to the bus, read the dummy char sent by the slave device */
+    if ( rd_buf == NULL )
+      fifo_data = BCM2835_REG(BCM2835_SPI_FIFO) & 0xFF; 
 
-    /* If reading from the bus, store the data retrieved from the RX FIFO on the buffer */
+    /* If reading from the bus, retrieve data from the RX FIFO and store it on the buffer */
     if ( rd_buf != NULL )
     {
       switch ( bytes_per_char )
       {
         case 1:
 
-          (*(uint8_t *)rd_buf) = (fifo_data >> bit_shift);
+          fifo_data = BCM2835_REG(BCM2835_SPI_FIFO) & 0xFF;
+          (*rd_buf) = (fifo_data >> bit_shift);
           break;
 
         case 2:
 
-          (*(uint16_t *)rd_buf) = (fifo_data >> bit_shift);
+          fifo_data = BCM2835_REG(BCM2835_SPI_FIFO) & 0xFFFF;
+          (*rd_buf) = (fifo_data >> bit_shift);
           break;
 
         case 3:
 
-          (*(uint16_t *)rd_buf) = (fifo_data >> bit_shift);
-
-          rd_buf += 2;
-
-          (*(uint8_t *)rd_buf) = (fifo_data >> bit_shift);
-
-          rd_buf++;
- 
-          buffer_size -= 3;
-
+          fifo_data = BCM2835_REG(BCM2835_SPI_FIFO) & 0xFFFFFF;
+          (*rd_buf) = (fifo_data >> bit_shift);
           break;
 
         case 4:
 
-          (*(uint32_t *)rd_buf) = (fifo_data >> bit_shift);
+          fifo_data = BCM2835_REG(BCM2835_SPI_FIFO);
+          (*rd_buf) = (fifo_data >> bit_shift);
           break;
 
         default:
           return -1;
       }
 
-      if (bytes_per_char != 3 )
-      {
-        rd_buf += bytes_per_char;
+      rd_buf += bytes_per_char;
 
-        buffer_size -= bytes_per_char;
-      }
+      buffer_size -= bytes_per_char;
     }
 
     /* If using bi-directional SPI */
@@ -369,9 +351,9 @@ rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl)
 
   // FIXME: this should be selectable elsewhere
 
-  softc_ptr->transfer_mode = SPI_POLLED;
+  //softc_ptr->transfer_mode = SPI_POLLED;
 
-  //softc_ptr->transfer_mode = SPI_IRQ;
+  softc_ptr->transfer_mode = SPI_IRQ;
 
   softc_ptr->wire_mode = SPI_3_WIRE;
 
@@ -507,5 +489,5 @@ rtems_status_code bcm2835_register_spi(void)
 
 int bcm2835_23k256_init(void)
 {
-  return rtems_libi2c_register_drv("23k256",&bcm2835_rw_drv_t, spi_bus_no_p1,0x00);
+  return rtems_libi2c_register_drv("23k256",&spi_23k256_rw_drv_t, spi_bus_no_p1,0x00);
 }
