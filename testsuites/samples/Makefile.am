@@ -1,6 +1,6 @@
 ACLOCAL_AMFLAGS = -I ../aclocal
 
-_SUBDIRS = hello capture ticker base_sp unlimited minimum fileio LIBGPIO_TEST LIBGPIO_TEST_IRQ LIBGPIO_JTAG SPI_23k256_TEST
+_SUBDIRS = hello capture ticker base_sp unlimited minimum fileio LIBGPIO_TEST LIBGPIO_TEST_IRQ LIBGPIO_JTAG SPI_23k256_TEST I2C_MCP23008_TEST
 
 if MPTESTS
 ## base_mp is a sample multiprocessing test

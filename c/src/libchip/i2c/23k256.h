@@ -15,7 +15,7 @@ rtems_status_code spi_23k256_read(rtems_device_major_number major, rtems_device_
 
 extern rtems_driver_address_table spi_23k256_rw_ops;
 
-extern rtems_libi2c_drv_t bcm2835_rw_drv_t;
+extern rtems_libi2c_drv_t spi_23k256_rw_drv_t;
 
 #ifdef __cplusplus
 }

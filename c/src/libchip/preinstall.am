@@ -154,6 +154,10 @@ $(PROJECT_INCLUDE)/libchip/23k256.h: i2c/23k256.h $(PROJECT_INCLUDE)/libchip/$(d
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/libchip/23k256.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/libchip/23k256.h
 
+$(PROJECT_INCLUDE)/libchip/mcp23008.h: i2c/mcp23008.h $(PROJECT_INCLUDE)/libchip/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/libchip/mcp23008.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/libchip/mcp23008.h
+
 $(PROJECT_INCLUDE)/libchip/mc68681.h: serial/mc68681.h $(PROJECT_INCLUDE)/libchip/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/libchip/mc68681.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/libchip/mc68681.h

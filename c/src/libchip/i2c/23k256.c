@@ -8,27 +8,21 @@
 
 rtems_libi2c_tfr_mode_t tfr_mode = 
 {
-  .baudrate =      20, 
+  .baudrate      = 20000000, 
   .bits_per_char = 8, 
-  .lsb_first =     FALSE,    
-  .clock_inv =     TRUE,    
-  .clock_phs =     FALSE
+  .lsb_first     = FALSE,    
+  .clock_inv     = TRUE,    
+  .clock_phs     = FALSE
 };
 
 /* Wait ms miliseconds */
 static rtems_status_code spi_23k256_wait_ms(int ms)
 {
-  rtems_interval ticks_per_second, ticks_since_boot, n;
+  rtems_interval ticks_per_second;
 
   ticks_per_second = rtems_clock_get_ticks_per_second();
-  ticks_since_boot = rtems_clock_get_ticks_since_boot();
 
-  n = rtems_clock_get_ticks_since_boot();
-
-  while ( (n - ticks_since_boot) < (ticks_per_second * ms / 1000) )
-    n = rtems_clock_get_ticks_since_boot();  
-  
-  return RTEMS_SUCCESSFUL;
+  return rtems_task_wake_after((ticks_per_second * ms / 1000));
 }
 
 rtems_status_code spi_23k256_write(rtems_device_major_number major, rtems_device_minor_number minor, void *arg)
@@ -68,7 +62,8 @@ rtems_status_code spi_23k256_write(rtems_device_major_number major, rtems_device
     if ( sc != RTEMS_SUCCESSFUL )
       return sc;
 
-    sc = spi_23k256_wait_ms(50);
+    /* Wait 1 milisecond */
+    sc = spi_23k256_wait_ms(1);
 
     if ( sc != RTEMS_SUCCESSFUL )
       return sc;
@@ -93,7 +88,8 @@ rtems_status_code spi_23k256_write(rtems_device_major_number major, rtems_device
     if ( sc != RTEMS_SUCCESSFUL )
       return sc;
 
-    sc = spi_23k256_wait_ms(50);
+    /* Wait 1 milisecond */
+    sc = spi_23k256_wait_ms(1);
 
     if ( sc != RTEMS_SUCCESSFUL )
       return sc;
@@ -110,7 +106,8 @@ rtems_status_code spi_23k256_write(rtems_device_major_number major, rtems_device
     if ( sc != RTEMS_SUCCESSFUL )
       return sc;
 
-    sc = spi_23k256_wait_ms(50);
+    /* Wait 1 milisecond */
+    sc = spi_23k256_wait_ms(1);
 
     if ( sc != RTEMS_SUCCESSFUL )
       return sc;
@@ -142,7 +139,8 @@ rtems_status_code spi_23k256_write(rtems_device_major_number major, rtems_device
     if ( sc != RTEMS_SUCCESSFUL )
       return sc;
     
-    sc = spi_23k256_wait_ms(50);
+    /* Wait 1 milisecond */
+    sc = spi_23k256_wait_ms(1);
 
     if ( sc != RTEMS_SUCCESSFUL )
       return sc;
@@ -191,7 +189,8 @@ rtems_status_code spi_23k256_read(rtems_device_major_number major, rtems_device_
   if ( sc != RTEMS_SUCCESSFUL )
       return sc;
   
-  sc = spi_23k256_wait_ms(50);
+  /* Wait 1 milisecond */
+  sc = spi_23k256_wait_ms(1);
 
   if ( sc != RTEMS_SUCCESSFUL )
    return sc;
@@ -231,12 +230,12 @@ rtems_status_code spi_23k256_read(rtems_device_major_number major, rtems_device_
 
 rtems_driver_address_table spi_23k256_rw_ops = 
 {
-  .read_entry           = spi_23k256_read,
-  .write_entry          = spi_23k256_write
+  .read_entry  = spi_23k256_read,
+  .write_entry = spi_23k256_write
 };
 
-rtems_libi2c_drv_t bcm2835_rw_drv_t =
+rtems_libi2c_drv_t spi_23k256_rw_drv_t =
 {
-    .ops =  &spi_23k256_rw_ops, 
-    .size = sizeof (bcm2835_rw_drv_t),
+    .ops  = &spi_23k256_rw_ops, 
+    .size = sizeof (spi_23k256_rw_drv_t),
 };
