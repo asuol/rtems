@@ -62,24 +62,29 @@ void bsp_interrupt_dispatch(void)
       vector = BCM2835_IRQ_ID_UART;
   }
   /* GPIO 0*/
-  else if ( BCM2835_REG(BCM2835_IRQ_ENABLE2) & BCM2835_BIT(17) )
+  else if ( BCM2835_REG(BCM2835_IRQ_PENDING2) & BCM2835_BIT(17) )
   {
       vector = BCM2835_IRQ_ID_GPIO_0;
   }
-  else if ( BCM2835_REG(BCM2835_IRQ_ENABLE2) & BCM2835_BIT(18) )
+  else if ( BCM2835_REG(BCM2835_IRQ_PENDING2) & BCM2835_BIT(18) )
   {
       vector = BCM2835_IRQ_ID_GPIO_1;
   }
-  else if ( BCM2835_REG(BCM2835_IRQ_ENABLE2) & BCM2835_BIT(19) )
+  else if ( BCM2835_REG(BCM2835_IRQ_PENDING2) & BCM2835_BIT(19) )
   {
       vector = BCM2835_IRQ_ID_GPIO_2;
   }
-  else if ( BCM2835_REG(BCM2835_IRQ_ENABLE2) & BCM2835_BIT(20) )
+  else if ( BCM2835_REG(BCM2835_IRQ_PENDING2) & BCM2835_BIT(20) )
   {
       vector = BCM2835_IRQ_ID_GPIO_3;
   }
+  /* I2C */
+  else if ( BCM2835_REG(BCM2835_IRQ_PENDING2) & BCM2835_BIT(21) )
+  {
+      vector = BCM2835_IRQ_ID_I2C;
+  }
   /* SPI */
-  else if ( BCM2835_REG(BCM2835_IRQ_ENABLE2) & BCM2835_BIT(22) )
+  else if ( BCM2835_REG(BCM2835_IRQ_PENDING2) & BCM2835_BIT(22) )
   {
       vector = BCM2835_IRQ_ID_SPI;
   }
@@ -126,6 +131,11 @@ rtems_status_code bsp_interrupt_vector_enable(rtems_vector_number vector)
   {
       BCM2835_REG(BCM2835_IRQ_ENABLE2) = BCM2835_BIT(20);
   }
+  /* I2C */
+  else if ( vector == BCM2835_IRQ_ID_I2C )
+  {
+      BCM2835_REG(BCM2835_IRQ_ENABLE2) = BCM2835_BIT(21);
+  }
   /* SPI */
   else if ( vector == BCM2835_IRQ_ID_SPI )
   {
@@ -150,6 +160,36 @@ rtems_status_code bsp_interrupt_vector_disable(rtems_vector_number vector)
   else if ( vector == BCM2835_IRQ_ID_UART )
   {
       BCM2835_REG(BCM2835_IRQ_DISABLE2) = BCM2835_BIT(25);
+  }
+  /* GPIO 0 */
+  else if ( vector == BCM2835_IRQ_ID_GPIO_0 )
+  {
+      BCM2835_REG(BCM2835_IRQ_DISABLE2) = BCM2835_BIT(17);
+  }
+  /* GPIO 1 */
+  else if ( vector == BCM2835_IRQ_ID_GPIO_1 )
+  {
+      BCM2835_REG(BCM2835_IRQ_DISABLE2) = BCM2835_BIT(18);
+  }
+  /* GPIO 2 */
+  else if ( vector == BCM2835_IRQ_ID_GPIO_2 )
+  {
+      BCM2835_REG(BCM2835_IRQ_DISABLE2) = BCM2835_BIT(19);
+  }
+  /* GPIO 3 */
+  else if ( vector == BCM2835_IRQ_ID_GPIO_3 )
+  {
+      BCM2835_REG(BCM2835_IRQ_DISABLE2) = BCM2835_BIT(20);
+  }
+  /* I2C */
+  else if ( vector == BCM2835_IRQ_ID_I2C )
+  {
+      BCM2835_REG(BCM2835_IRQ_DISABLE2) = BCM2835_BIT(21);
+  }
+  /* SPI */
+  else if ( vector == BCM2835_IRQ_ID_SPI )
+  {
+      BCM2835_REG(BCM2835_IRQ_DISABLE2) = BCM2835_BIT(22);
   }
 
   rtems_interrupt_enable(level);

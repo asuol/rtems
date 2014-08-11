@@ -12,7 +12,7 @@
 #define MCP23008_REG_GPIO    0x09
 #define MCP23008_REG_OLAT    0x0A
 
-rtems_libi2c_tfr_mode_t tfr_mode = 
+static rtems_libi2c_tfr_mode_t tfr_mode = 
 {
   /* Set a baudrate of 100kHz */
   .baudrate = 100000

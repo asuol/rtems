@@ -6,7 +6,7 @@
 #define SPI_MEM_CMD_WRSR  0x01 /* Write status register */
 #define SPI_MEM_CMD_SEQ   0x40
 
-rtems_libi2c_tfr_mode_t tfr_mode = 
+static rtems_libi2c_tfr_mode_t tfr_mode = 
 {
   .baudrate      = 20000000, 
   .bits_per_char = 8, 

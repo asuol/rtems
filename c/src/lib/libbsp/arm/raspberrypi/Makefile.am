@@ -82,7 +82,6 @@ libbsp_a_SOURCES += ../../shared/bspclean.c
 libbsp_a_SOURCES += ../../shared/bspgetworkarea.c
 libbsp_a_SOURCES += ../../shared/bsplibc.c
 libbsp_a_SOURCES += ../../shared/bsppost.c
-libbsp_a_SOURCES += ../../shared/bsppredriverhook.c
 libbsp_a_SOURCES += ../../shared/bsppretaskinghook.c
 libbsp_a_SOURCES += ../../shared/cpucounterread.c
 libbsp_a_SOURCES += ../../shared/cpucounterdiff.c
@@ -131,8 +130,10 @@ libbsp_a_SOURCES += gpio/gpio.c
 # SSP
 
 # I2C
-libbsp_a_SOURCES += i2c/spi.c
 libbsp_a_SOURCES += i2c/i2c.c
+libbsp_a_SOURCES += i2c/i2c_init.c
+libbsp_a_SOURCES += i2c/spi.c
+libbsp_a_SOURCES += i2c/spi_init.c
 
 # Cache
 libbsp_a_SOURCES += ../../../libcpu/shared/src/cache_manager.c

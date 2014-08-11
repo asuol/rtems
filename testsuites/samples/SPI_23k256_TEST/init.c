@@ -6,7 +6,6 @@
 
 #include <bsp.h> /* for device driver prototypes */
 
-#include <bsp/gpio.h> /* Calls the BSP gpio library */
 #include <bsp/i2c.h>
 #include <rtems/status-checks.h>
 
@@ -32,29 +31,6 @@ rtems_task Init(
 
   rtems_test_begin ();
   
-  /* Setup GPIOS for the 23k256 VCC and HOLD pins */
-  gpio_initialize();
-
-  rv = gpio_select_pin (3, DIGITAL_OUTPUT);
-  RTEMS_CHECK_RV (rv, "gpio_select_pin output");
-  
-  rv = gpio_set (3);
-  RTEMS_CHECK_RV(rv, "gpio_set");
-
-  rv = gpio_select_pin (2, DIGITAL_OUTPUT);
-  RTEMS_CHECK_RV (rv, "gpio_select_pin output");
-  
-  rv = gpio_set (2);
-  RTEMS_CHECK_RV(rv, "gpio_set");
-
-  /* Register SPI bus  */
-  if ( bcm2835_register_spi() != RTEMS_SUCCESSFUL )
-    printf("\nSPI bus register failed\n");
-
-  /* Register 23k256 device driver */
-  if ( bcm2835_23k256_init() < 0 )
-    printf("\n23k256 driver init failed\n");
-
   fd = open("/dev/spi.23k256", O_RDWR);
   RTEMS_CHECK_RV(rv, "Open /dev/spi.23k256");
   
@@ -81,8 +57,7 @@ rtems_task Init(
 
 #define CONFIGURE_USE_IMFS_AS_BASE_FILESYSTEM
 
-
-#define CONFIGURE_MAXIMUM_SEMAPHORES 1
+#define CONFIGURE_MAXIMUM_SEMAPHORES 3
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE
 

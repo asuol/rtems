@@ -1,34 +1,11 @@
+#include <bsp.h>
 #include <bsp/raspberrypi.h>
 #include <bsp/gpio.h>
 #include <bsp/irq.h>
 #include <bsp/i2c.h>
 
-#include <libchip/23k256.h>
-
 /* GPU processor core clock rate in Hz */ //MK: probe this value?
 #define GPU_CORE_CLOCK_RATE 250000000
-
-rtems_libi2c_bus_ops_t bcm2835_spi_ops = {
-  init:        bcm2835_spi_init,
-  send_start:  bcm2835_spi_send_start,
-  send_stop:   bcm2835_spi_stop,
-  send_addr:   bcm2835_spi_send_addr,
-  read_bytes:  bcm2835_spi_read_bytes,
-  write_bytes: bcm2835_spi_write_bytes,
-  ioctl:       bcm2835_spi_ioctl
-};
-
-static bcm2835_spi_desc_t bcm2835_spi_bus_desc = {
-  {
-    ops:  &bcm2835_spi_ops,
-    size: sizeof(bcm2835_spi_bus_desc)
-  },
-  {
-    initialized:    0
-  }
-};
-
-int spi_bus_no_p1;
 
 /* Calculates the clock divider that provides the closest (<=) clock rate to the desired */
 static rtems_status_code bcm2835_spi_calculate_clock_divider(uint32_t clock_hz, uint16_t *clock_divider)
@@ -159,15 +136,7 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
   /* Set SPI transfer active */
   BCM2835_REG(BCM2835_SPI_CS) |= (1 << 7);
 
-  if ( softc_ptr->transfer_mode == SPI_POLLED )
-    /* 
-     * If in polling mode,
-     * Poll TXD bit until there is space to write at least one byte on the TX FIFO
-     */
-    while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 18)) == 0 )
-      ;
-
-  else if ( softc_ptr->transfer_mode == SPI_IRQ )
+  if ( SPI_IO_MODE == 1 )
   {
     softc_ptr->irq_write = 1;
 
@@ -176,6 +145,14 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,50) != RTEMS_SUCCESSFUL )
       return -1;
   }
+
+  else
+    /* 
+     * If in polling mode,
+     * Poll TXD bit until there is space to write at least one byte on the TX FIFO
+     */
+    while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 18)) == 0 )
+      ;
 
   /* While there is data to be transferred */
   while ( buffer_size >= bytes_per_char )
@@ -224,8 +201,18 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
       /* Change bus direction to read from the slave */
       BCM2835_REG(BCM2835_SPI_CS) |= (1 << 12);
 
+    if ( SPI_IO_MODE == 1 )
+    {
+      softc_ptr->irq_write = 0;
+
+      BCM2835_REG(BCM2835_SPI_CS) |= (3 << 9);
+
+      if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,50) != RTEMS_SUCCESSFUL )
+        return -1;
+    }
+
     /* If in polling mode */
-    if ( softc_ptr->transfer_mode == SPI_POLLED )
+    else
     {
       /* Poll Done bit until the data transfer is complete */
       while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 16)) == 0 )
@@ -234,16 +221,6 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
       /* Poll RXD bit until there is at least one byte on the RX FIFO to be read */
       while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 17)) == 0 )
         ;
-    }
-
-    else if ( softc_ptr->transfer_mode == SPI_IRQ )
-    {
-      softc_ptr->irq_write = 0;
-
-      BCM2835_REG(BCM2835_SPI_CS) |= (3 << 9);
-
-      if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,50) != RTEMS_SUCCESSFUL )
-        return -1;
     }
 
     /* If writting to the bus, read the dummy char sent by the slave device */
@@ -294,16 +271,7 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
       BCM2835_REG(BCM2835_SPI_CS) &= ~(1 << 12);
   }
 
-  if ( softc_ptr->transfer_mode == SPI_POLLED )
-    /* 
-     * If in polling mode,
-     * Poll Done bit until the data transfer is complete.
-     */
-    while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 16)) == 0 )
-      ;
-
-
-  else if ( softc_ptr->transfer_mode == SPI_IRQ )
+  if ( SPI_IO_MODE == 1 )
   {
     softc_ptr->irq_write = 1;
 
@@ -312,6 +280,14 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,50) != RTEMS_SUCCESSFUL )
       return -1;
   }
+
+  else
+    /* 
+     * If in polling mode,
+     * Poll Done bit until the data transfer is complete.
+     */
+    while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 16)) == 0 )
+      ;
 
   bytes_sent -= buffer_size;
   
@@ -350,14 +326,9 @@ rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl)
   softc_ptr->initialized = 1;
 
   // FIXME: this should be selectable elsewhere
-
-  //softc_ptr->transfer_mode = SPI_POLLED;
-
-  softc_ptr->transfer_mode = SPI_IRQ;
-
   softc_ptr->wire_mode = SPI_3_WIRE;
 
-  if ( softc_ptr->transfer_mode == SPI_IRQ )
+  if ( SPI_IO_MODE == 1 )
   {
     sc = rtems_semaphore_create(rtems_build_name('s','p','i','s'), 0, RTEMS_FIFO | RTEMS_SIMPLE_BINARY_SEMAPHORE, 0, &softc_ptr->irq_sema_id);
 
@@ -458,36 +429,4 @@ int bcm2835_spi_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg)
   }
 
   return 0;
-}
-
-rtems_status_code bcm2835_register_spi(void)
-{
-  int rv = 0;
-
-  /* Initialize the libi2c API */
-  rtems_libi2c_initialize ();
-
-  /* Enable the SPI interface on the Raspberry Pi P1 GPIO header */
-  gpio_initialize ();
-
-  if ( gpio_select_spi_p1() < 0 )
-    return RTEMS_RESOURCE_IN_USE;
-
-  /* Clear SPI control register and clear SPI FIFOs */
-  BCM2835_REG(BCM2835_SPI_CS) = 0x0000030;
-
-  /* Register the SPI bus */
-  rv = rtems_libi2c_register_bus("/dev/spi", &(bcm2835_spi_bus_desc.bus_desc));
-
-  if ( rv < 0 )
-    return -rv;
-  
-  spi_bus_no_p1 = rv;
-
-  return 0;
-}
-
-int bcm2835_23k256_init(void)
-{
-  return rtems_libi2c_register_drv("23k256",&spi_23k256_rw_drv_t, spi_bus_no_p1,0x00);
 }

@@ -1,9 +1,8 @@
+#include <bsp.h>
 #include <bsp/raspberrypi.h>
 #include <bsp/gpio.h>
 #include <bsp/irq.h>
 #include <bsp/i2c.h>
-
-#include <libchip/mcp23008.h>
 
 #define BSC_CORE_CLK_HZ 150000000
 
@@ -11,30 +10,7 @@
  * - Clock stretching (using default values)
  * - 10-bit addressing
  * - Falling/Rising edge delays (using default values)
- * - Interrupt mode
  */
-
-rtems_libi2c_bus_ops_t bcm2835_i2c_ops = {
-  init:             bcm2835_i2c_init,
-  send_start:       bcm2835_i2c_send_start,
-  send_stop:        bcm2835_i2c_stop,
-  send_addr:        bcm2835_i2c_send_addr,
-  read_bytes:       bcm2835_i2c_read_bytes,
-  write_bytes:      bcm2835_i2c_write_bytes,
-  ioctl:            bcm2835_i2c_ioctl
-};
-
-static bcm2835_i2c_desc_t bcm2835_i2c_bus_desc = {
-  {
-    ops:            &bcm2835_i2c_ops,
-    size:           sizeof(bcm2835_i2c_bus_desc)
-  },
-  {
-    initialized:    0
-  }
-};
-
-int i2c_bus_no_p1;
 
 static rtems_status_code bcm2835_i2c_calculate_clock_divider(uint32_t clock_hz, uint16_t *clock_divider)
 {
@@ -83,6 +59,8 @@ static rtems_status_code bcm2835_i2c_set_tfr_mode(rtems_libi2c_bus_t *bushdl, co
 
 static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd_buf, const unsigned char *wr_buf, int buffer_size)
 {
+  bcm2835_i2c_softc_t *softc_ptr = &(((bcm2835_i2c_desc_t *)(bushdl))->softc);
+
   uint32_t bytes_sent = buffer_size;
 
   /* Since there is a maximum of 0xFFFF number of packets per transfer,
@@ -114,21 +92,31 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
       /* If writting */
       if ( rd_buf == NULL )
       {
-        /* Poll TXD bit until there is space available to write */
-        while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 4)) == 0 )
-          ;
+        /* If transfer is not active */
+        if( (BCM2835_REG(BCM2835_I2C_S) & (1 << 0)) == 0)
+        {
+          /* Send start bit */
+          BCM2835_REG(BCM2835_I2C_C) |= (1 << 7);
+        }
 
+        if ( I2C_IO_MODE == 1 )
+        {
+          /* Generate interrupts on the TXW bit condition */
+          BCM2835_REG(BCM2835_I2C_C) |= (1 << 9);
+
+	  if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,500) != RTEMS_SUCCESSFUL )
+	    return -1;
+	}
+
+        else 
+          /* Poll TXW bit until there is space available to write */
+          while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 2)) == 0 )
+            ;
+	
         /* Write data to the TX fifo */
         BCM2835_REG(BCM2835_I2C_FIFO) = (*(uint8_t *)wr_buf);
 
         wr_buf++;
-
-        /* If transfer is not active */
-        if( (BCM2835_REG(BCM2835_I2C_S) & (1 << 0)) == 0)
-          {
-            /* Send start bit */
-            BCM2835_REG(BCM2835_I2C_C) |= (1 << 7);
-          }
 
         /* Check for acknowledgment or clock stretching errors */
         if ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 8)) || (BCM2835_REG(BCM2835_I2C_S) & (1 << 9)) )
@@ -146,7 +134,7 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
           return -1;
         
         /* Poll RXD bit until there is data to read */
-        while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 5)) == 0 )
+        while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 5)) == 0 ) 
           ;
 
         /* Read data from the RX FIFO */
@@ -165,13 +153,68 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     }
   } while ( transfer_count > 0 );
 
-  /* Poll DONE bit until data has been sent */
-  while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 1)) == 0 )
-    ;
+  if ( I2C_IO_MODE == 1 )
+  {
+    /* Generate interrupts on the DONE bit condition */
+    BCM2835_REG(BCM2835_I2C_C) |= (1 << 8);
+
+    if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id,RTEMS_WAIT,500) != RTEMS_SUCCESSFUL )
+      return -1;
+  }
+
+  else
+    /* Poll DONE bit until data has been sent */
+    while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 1)) == 0 )
+      ;
 
   bytes_sent -= buffer_size;
 
   return bytes_sent;
+}
+
+static void i2c_handler(void* arg)
+{
+  bcm2835_i2c_softc_t *softc_ptr = (bcm2835_i2c_softc_t *) arg;
+
+  rtems_status_code sc;
+
+  int txw, rxd, done;
+
+  txw = rxd = done = 0;
+
+  if ( (BCM2835_REG(BCM2835_I2C_C) & (1 << 9)) )
+    txw = 1;
+
+  else if ( (BCM2835_REG(BCM2835_I2C_C) & (1 << 10)) )
+    rxd = 1;
+
+  else if ( (BCM2835_REG(BCM2835_I2C_C) & (1 << 8)) )
+    done = 1;
+
+  /* If waiting to write to the bus, expect the TXW bit to be set to release the irq semaphore 
+   * If waiting to read from the bus, expect the RXD bit to be set before releasing the irq semaphore
+   * If waiting for a transfer to be done, expect the DONE bit to be set before releasing the irq semaphore
+   */
+  if (
+      ( txw && (BCM2835_REG(BCM2835_I2C_S) & (1 << 2)) != 0 )
+      ||
+      ( rxd && (BCM2835_REG(BCM2835_I2C_S) & (1 << 5)) != 0 )
+      ||
+      ( done && (BCM2835_REG(BCM2835_I2C_S) & (1 << 1)) != 0 )
+     )
+  {
+    if ( txw )
+      BCM2835_REG(BCM2835_I2C_C) &= ~(1 << 9);
+
+    else if ( rxd )
+      BCM2835_REG(BCM2835_I2C_C) &= ~(1 << 10);
+
+    else if ( done )
+      BCM2835_REG(BCM2835_I2C_C) &= ~(1 << 8);
+
+    /* Release the irq semaphore */
+    sc = rtems_semaphore_release(softc_ptr->irq_sema_id);
+  }
 }
 
 rtems_status_code bcm2835_i2c_init(rtems_libi2c_bus_t * bushdl)
@@ -186,6 +229,14 @@ rtems_status_code bcm2835_i2c_init(rtems_libi2c_bus_t * bushdl)
 
   /* Enable the I2C BSC interface */
   BCM2835_REG(BCM2835_I2C_C) |= (1 << 15);
+
+  /* If the access to the bus is configured to be interrupt-driven */
+  if ( I2C_IO_MODE == 1 )
+  {
+    sc = rtems_semaphore_create(rtems_build_name('i','2','c','s'), 0, RTEMS_FIFO | RTEMS_SIMPLE_BINARY_SEMAPHORE, 0, &softc_ptr->irq_sema_id);
+
+    sc = rtems_interrupt_handler_install(BCM2835_IRQ_ID_I2C, NULL, RTEMS_INTERRUPT_SHARED, (rtems_interrupt_handler) i2c_handler, softc_ptr);
+  }
 
   return sc;
 }
@@ -246,33 +297,4 @@ int bcm2835_i2c_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg)
   }
 
   return 0;
-}
-
-rtems_status_code bcm2835_register_i2c(void)
-{
-  int rv = 0;
-
-  /* Initialize the libi2c API */
-  rtems_libi2c_initialize ();
-
-  /* Enable the I2C interface on the Raspberry Pi P1 GPIO header */
-  gpio_initialize ();
-
-  if ( gpio_select_i2c_p1_rev2() < 0 )
-    return RTEMS_RESOURCE_IN_USE;
-
-  /* Register the I2C bus */
-  rv = rtems_libi2c_register_bus("/dev/i2c", &(bcm2835_i2c_bus_desc.bus_desc));
-
-  if ( rv < 0 )
-    return -rv;
-  
-  i2c_bus_no_p1 = rv;
-
-  return 0;
-}
-
-int bcm2835_mcp23008_init(void)
-{
-  return rtems_libi2c_register_drv("mcp23008", &i2c_mcp23008_drv_t, i2c_bus_no_p1, MCP23008_ADDR);
 }

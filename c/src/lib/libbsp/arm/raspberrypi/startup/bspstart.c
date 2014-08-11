@@ -22,8 +22,18 @@
 #include <bsp/linker-symbols.h>
 #include <bsp/stackalloc.h>
 #include <bsp/raspberrypi.h>
+#include <bsp/i2c.h>
+
+void bsp_predriver_hook(void)
+{
+  if ( BSP_ENABLE_SPI == 1 )
+    BSP_spi_init();
+
+  if ( BSP_ENABLE_I2C == 1 )
+    BSP_i2c_init();
+}
 
 void bsp_start(void)
 {
-    bsp_interrupt_initialize();
+  bsp_interrupt_initialize();
 }

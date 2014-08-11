@@ -6,7 +6,6 @@
 
 #include <bsp.h> /* for device driver prototypes */
 
-#include <bsp/gpio.h> /* Calls the BSP gpio library */
 #include <bsp/i2c.h>
 #include <rtems/status-checks.h>
 
@@ -33,29 +32,6 @@ rtems_task Init(
 
   rtems_test_begin ();
   
-  /* Setup GPIOS for the mcp23008 VDD and RESET pins */
-  gpio_initialize();
-
-  rv = gpio_select_pin (7, DIGITAL_OUTPUT);
-  RTEMS_CHECK_RV (rv, "gpio_select_pin output");
-  
-  rv = gpio_set (7);
-  RTEMS_CHECK_RV(rv, "gpio_set");
-
-  rv = gpio_select_pin (8, DIGITAL_OUTPUT);
-  RTEMS_CHECK_RV (rv, "gpio_select_pin output");
-  
-  rv = gpio_set (8);
-  RTEMS_CHECK_RV(rv, "gpio_set");
-
-  /* Register I2C bus  */
-  if ( bcm2835_register_i2c() != RTEMS_SUCCESSFUL )
-    printf("\nSPI bus register failed\n");
-
-  /* Register mcp23008 device driver */
-  if ( bcm2835_mcp23008_init() < 0 )
-    printf("\nmcp23008 driver init failed\n");
-
   /* Open the mcp23008 device file */
   fd = open("/dev/i2c.mcp23008", O_RDWR);
   RTEMS_CHECK_RV(rv, "Open /dev/i2c.mcp23008");
@@ -108,7 +84,6 @@ rtems_task Init(
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_USE_IMFS_AS_BASE_FILESYSTEM
-
 
 #define CONFIGURE_MAXIMUM_SEMAPHORES 3
 
