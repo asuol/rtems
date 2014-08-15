@@ -1,17 +1,17 @@
 /**
- * @file
+ * @file gpio.h
  *
  * @ingroup raspberrypi_gpio
  *
- * @brief Raspberry Pi specific GPIO information.
+ * @brief Raspberry Pi specific GPIO definitions.
  */
 
 /*
- * Copyright (c) 2014 Andre Marques.
+ *  COPYRIGHT (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
  *
- * The license and distribution terms for this file may be
- * found in the file LICENSE in this distribution or at
- * http://www.rtems.org/license/LICENSE.
+ *  The license and distribution terms for this file may be
+ *  found in the file LICENSE in this distribution or at
+ *  http://www.rtems.org/license/LICENSE.
  */
 
 #ifndef LIBBSP_ARM_RASPBERRYPI_GPIO_H
@@ -23,14 +23,17 @@
 extern "C" {
 #endif /* __cplusplus */
 
+/**
+ * @brief  Number of total GPIOS on the Raspberry Pi,
+ *         including the internal ones.
+ */
 #define GPIO_PIN_COUNT 54
 
-#define JTAG_PIN_COUNT 5
-
 /**
- * @brief The set of possible input drive modes.
+ * @brief The set of possible configurations for a GPIO pull-up resistor.
  *
- * Enumerated type to define the drive modes for an input pin.
+ * Enumerated type to define the possible pull-up resistor configuratons 
+ * for an input pin.
  */
 typedef enum
 {
@@ -38,18 +41,6 @@ typedef enum
   PULL_DOWN,
   NO_PULL_RESISTOR
 } rpi_gpio_input_mode;
-
-/**
- * @brief The set of possible output drive modes.
- *
- * Enumerated type to define the drive modes for an output pin.
- */
-typedef enum
-{
-  PUSH_PULL,
-  OPEN_DRAIN,
-  NEUTRAL
-} rpi_gpio_output_mode;
 
 /**
  * @brief The set of possible functions a pin can have.
@@ -85,6 +76,11 @@ typedef enum
   NONE
 } gpio_interrupt;
 
+/**
+ * @brief Object containing relevant information to a interrupt handler.
+ *
+ * Encapsulates relevant data for a GPIO interrupt handler.
+ */
 typedef struct
 {
   int pin_number;
@@ -92,14 +88,15 @@ typedef struct
   void (*handler) (void);
 
   int debouncing_tick_count;
-
+ 
   rtems_interval last_isr_tick;
+
 } handler_arguments;
 
 /**
- * @brief Object containing information on a generic pin.
+ * @brief Object containing information on a GPIO pin.
  *
- * Encapsulates relevant data about any type of pin.
+ * Encapsulates relevant data about a GPIO pin.
  */
 typedef struct
 { 
@@ -111,12 +108,9 @@ typedef struct
 
   gpio_interrupt enabled_interrupt;
 
-  /* The pin mode */
-  union
-  {
-    rpi_gpio_input_mode input;
-    rpi_gpio_output_mode output;
-  }mode;
+  /* GPIO input pin mode. */
+  rpi_gpio_input_mode input_mode;
+
 } rpi_gpio_pin;
  
 /** @} */
@@ -128,10 +122,8 @@ typedef struct
  */
 
 /**
- * @brief gpio initialization.
+ * @brief Initializes the GPIO API.
  */
-
-/* Initializes the API */
 extern void gpio_initialize(void);
 
 /* Turns on the given pin */
@@ -160,9 +152,6 @@ extern int gpio_input_mode(int pin, rpi_gpio_input_mode mode);
 
 /* Sets a GPIO input pin mode for a number of pins */
 extern int gpio_setup_input_mode(int *pin, int pin_count, rpi_gpio_input_mode mode);
-
-/* Sets a GPIO output pin mode */
-extern int gpio_output_mode(int pin, rpi_gpio_output_mode mode);
 
 /* Configures a GPIO pin as NOT_USED */
 extern int gpio_disable_pin(int dev_pin);

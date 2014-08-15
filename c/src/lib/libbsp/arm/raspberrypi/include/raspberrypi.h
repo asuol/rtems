@@ -1,6 +1,5 @@
-
 /**
- * @file
+ * @file raspberrypi.h
  *
  * @ingroup raspberrypi_reg
  *
@@ -8,6 +7,7 @@
  */
 
 /*
+ * COPYRIGHT (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
  * Copyright (c) 2013 Alan Cudmore.
  *
  *  The license and distribution terms for this file may be
@@ -115,13 +115,11 @@
 
 /** @} */
 
-
 /**
  * @name UART 0 (PL011) Registers
  *
  * @{
  */
-
 
 #define BCM2835_UART0_BASE       (0x20201000)
 
@@ -237,7 +235,6 @@
 
 /** @} */
 
-
 /**
  * @name GPU Timer Registers
  *
@@ -260,7 +257,6 @@
 #define BCM2835_GPU_TIMER_C3      (BCM2835_TIMER_BASE+0x18)
 
 /** @} */
-
 
 /** @} */
 

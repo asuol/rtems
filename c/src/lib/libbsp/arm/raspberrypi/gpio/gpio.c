@@ -3,7 +3,7 @@
  *
  * @ingroup raspberrypi_gpio
  *
- * @brief Raspberry Pi gpio API implementation.
+ * @brief Support for the Raspberry PI GPIO.
  *
  */
 
@@ -28,7 +28,12 @@ static bool is_initialized = false;
 
 rpi_gpio_pin *gpio_pin;
 
-/* Wait a number of CPU cycles. */
+/**
+ * @brief Waits a number of CPU cycles.
+ *
+ * @param[in] cycles The number of CPU cycles to wait.
+ *
+ */
 static void arm_delay (int cycles)
 {
   int i;
@@ -38,18 +43,10 @@ static void arm_delay (int cycles)
 }
 
 /**
- * @brief Copies from a source to a destination memory area.
- *
- * The source and destination areas may not overlap.
- * 
- * @param[out] dest The destination memory area to copy to.
- * @param[in] src The source memory area to copy from.
- * @param[in] n The number of bytes to copy.
+ * @brief Initializes the GPIO API. 
+ *        Allocates space to the gpio_pin array and sets every pin as NOT_USED.
+ *        If the API has already been initialized silently exits.
  */
-
-/* Initializes the GPIO API. 
- * Allocates space to the gpio_pin array and sets every pin as NOT_USED.
- * If the API has already been initialized silently exits. */
 void gpio_initialize(void)
 {
   int i;
@@ -69,7 +66,15 @@ void gpio_initialize(void)
   }
 }
 
-/* Gives an output GPIO pin the logical value of 1 */
+/**
+ * @brief Gives an output GPIO pin the logical value of 1.
+ *
+ * @param[in] pin The Raspberry Pi GPIO pin label number (not is position 
+ *            on the header). 
+ *
+ * @retval 0 Pin was set successfully.
+ * @retval -1 The received pin is not configured as an digital output.
+ */
 int gpio_set(int pin)
 {
   if (gpio_pin[pin-1].pin_type != DIGITAL_OUTPUT)
@@ -80,7 +85,15 @@ int gpio_set(int pin)
   return 0;
 }
 
-/* Gives an output GPIO pin the logical value of 0 */
+/**
+ * @brief Gives an output GPIO pin the logical value of 0.
+ *
+ * @param[in] pin The Raspberry Pi GPIO pin label number (not is position 
+ *            on the header). 
+ *
+ * @retval 0 Pin was cleared successfully.
+ * @retval -1 The received pin is not configured as an digital output.
+ */
 int gpio_clear(int pin)
 {
   if (gpio_pin[pin-1].pin_type != DIGITAL_OUTPUT)
@@ -91,13 +104,30 @@ int gpio_clear(int pin)
   return 0;
 }
 
-/* Gets the level, or value, of a GPIO input pin */
+/**
+ * @brief Gets the value (level) of a GPIO input pin.
+ *
+ * @param[in] pin The Raspberry Pi GPIO pin label number (not is position 
+ *            on the header). 
+ *
+ * @retval The function returns 0 or 1 depending on the pin current 
+ *         logical value.
+ */
 int gpio_get_val(int pin)
 {
   return BCM2835_REG(BCM2835_GPIO_GPLEV0) &= (1 << (pin));
 }
 
-/* Selects a GPIO pin operation or function */
+/**
+ * @brief Configures a GPIO pin to perform a certain function.
+ *
+ * @param[in] pin The Raspberry Pi GPIO pin label number (not is position 
+ *            on the header). 
+ * @param[in] type The new function of the pin.
+ *
+ * @retval 0 Pin was configured successfully.
+ * @retval -1 The received pin is already being used, or unknown function.
+ */
 int gpio_select_pin(int pin, rpi_pin type)
 {
   /* Calculate the pin function select register address. */
@@ -170,8 +200,17 @@ int gpio_select_pin(int pin, rpi_pin type)
   return 0;
 }
 
-/* Sets the operating mode of one or more GPIO input pins, 
- * namely its pull-up/down resistor status. */
+/**
+ * @brief Configures the pull resistor setting of an array of GPIO pins. 
+ *
+ * @param[in] pins Array of Raspberry Pi GPIO pin label numbers (not their position 
+ *            on the header). 
+ * @param[in] pin_count Number of pins on the @var pins array.
+ * @param[in] mode The pull resistor mode.
+ *
+ * @retval 0 Pull resistor successfully configured.
+ * @retval -1 Unknown pull resistor mode.
+ */
 static int 
 set_input_mode(int *pins, int pin_count, int pin_mask, rpi_gpio_input_mode mode)
 {
@@ -212,19 +251,28 @@ set_input_mode(int *pins, int pin_count, int pin_mask, rpi_gpio_input_mode mode)
   /* If the operation was successful, record that information
    * on the gpio_pin structure so it can be recalled later. */
   for ( i = 0; i < pin_count; i++ )
-    gpio_pin[pins[i]-1].mode.input = mode;
+    gpio_pin[pins[i]-1].input_mode = mode;
 
   return 0;
 }
 
-/* Sets the pull-up/down resistors actuation mode for only one GPIO input pin. */
+/**
+ * @brief Configures a single GPIO pin pull resistor. 
+ *
+ * @param[in] pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ * @param[in] mode The pull resistor mode.
+ *
+ * @retval 0 Pull resistor successfully configured.
+ * @retval -1 @see set_input_mode().
+ */
 int gpio_input_mode(int pin, rpi_gpio_input_mode mode)
 {
   int pin_mask = (1 << pin);
   int pins[1];
 
   /* If the desired actuation mode is already set, silently exits. */
-  if ( gpio_pin[pin-1].mode.input == mode )
+  if ( gpio_pin[pin-1].input_mode == mode )
     return 0;
 
   pins[0] = pin;
@@ -232,10 +280,20 @@ int gpio_input_mode(int pin, rpi_gpio_input_mode mode)
   return set_input_mode(pins, 1, pin_mask, mode);
 }
 
-/* Sets the same pull-up/down resistors actuation mode to multiple GPIO input pins.
- * There is a maximum number of 32 pins per call, which is enough for 
- * Raspberry Pi models A and B (17 GPIOs on P1 GPIO header) 
- * and also model B+ (28 GPIOs on J8 GPIO header). */
+/**
+ * @brief Sets the same pull-up/down resistors actuation mode to multiple GPIO input pins.
+ *        There is a maximum number of 32 pins per call, which is enough for 
+ *        Raspberry Pi models A and B (17 GPIOs on P1 GPIO header) 
+ *        and also model B+ (28 GPIOs on J8 GPIO header). 
+ *
+ * @param[in] pins Array of Raspberry Pi GPIO pin label numbers (not their position 
+ *            on the header). 
+ * @param[in] pin_count Number of pins on the @var pins array.
+ * @param[in] mode The pull resistor mode.
+ *
+ * @retval 0 Pull resistor successfully configured.
+ * @retval -1 Unknown pull resistor mode.
+ */
 int gpio_setup_input_mode(int *pins, int pin_count, rpi_gpio_input_mode mode)
 {
   uint32_t pin_mask = 0;
@@ -251,7 +309,7 @@ int gpio_setup_input_mode(int *pins, int pin_count, rpi_gpio_input_mode mode)
    * in its corresponding place on a bitmask. If the mode for a pin will not change 
    * then the diff_mode_counter variable is increased. */
   for ( i = 0; i < pin_count; i++ ) {
-    if ( gpio_pin[pins[i] - 1].mode.input != mode )
+    if ( gpio_pin[pins[i] - 1].input_mode != mode )
       pin_mask |= (1 << pins[i]);
     
     else
@@ -266,7 +324,16 @@ int gpio_setup_input_mode(int *pins, int pin_count, rpi_gpio_input_mode mode)
   return set_input_mode(pins, pin_count, pin_mask, mode);
 }
 
-/* Disables a GPIO pin on the APiI, making it available to be used by anyone on the system. */
+/**
+ * @brief Disables a GPIO pin on the APiI, making it available to be used 
+ *        by anyone on the system.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ *
+ * @retval 0 Pin successfully disabled on the API.
+ * @retval -1 Could not disable an ative interrupt on this pin.
+ */
 int gpio_disable_pin(int dev_pin)
 {
   rtems_status_code sc;
@@ -287,83 +354,122 @@ int gpio_disable_pin(int dev_pin)
   return sc;
 }
 
-/* Allows to setup a JTAG interface using the main (P1) GPIO pin header. */
+/**
+ * @brief Setups a JTAG interface using the P1 GPIO pin header
+ *        for the models A/B and J8 header on the B+. 
+ *        The following pins should be unused before calling this function:
+ *        GPIO 4, 22, 24, 25 and 27.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ *
+ * @retval 0 JTAG interface successfully configured.
+ * @retval -1 At least one of the required pins is currently occupied.
+ */
 int gpio_select_jtag(void)
 {
-  /* setup gpio 4 alt5 ARM_TDI */
+  /* Setup gpio 4 alt5 ARM_TDI. */
   if ( gpio_select_pin(4, ALT_FUNC_5) < 0 )
       return -1;
 
-  /* setup gpio 22 alt4 ARM_TRST */
+  /* Setup gpio 22 alt4 ARM_TRST. */
   if ( gpio_select_pin(22, ALT_FUNC_4) < 0 )
       return -1;
 
-  /* setup gpio 24 alt4 ARM_TDO */
+  /* Setup gpio 24 alt4 ARM_TDO. */
   if ( gpio_select_pin(24, ALT_FUNC_4) < 0 )
       return -1;
 
-  /* setup gpio 25 alt4 ARM_TCK */
+  /* Setup gpio 25 alt4 ARM_TCK. */
   if ( gpio_select_pin(25, ALT_FUNC_4) < 0 )
       return -1;
 
-  /* setup gpio 27 alt4 ARM_TMS */
+  /* Setup gpio 27 alt4 ARM_TMS. */
   if ( gpio_select_pin(27, ALT_FUNC_4) < 0 )
       return -1;
     
   return 0;
 }
 
-/* Allows to setup the SPI interface on the main (P1) GPIO pin header */
+/**
+ * @brief Setups a SPI interface using the P1 GPIO pin header
+ *        for the models A/B and J8 header on the B+. 
+ *        The following pins should be unused before calling this function:
+ *        GPIO 7, 8, 9, 10 and 11.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ *
+ * @retval 0 SPI interface successfully configured.
+ * @retval -1 At least one of the required pins is currently occupied.
+ */
 int gpio_select_spi_p1(void)
 {
-  /* SPI master 0 MISO data line */
+  /* SPI master 0 MISO data line. */
   if ( gpio_select_pin(9, ALT_FUNC_0) < 0 )
       return -1;
 
-  /* SPI master 0 MOSI data line */
+  /* SPI master 0 MOSI data line. */
   if ( gpio_select_pin(10, ALT_FUNC_0) < 0 )
       return -1;
 
-  /* SPI master 0 SCLK clock line */
+  /* SPI master 0 SCLK clock line. */
   if ( gpio_select_pin(11, ALT_FUNC_0) < 0 )
       return -1;
 
-  /* SPI master 0 CE_0 chip enable line */
+  /* SPI master 0 CE_0 chip enable line. */
   if ( gpio_select_pin(8, ALT_FUNC_0) < 0 )
       return -1;
 
-  /* SPI master 0 CE_1 chip enable line */
+  /* SPI master 0 CE_1 chip enable line. */
   if ( gpio_select_pin(7, ALT_FUNC_0) < 0 )
       return -1;
     
   return 0;
 }
 
-/* Allows to setup the I2C interface on the main (P1) GPIO pin header 
- * (model B rev2 and B+) */
+/**
+ * @brief Setups a I2C interface using the P1 GPIO pin header
+ *        for the models A/B and J8 header on the B+. 
+ *        The following pins should be unused before calling this function:
+ *        GPIO 2 and 3.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ *
+ * @retval 0 JTAG interface successfully configured.
+ * @retval -1 At least one of the required pins is currently occupied.
+ */
 int gpio_select_i2c_p1_rev2(void)
 {
   int pins[] = {2,3};
 
-  /* I2C BSC1 SDA data line */
+  /* I2C BSC1 SDA data line. */
   if ( gpio_select_pin(2, ALT_FUNC_0) < 0 )
       return -1;
 
-  /* I2C BSC1 SCL clock line */
+  /* I2C BSC1 SCL clock line. */
   if ( gpio_select_pin(3, ALT_FUNC_0) < 0 )
       return -1;
 
-  /* Enable pins 2 and 3 pull-up resistors */
+  /* Enable pins 2 and 3 pull-up resistors. */
   if ( gpio_setup_input_mode(pins, 2, PULL_UP) < 0 )
     return -1;
     
   return 0;
 }
 
-/* De-bounces a switch by requiring a certain time to pass between interrupts.
- * Any interrupt fired too close to the last will be ignored as it is should
- * be the result of the involuntary hardware switch/button bouncing after its
- * being released. */
+/**
+ * @brief De-bounces a switch by requiring a certain time to pass between interrupts.
+ *        Any interrupt fired too close to the last will be ignored as it is probably
+ *        the result of a involuntary switch/button bounce after being released.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ *
+ * @retval 0 Interrupt is likely provoked by a user press on the switch.
+ * @retval -1 Interrupt was generated too close to the last one. Probable switch bounce.
+ */
 static int debounce_switch(int dev_pin)
 {
   rtems_interval time;
@@ -381,8 +487,12 @@ static int debounce_switch(int dev_pin)
   return 0;
 }
 
-/* Generic ISR that clears the event register on the Raspberry Pi and calls 
- * an user defined ISR. */
+/**
+ * @brief Generic ISR that clears the event register on the Raspberry Pi and calls 
+ *        an user defined ISR. 
+ *
+ * @param[in] arg Void pointer to a handler_arguments structure. 
+ */
 static void generic_handler(void* arg)
 {
   handler_arguments* handler_args;
@@ -413,9 +523,18 @@ static void generic_handler(void* arg)
   (handler_args->handler) ();
 }
 
-/* Defines for a GPIO input pin the number of clock ticks that must pass before
- * an generated interrupt is garanteed to be generated by the user and not by
- * a bouncing switch/button. */
+/**
+ * @brief Defines for a GPIO input pin the number of clock ticks that must pass before
+ *        an generated interrupt is garanteed to be generated by the user and not by
+ *        a bouncing switch/button.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ *
+ * @retval 0 De-bounce function successfully attached to the pin.
+ * @retval -1 The current pin is not configured as a digital input, hence
+ *            it can not be connected to a switch.
+ */
 int gpio_debounce_switch(int dev_pin, int ticks)
 {
   if ( gpio_pin[dev_pin-1].pin_type != DIGITAL_INPUT )
@@ -426,14 +545,27 @@ int gpio_debounce_switch(int dev_pin, int ticks)
   return 0;
 }
 
-/* Enables interrupts to be generated on a given GPIO pin.
- * When fired that interrupt will call the given handler. */
+/**
+ * @brief Enables interrupts to be generated on a given GPIO pin.
+ *        When fired that interrupt will call the given handler.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ * @param[in] interrupt Type of interrupt to enable for the pin.
+ * @param[in] handler Pointer to a function that will be called every time 
+ *                    @var interrupt is generated. This function must have 
+ *                    no receiving parameters and return void.
+ *
+ * @retval 0 Interrupt successfully enabled for this pin.
+ * @retval -1 Could not replace the currently active interrupt on this pin, or
+ *            unknown @var interrupt.
+ */
 int gpio_enable_interrupt(int dev_pin, gpio_interrupt interrupt, void (*handler)(void))
 {
   rtems_status_code sc; 
   rpi_gpio_pin *pin;
 
-  /* Only consider GPIO pins up to 31 */
+  /* Only consider GPIO pins up to 31. */
   if ( dev_pin > 31 )
     return -1;
 
@@ -467,48 +599,48 @@ int gpio_enable_interrupt(int dev_pin, gpio_interrupt interrupt, void (*handler)
   switch ( interrupt ) {
     case FALLING_EDGE:
 
-      /* Enables asynchronous falling edge detection */
+      /* Enables asynchronous falling edge detection. */
       BCM2835_REG(BCM2835_GPIO_GPAFEN0) |= (1 << dev_pin);
 
       break;
 
     case RISING_EDGE:
     
-      /* Enables asynchronous rising edge detection */
+      /* Enables asynchronous rising edge detection. */
       BCM2835_REG(BCM2835_GPIO_GPAREN0) |= (1 << dev_pin);
       
       break;
 
     case BOTH_EDGES:
 
-      /* Enables asynchronous falling edge detection */
+      /* Enables asynchronous falling edge detection. */
       BCM2835_REG(BCM2835_GPIO_GPAFEN0) |= (1 << dev_pin);
 
-      /* Enables asynchronous rising edge detection */
+      /* Enables asynchronous rising edge detection. */
       BCM2835_REG(BCM2835_GPIO_GPAREN0) |= (1 << dev_pin);
       
       break;
 
     case LOW_LEVEL:
     
-      /* Enables pin low level detection */
+      /* Enables pin low level detection. */
       BCM2835_REG(BCM2835_GPIO_GPLEN0) |= (1 << dev_pin);
       
       break;
 
     case HIGH_LEVEL:
     
-      /* Enables pin high level detection */
+      /* Enables pin high level detection. */
       BCM2835_REG(BCM2835_GPIO_GPHEN0) |= (1 << dev_pin);
       
       break;
 
     case BOTH_LEVELS:
     
-      /* Enables pin low level detection */
+      /* Enables pin low level detection. */
       BCM2835_REG(BCM2835_GPIO_GPLEN0) |= (1 << dev_pin);
 
-      /* Enables pin high level detection */
+      /* Enables pin high level detection. */
       BCM2835_REG(BCM2835_GPIO_GPHEN0) |= (1 << dev_pin);
       
       break;
@@ -525,8 +657,17 @@ int gpio_enable_interrupt(int dev_pin, gpio_interrupt interrupt, void (*handler)
   return 0;
 }
 
-/* Stops interrupts from being generated from a given GPIO pin
- * and removes the corresponding handler. */
+/**
+ * @brief Stops interrupts from being generated from a given GPIO pin
+ *        and removes the corresponding handler.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ *
+ * @retval 0 Interrupt successfully disabled for this pin.
+ * @retval -1 Could not remove the current interrupt handler or could not
+ *            recognise the current active interrupt on this pin.
+ */
 int gpio_disable_interrupt(int dev_pin)
 {
   rtems_status_code sc;
@@ -537,48 +678,48 @@ int gpio_disable_interrupt(int dev_pin)
   switch ( pin->enabled_interrupt ) {
     case FALLING_EDGE:
 
-      /* Disables asynchronous falling edge detection */
+      /* Disables asynchronous falling edge detection. */
       BCM2835_REG(BCM2835_GPIO_GPAFEN0) &= ~(1 << dev_pin);
 
       break;
 
     case RISING_EDGE:
     
-      /* Disables asynchronous rising edge detection */
+      /* Disables asynchronous rising edge detection. */
       BCM2835_REG(BCM2835_GPIO_GPAREN0) &= ~(1 << dev_pin);
       
       break;
 
     case BOTH_EDGES:
 
-      /* Disables asynchronous falling edge detection */
+      /* Disables asynchronous falling edge detection. */
       BCM2835_REG(BCM2835_GPIO_GPAFEN0) &= ~(1 << dev_pin);
 
-      /* Disables asynchronous rising edge detection */
+      /* Disables asynchronous rising edge detection. */
       BCM2835_REG(BCM2835_GPIO_GPAREN0) &= ~(1 << dev_pin);
       
       break;
 
     case LOW_LEVEL:
     
-      /* Disables pin low level detection */
+      /* Disables pin low level detection. */
       BCM2835_REG(BCM2835_GPIO_GPLEN0) &= ~(1 << dev_pin);
       
       break;
 
     case HIGH_LEVEL:
     
-      /* Disables pin high level detection */
+      /* Disables pin high level detection. */
       BCM2835_REG(BCM2835_GPIO_GPHEN0) &= ~(1 << dev_pin);
       
       break;
 
     case BOTH_LEVELS:
     
-      /* Disables pin low level detection */
+      /* Disables pin low level detection. */
       BCM2835_REG(BCM2835_GPIO_GPLEN0) &= ~(1 << dev_pin);
 
-      /* Disables pin high level detection */
+      /* Disables pin high level detection. */
       BCM2835_REG(BCM2835_GPIO_GPHEN0) &= ~(1 << dev_pin);
       
       break;

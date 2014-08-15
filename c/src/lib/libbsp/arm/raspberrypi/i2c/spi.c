@@ -1,7 +1,7 @@
 /**
  * @file spi.c
  *
- * @ingroup raspberrypi_spi
+ * @ingroup raspberrypi_i2c
  *
  * @brief Support for the SPI bus on the Raspberry Pi GPIO P1 header (model A/B)
  * and GPIO J8 header on model B+.
@@ -123,7 +123,7 @@ static rtems_status_code bcm2835_spi_set_tfr_mode(rtems_libi2c_bus_t *bushdl, co
   if ( tfr_mode->lsb_first )
     softc_ptr->bit_shift = 32 - tfr_mode->bits_per_char;
 
-  /* If MSB first */
+  /* If MSB first. */
   else
     softc_ptr->bit_shift = 0;
 
@@ -203,7 +203,7 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     if ( rd_buf != NULL )
       BCM2835_REG(BCM2835_SPI_FIFO) = dummy_char;
 
-    /* If writting to the bus, move the buffer data to the TX FIFO. */
+    /* If writing to the bus, move the buffer data to the TX FIFO. */
     else {
       switch ( bytes_per_char ) {
         case 1:
@@ -237,7 +237,7 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     }
     
     /* If using bi-directional SPI. */
-    if ( softc_ptr->wire_mode == SPI_2_WIRE )
+    if ( softc_ptr->bidirectional == 1 )
       /* Change bus direction to read from the slave device. */
       BCM2835_REG(BCM2835_SPI_CS) |= (1 << 12);
 
@@ -262,7 +262,7 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
         ;
     }
 
-    /* If writting to the bus, read the dummy char sent by the slave device. */
+    /* If writing to the bus, read the dummy char sent by the slave device. */
     if ( rd_buf == NULL )
       fifo_data = BCM2835_REG(BCM2835_SPI_FIFO) & 0xFF; 
 
@@ -303,7 +303,7 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     }
 
     /* If using bi-directional SPI. */
-    if ( softc_ptr->wire_mode == SPI_2_WIRE )
+    if ( softc_ptr->bidirectional == 1 )
       /* Restore bus direction to write to the slave. */
       BCM2835_REG(BCM2835_SPI_CS) &= ~(1 << 12);
   }
@@ -334,17 +334,17 @@ static int bcm2835_spi_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
  *        There are 2 situations that can generate an interrupt:
  *        
  *        1. Transfer (read/write) complete;
- *        2. RX Fifo full.
+ *        2. RX FIFO full.
  *
- *        Because the 2. situation is not usefull to many applications,
+ *        Because the 2. situation is not useful to many applications,
  *        the only interrupt that is generated and handled is the
  *        transfer complete interrupt.
  *
  *        The objective of the handler is then, depending on the transfer 
- *        context (reading or writting on the bus), to check if there is enough 
- *        space available on the TX fifo to send data over the bus (if writting) 
+ *        context (reading or writing on the bus), to check if there is enough 
+ *        space available on the TX FIFO to send data over the bus (if writing) 
  *        or if the slave device has sent enough data to be fetched from the
- *        RX fifo (if reading).
+ *        RX FIFO (if reading).
  *
  *        When any of these two conditions occur, disables further interrupts 
  *        to be generated and releases a irq semaphore which will allow the 
@@ -377,7 +377,7 @@ static void spi_handler(void* arg)
  *
  * @param[in] bushdl Pointer to the libi2c API bus driver data structure.
  *
- * @retval RTEMS_SUCCESSFUL SPI bus successfuly initialized.
+ * @retval RTEMS_SUCCESSFUL SPI bus successfully initialized.
  * @retval Any other status code @see rtems_semaphore_create() and 
  *         @see rtems_interrupt_handler_install().
  */
@@ -393,7 +393,7 @@ rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl)
 
   /* FIXME: This should be set on the device driver itself and configured
    * during the bus transfer mode setup or another ioctl request. */ 
-  softc_ptr->wire_mode = SPI_3_WIRE;
+  softc_ptr->bidirectional = 0;
 
   /* If using the SPI bus in interrupt-driven mode. */
   if ( SPI_IO_MODE == 1 ) {
@@ -439,10 +439,10 @@ rtems_status_code bcm2835_spi_stop(rtems_libi2c_bus_t * bushdl)
   uint32_t addr = softc_ptr->current_slave_addr;
   uint32_t chip_select_bit = 21 + addr;
 
-  /* Set SPI transfer as not active */
+  /* Set SPI transfer as not active. */
   BCM2835_REG(BCM2835_SPI_CS) &= ~(1 << 7);
 
-  /* Unselect the active SPI slave */
+  /* Unselect the active SPI slave. */
   switch ( addr ) {
     case 0:
     case 1:
@@ -464,7 +464,7 @@ rtems_status_code bcm2835_spi_stop(rtems_libi2c_bus_t * bushdl)
  * @param[in] bushdl Pointer to the libi2c API bus driver data structure.
  * @param[in] addr SPI slave select line address (0 for CE0 or 1 for CE1).
  * @param[in] rw This values is unnecessary to address a SPI device and its
- *               presence here is only to fullfill a libi2c requirement.
+ *               presence here is only to fulfill a libi2c requirement.
  *
  * @retval RTEMS_SUCCESSFUL The slave device has been successfully addressed.
  * @retval RTEMS_INVALID_ADDRESS The received address is neither 0 or 1.
@@ -537,10 +537,10 @@ int bcm2835_spi_write_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, i
  *
  * @param[in] bushdl Pointer to the libi2c API bus driver data structure.
  * @param[in] cmd IOCTL request command.
- * @param[in] arg Arguments needed to fullfill the requested IOCTL command.
+ * @param[in] arg Arguments needed to fulfill the requested IOCTL command.
  *
  * @retval -1 Unknown request command.
- * @retval >=0 rtems status code from bcm2835_spi_set_tfr_mode.
+ * @retval >=0 @see bcm2835_spi_set_tfr_mode().
  */
 int bcm2835_spi_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg)
 {

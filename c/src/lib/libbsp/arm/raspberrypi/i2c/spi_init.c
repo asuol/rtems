@@ -1,3 +1,19 @@
+/**
+ * @file spi_init.c
+ *
+ * @ingroup raspberrypi_i2c
+ *
+ * @brief Raspberry Pi SPI bus initialization.
+ */
+
+/*
+ *  COPYRIGHT (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *
+ *  The license and distribution terms for this file may be
+ *  found in the file LICENSE in this distribution or at
+ *  http://www.rtems.org/license/LICENSE.
+ */
+
 #include <bsp/raspberrypi.h>
 #include <bsp/gpio.h>
 #include <bsp/i2c.h>

@@ -80,13 +80,13 @@ static rtems_status_code bcm2835_i2c_set_tfr_mode(rtems_libi2c_bus_t *bushdl, co
   rtems_status_code sc;
   uint16_t clock_divider;
 
-  /* Calculate the most appropriate clock divider */
+  /* Calculate the most appropriate clock divider. */
   sc = bcm2835_i2c_calculate_clock_divider(tfr_mode->baudrate, &clock_divider);
   
   if ( sc != RTEMS_SUCCESSFUL )
     return sc;
 
-  /* Set clock divider */
+  /* Set clock divider. */
   BCM2835_REG(BCM2835_I2C_DIV) = clock_divider;
 
   return sc;
@@ -111,13 +111,14 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
 
   uint32_t bytes_sent = buffer_size;
 
-  /* Since there is a maximum of 0xFFFF packets per transfer, count how many 
-   * transfers will be needed and adjust each transfer size accordingly. */
+  /* Since there is a maximum of 0xFFFF packets per transfer 
+   * (size of the DLEN register), count how many transfers will be 
+   * needed and adjust each transfer size accordingly. */
   int transfer_count = buffer_size / 0xFFFF; 
   uint16_t dlen_buffer_size;
 
   /* If the buffer size is a multiple of the max size per transfer, 
-   * round up the transfer count */
+   * round up the transfer count. */
   if ( buffer_size % 0xFFFF != 0 )
     transfer_count++;
 
@@ -130,13 +131,13 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     /* Set the DLEN register, which specifies how many data packets will be transferred. */
     BCM2835_REG(BCM2835_I2C_DLEN) = dlen_buffer_size;
 
-    /* Clear the acknowledgement and clock stretching error status. */
+    /* Clear the acknowledgment and clock stretching error status. */
     BCM2835_REG(BCM2835_I2C_S) |= (3 << 8);
 
     /* While there is data to transfer. */
     while ( dlen_buffer_size >= 1 ) {
 
-      /* If writting. */
+      /* If writing. */
       if ( rd_buf == NULL ) {
 
         /* If transfer is not active, send start bit. */
@@ -149,17 +150,17 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
           /* Generate interrupts on the TXW bit condition. */
           BCM2835_REG(BCM2835_I2C_C) |= (1 << 9);
 
-	  if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) != RTEMS_SUCCESSFUL )
-	    return -1;
-	}
+          if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) != RTEMS_SUCCESSFUL )
+            return -1;
+        }
 
         /* If using the bus in polling mode. */
         else 
           /* Poll TXW bit until there is space available to write. */
           while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 2)) == 0 )
             ;
-	
-        /* Write data to the TX fifo. */
+        
+        /* Write data to the TX FIFO. */
         BCM2835_REG(BCM2835_I2C_FIFO) = (*(uint8_t *)wr_buf);
 
         wr_buf++;
@@ -227,23 +228,23 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
  *        3. The RX FIFO is full.
  *
  *        Because the I2C FIFO has a 16 byte size, the 3. situation is not 
- *        as usefull to many applications as knowing that at least 1 byte can
+ *        as useful to many applications as knowing that at least 1 byte can
  *        be read from the RX FIFO. For that reason this information is
  *        got through polling the RXD bit even in interrupt-driven mode.
  *
- *        This leaves only 2 interrupts to be catched. At any given time
+ *        This leaves only 2 interrupts to be caught. At any given time
  *        when no I2C bus transfer is taking place no I2C interrupts are 
  *        generated, and they do they are only enabled one at a time: 
  *
  *        - When trying to write, the 2. interrupt is enabled to signal that 
  *          data can be written on the TX FIFO, avoiding data loss in case
- *          it is full. When catched the handler disables that interrupt from
+ *          it is full. When caught the handler disables that interrupt from
  *          being generated and releases the irq semaphore, which will allow
- *          the transfer process to continue (by writting to the TX FIFO);
+ *          the transfer process to continue (by writing to the TX FIFO);
  *
- *        - When the transfer is done on Raspberry side, the 1. interupt is
+ *        - When the transfer is done on Raspberry side, the 1. interrupt is
  *          enabled for the device to signal it has finished the transfer as
- *          well. When catched the handler disables that interrupt from being 
+ *          well. When caught the handler disables that interrupt from being 
  *          generated and releases the irq semaphore, marking the end of the
  *          transfer.
  *
@@ -261,7 +262,7 @@ static void i2c_handler(void* arg)
   else if ( (BCM2835_REG(BCM2835_I2C_C) & (1 << 8)) )
     BCM2835_REG(BCM2835_I2C_C) &= ~(1 << 8);
 
-    /* Release the irq semaphore */
+    /* Release the irq semaphore. */
     rtems_semaphore_release(softc_ptr->irq_sema_id);
 }
 
@@ -271,7 +272,7 @@ static void i2c_handler(void* arg)
  *
  * @param[in] bushdl Pointer to the libi2c API bus driver data structure.
  *
- * @retval RTEMS_SUCCESSFUL SPI bus successfuly initialized.
+ * @retval RTEMS_SUCCESSFUL SPI bus successfully initialized.
  * @retval Any other status code @see rtems_semaphore_create() and 
  *         @see rtems_interrupt_handler_install().
  */
@@ -285,10 +286,10 @@ rtems_status_code bcm2835_i2c_init(rtems_libi2c_bus_t * bushdl)
 
   softc_ptr->initialized = 1;
 
-  /* Enable the I2C BSC interface */
+  /* Enable the I2C BSC interface. */
   BCM2835_REG(BCM2835_I2C_C) |= (1 << 15);
 
-  /* If the access to the bus is configured to be interrupt-driven */
+  /* If the access to the bus is configured to be interrupt-driven. */
   if ( I2C_IO_MODE == 1 ) {
     sc = rtems_semaphore_create(rtems_build_name('i','2','c','s'), 0, RTEMS_FIFO | RTEMS_SIMPLE_BINARY_SEMAPHORE, 0, &softc_ptr->irq_sema_id);
 
@@ -321,7 +322,7 @@ rtems_status_code bcm2835_i2c_send_start(rtems_libi2c_bus_t * bushdl)
 /**
  * @brief Low level function that would send a stop condition over the I2C bus,
  *        however the BSC controller send this condition automatically when the
- *        DLEN (data lenght - the number of bytes to be transferred) register
+ *        DLEN (data length - the number of bytes to be transferred) register
  *        value reaches 0.
  *        For that reason, it is here just to satisfy, the libi2c API,
  *         which requires this function.
@@ -352,7 +353,7 @@ rtems_status_code bcm2835_i2c_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t ad
   BCM2835_REG(BCM2835_I2C_A) = addr;
 
   /* Set read/write bit. 
-   * If writting. */
+   * If writing. */
   if ( rw == 0 )
     BCM2835_REG(BCM2835_I2C_C) &= ~(1 << 0);
 
@@ -404,10 +405,10 @@ int bcm2835_i2c_write_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, i
  *
  * @param[in] bushdl Pointer to the libi2c API bus driver data structure.
  * @param[in] cmd IOCTL request command.
- * @param[in] arg Arguments needed to fullfill the requested IOCTL command.
+ * @param[in] arg Arguments needed to fulfill the requested IOCTL command.
  *
  * @retval -1 Unknown request command.
- * @retval >=0 rtems status code from bcm2835_i2c_set_tfr_mode.
+ * @retval >=0 @see bcm2835_i2c_set_tfr_mode().
  */
 int bcm2835_i2c_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg)
 {
