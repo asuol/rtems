@@ -4,6 +4,15 @@
 #define SPI_3_WIRE  0 /* MOSI, MISO and SCLK */
 #define SPI_2_WIRE  1 /* Bi-directional MOSI data line and SCLK */
 
+/* SPI constants */
+
+/* GPU processor core clock rate in Hz. Unless configured otherwise
+ * on a "config.txt" file present on the SD card the GPU defaults to 250 MHz. 
+ * 
+ * TODO: It would be nice if this value could be probed at startup,
+ *       probably using the Mailbox interface. */
+#define GPU_CORE_CLOCK_RATE 250000000
+
 /* SPI data structures */
 
 typedef struct {
@@ -39,6 +48,13 @@ int bcm2835_spi_write_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, i
 int bcm2835_spi_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg);
 
 rtems_status_code BSP_spi_init(void);
+
+/* I2C constants */
+
+/* BSC controller core clock rate in Hz. 
+ * This is set to 150 MHz as per the BCM2835 datasheet. */
+
+#define BSC_CORE_CLK_HZ 150000000
 
 /* I2C data structures */
 
