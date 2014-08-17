@@ -1,5 +1,5 @@
 /**
- * @file
+ * @file irq.h
  *
  * @ingroup raspberrypi_interrupt
  *
@@ -7,7 +7,8 @@
  */
 
 /**
- * Copyright (c) 2013 Alan Cudmore
+ *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2013 Alan Cudmore
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at

@@ -8,7 +8,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -221,6 +221,7 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
 
 /**
  * @brief Handler function that is called on any I2C interrupt. 
+ *
  *        There are 3 situations that can generate an interrupt:
  *        
  *        1. Transfer (read/write) complete;

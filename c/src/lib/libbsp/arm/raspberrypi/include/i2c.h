@@ -7,7 +7,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -70,11 +70,6 @@ typedef struct {
   int                 irq_write;
 } bcm2835_spi_softc_t;
 
-/**
- * @brief Object containing the SPI bus configuration settings.
- *
- * Encapsulates the current SPI bus configuration.
- */
 typedef struct {
   rtems_libi2c_bus_t  bus_desc;
   bcm2835_spi_softc_t softc;
@@ -102,7 +97,9 @@ int bcm2835_spi_write_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, i
 
 int bcm2835_spi_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg);
 
-rtems_status_code BSP_spi_init(void);
+int BSP_spi_register_drivers(int spi_bus_number);
+
+int BSP_spi_init(void);
 
 /** @} */
 
@@ -112,9 +109,12 @@ rtems_status_code BSP_spi_init(void);
  * @{
  */
 
-/* BSC controller core clock rate in Hz. 
- * This is set to 150 MHz as per the BCM2835 datasheet. */
 
+/**
+ * @brief  BSC controller core clock rate in Hz. 
+ *
+ * This is set to 150 MHz as per the BCM2835 datasheet.
+ */
 #define BSC_CORE_CLK_HZ 150000000
 
 /** @} */
@@ -157,7 +157,9 @@ int bcm2835_i2c_write_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, i
 
 int bcm2835_i2c_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg);
 
-rtems_status_code BSP_i2c_init(void);
+int BSP_i2c_register_drivers(int i2c_bus_number);
+
+int BSP_i2c_init(void);
 
 /** @} */
 

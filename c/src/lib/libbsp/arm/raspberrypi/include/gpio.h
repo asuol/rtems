@@ -7,7 +7,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -126,43 +126,69 @@ typedef struct
  */
 extern void gpio_initialize(void);
 
-/* Turns on the given pin */
+/**
+ * @brief Turns on the given pin.
+ */
 extern int gpio_set(int pin);
 
-/* Turns off the given pin */
+/**
+ * @brief Turns off the given pin.
+ */
 extern int gpio_clear(int pin);
 
-/* Returns the current value of a GPIO pin */
+/**
+ * @brief Returns the current value of a GPIO pin.
+ */
 extern int gpio_get_val(int pin);
 
-/* Selects a GPIO pin for a specific type */
+/**
+ * @brief Selects a GPIO pin for a specific function.
+ */
 extern int gpio_select_pin(int pin, rpi_pin type);
 
-/* Setups a JTAG pin configuration */
+/**
+ * @brief Setups a JTAG pin configuration.
+ */
 extern int gpio_select_jtag(void);
 
-/* Setups the SPI interface on the RPI P1 GPIO header */
+/**
+ * @brief Setups the SPI interface on the RPI P1 GPIO header.
+ */
 extern int gpio_select_spi_p1(void);
 
-/* Allows to setup the I2C interface on the main (P1) GPIO pin header (rev2) */
+/**
+ * @brief Setups the I2C interface on the main (P1) GPIO pin header (rev2).
+ */
 extern int gpio_select_i2c_p1_rev2(void); 
 
-/* Sets a GPIO input pin mode */
+/**
+ * @brief Configures a input GPIO pin pull-up resistor.
+ */
 extern int gpio_input_mode(int pin, rpi_gpio_input_mode mode);
 
-/* Sets a GPIO input pin mode for a number of pins */
+/**
+ * @brief Configures several input GPIO pins to the same pull-up resistor setup.
+ */
 extern int gpio_setup_input_mode(int *pin, int pin_count, rpi_gpio_input_mode mode);
 
-/* Configures a GPIO pin as NOT_USED */
+/**
+ * @brief Discards any configuration made on this pin.
+ */
 extern int gpio_disable_pin(int dev_pin);
 
-/* Debouces a switch by requiring a number of clock ticks to pass between interruts */
+/**
+ * @brief Debouces a switch by requiring a number of clock ticks to pass between interruts.
+ */
 extern int gpio_debounce_switch(int pin, int ticks);
 
-/* Enables interrupts on the given GPIO pin */
+/**
+ * @brief Enables interrupts on the given GPIO pin.
+ */
 extern int gpio_enable_interrupt(int dev_pin, gpio_interrupt interrupt, void (*handler) (void));
 
-/* Disables any interrupt enabled on the given GPIO pin */
+/**
+ * @brief Disables any interrupt enabled on the given GPIO pin.
+ */
 extern int gpio_disable_interrupt(int dev_pin);
 
 #ifdef __cplusplus

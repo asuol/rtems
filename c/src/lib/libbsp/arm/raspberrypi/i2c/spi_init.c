@@ -7,7 +7,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -40,33 +40,48 @@ static bcm2835_spi_desc_t bcm2835_spi_bus_desc = {
   }
 };
 
-rtems_status_code BSP_spi_init(void)
+/* Register drivers here for all the devices 
+ * which require access to the SPI bus.
+ *
+ * The libi2c function "rtems_libi2c_register_drv" must be used to 
+ * register each device driver, using the received spi bus number. 
+ *
+ * This function returns 0 on success. */
+int BSP_spi_register_drivers(int spi_bus_number)
 {
   int rv = 0;
 
-  int spi_bus_no_p1;
+  rv = rtems_libi2c_register_drv("23k256", &spi_23k256_rw_drv_t, spi_bus_number, 0x00);
 
-  /* Initialize the libi2c API */
+  return rv;
+}
+
+int BSP_spi_init(void)
+{
+  int rv;
+
+  /* Initialize the libi2c API. */
   rtems_libi2c_initialize ();
 
-  /* Enable the SPI interface on the Raspberry Pi P1 GPIO header */
+  /* Enable the SPI interface on the Raspberry Pi P1 GPIO header. */
   gpio_initialize ();
 
   if ( gpio_select_spi_p1() < 0 )
     return RTEMS_RESOURCE_IN_USE;
 
-  /* Clear SPI control register and clear SPI FIFOs */
+  /* Clear SPI control register and clear SPI FIFOs. */
   BCM2835_REG(BCM2835_SPI_CS) = 0x0000030;
 
-  /* Register the SPI bus */
+  /* Register the SPI bus. */
   rv = rtems_libi2c_register_bus("/dev/spi", &(bcm2835_spi_bus_desc.bus_desc));
 
   if ( rv < 0 )
-    return -rv;
+    return rv;
   
-  spi_bus_no_p1 = rv;
+  /* Register SPI device drivers. */
+  rv =  BSP_spi_register_drivers(rv);
 
- rtems_libi2c_register_drv("23k256",&spi_23k256_rw_drv_t, spi_bus_no_p1,0x00);
-
-  return 0;
+  return rv;
 }
+
+

@@ -1,5 +1,5 @@
 /**
- * @file
+ * @file irq.c
  *
  * @ingroup raspberrypi_interrupt
  *
@@ -7,6 +7,8 @@
  */
 
 /*
+ * Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *
  * Copyright (c) 2009
  * embedded brains GmbH
  * Obere Lagerstr. 30
