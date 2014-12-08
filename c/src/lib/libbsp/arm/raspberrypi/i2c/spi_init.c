@@ -18,8 +18,6 @@
 #include <bsp/gpio.h>
 #include <bsp/i2c.h>
 
-#include <libchip/23k256.h>
-
 static rtems_libi2c_bus_ops_t bcm2835_spi_ops = {
   init:        bcm2835_spi_init,
   send_start:  bcm2835_spi_send_start,
@@ -51,8 +49,6 @@ int BSP_spi_register_drivers(int spi_bus_number)
 {
   int rv = 0;
 
-  rv = rtems_libi2c_register_drv("23k256", &spi_23k256_rw_drv_t, spi_bus_number, 0x00);
-
   return rv;
 }
 
@@ -66,8 +62,9 @@ int BSP_spi_init(void)
   /* Enable the SPI interface on the Raspberry Pi P1 GPIO header. */
   gpio_initialize ();
 
-  if ( gpio_select_spi_p1() < 0 )
+  if ( gpio_select_spi_p1() < 0 ) {
     return RTEMS_RESOURCE_IN_USE;
+  }
 
   /* Clear SPI control register and clear SPI FIFOs. */
   BCM2835_REG(BCM2835_SPI_CS) = 0x0000030;
@@ -75,8 +72,9 @@ int BSP_spi_init(void)
   /* Register the SPI bus. */
   rv = rtems_libi2c_register_bus("/dev/spi", &(bcm2835_spi_bus_desc.bus_desc));
 
-  if ( rv < 0 )
+  if ( rv < 0 ) {
     return rv;
+  }
   
   /* Register SPI device drivers. */
   rv =  BSP_spi_register_drivers(rv);

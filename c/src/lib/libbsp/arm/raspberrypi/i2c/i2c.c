@@ -4,7 +4,7 @@
  * @ingroup raspberrypi_i2c
  *
  * @brief Support for the I2C bus on the Raspberry Pi GPIO P1 header (model A/B)
- * and GPIO J8 header on model B+.
+ *        and GPIO J8 header on model B+.
  */
 
 /*
@@ -15,10 +15,11 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
-/* TODO:
- * - Clock stretching (using default values)
+/* 
+ * TODO:
+ * - Clock stretching (currently using default values)
  * - 10-bit addressing
- * - Falling/Rising edge delays (using default values)
+ * - Falling/Rising edge delays (currently using default values)
  */
 
 #include <bsp.h>
@@ -26,6 +27,7 @@
 #include <bsp/gpio.h>
 #include <bsp/irq.h>
 #include <bsp/i2c.h>
+#include <assert.h>
 
 /**
  * @brief Calculates a clock divider to be used with the BSC core clock rate
@@ -40,23 +42,23 @@
  *                              an invalid BSC_CORE_CLOCK_HZ 
  *                              or clock_hz value.
  */
-static rtems_status_code bcm2835_i2c_calculate_clock_divider(uint32_t clock_hz, uint16_t *clock_divider)
+static rtems_status_code 
+bcm2835_i2c_calculate_clock_divider(uint32_t clock_hz, uint16_t *clock_divider)
 {
   uint16_t divider;
   uint32_t clock_rate;
 
+  assert( clock_hz > 0 );
+
   /* Calculates an initial clock divider. */
   divider = BSC_CORE_CLK_HZ / clock_hz;
 
-  if ( divider < 0 || divider > 0xFFFF )
-    return RTEMS_INVALID_NUMBER;
-
   clock_rate = BSC_CORE_CLK_HZ / divider;
 
-  /* If the resulting clock rate is greater than desired, try the next greater divider. */
-  while ( clock_rate > clock_hz )
-  {
-    divider++;
+  /* If the resulting clock rate is greater than desired, try the next greater 
+   * divider. */
+  while ( clock_rate > clock_hz ) {
+    ++divider;
 
     clock_rate = BSC_CORE_CLK_HZ / divider;
   }
@@ -75,7 +77,10 @@ static rtems_status_code bcm2835_i2c_calculate_clock_divider(uint32_t clock_hz, 
  * @retval RTEMS_SUCCESSFUL Successfully setup the bus transfer mode as desired.
  * @retval RTEMS_INVALID_NUMBER @see bcm2835_i2c_calculate_clock_divider().
  */
-static rtems_status_code bcm2835_i2c_set_tfr_mode(rtems_libi2c_bus_t *bushdl, const rtems_libi2c_tfr_mode_t *tfr_mode)
+static rtems_status_code bcm2835_i2c_set_tfr_mode(
+rtems_libi2c_bus_t *bushdl, 
+const rtems_libi2c_tfr_mode_t *tfr_mode
+)
 {
   rtems_status_code sc;
   uint16_t clock_divider;
@@ -83,8 +88,9 @@ static rtems_status_code bcm2835_i2c_set_tfr_mode(rtems_libi2c_bus_t *bushdl, co
   /* Calculate the most appropriate clock divider. */
   sc = bcm2835_i2c_calculate_clock_divider(tfr_mode->baudrate, &clock_divider);
   
-  if ( sc != RTEMS_SUCCESSFUL )
+  if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
+  }
 
   /* Set clock divider. */
   BCM2835_REG(BCM2835_I2C_DIV) = clock_divider;
@@ -105,7 +111,12 @@ static rtems_status_code bcm2835_i2c_set_tfr_mode(rtems_libi2c_bus_t *bushdl, co
  * @retval -1 Could not send/receive data to/from the bus.
  * @retval >=0 The number of bytes read/written.
  */
-static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd_buf, const unsigned char *wr_buf, int buffer_size)
+static int bcm2835_i2c_read_write(
+rtems_libi2c_bus_t * bushdl, 
+unsigned char *rd_buf, 
+const unsigned char *wr_buf, 
+int buffer_size
+)
 {
   bcm2835_i2c_softc_t *softc_ptr = &(((bcm2835_i2c_desc_t *)(bushdl))->softc);
 
@@ -114,21 +125,19 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
   /* Since there is a maximum of 0xFFFF packets per transfer 
    * (size of the DLEN register), count how many transfers will be 
    * needed and adjust each transfer size accordingly. */
-  int transfer_count = buffer_size / 0xFFFF; 
+  int transfer_count = (buffer_size + 0xFFFE) / 0xFFFF;
   uint16_t dlen_buffer_size;
 
-  /* If the buffer size is a multiple of the max size per transfer, 
-   * round up the transfer count. */
-  if ( buffer_size % 0xFFFF != 0 )
-    transfer_count++;
-
   do {
-    if (transfer_count > 1)
+    if ( transfer_count > 1 ) {
       dlen_buffer_size = 0xFFFF;
-    else
+    }
+    else {
       dlen_buffer_size = (buffer_size & 0xFFFF);
+    }
 
-    /* Set the DLEN register, which specifies how many data packets will be transferred. */
+    /* Set the DLEN register, which specifies how many data packets 
+     * will be transferred. */
     BCM2835_REG(BCM2835_I2C_DLEN) = dlen_buffer_size;
 
     /* Clear the acknowledgment and clock stretching error status. */
@@ -136,12 +145,11 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
 
     /* While there is data to transfer. */
     while ( dlen_buffer_size >= 1 ) {
-
       /* If writing. */
       if ( rd_buf == NULL ) {
 
         /* If transfer is not active, send start bit. */
-        if( (BCM2835_REG(BCM2835_I2C_S) & (1 << 0)) == 0)
+        if( (BCM2835_REG(BCM2835_I2C_S) & (1 << 0)) == 0 )
           BCM2835_REG(BCM2835_I2C_C) |= (1 << 7);
 
         /* If using the I2C bus in interrupt-driven mode. */
@@ -150,52 +158,68 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
           /* Generate interrupts on the TXW bit condition. */
           BCM2835_REG(BCM2835_I2C_C) |= (1 << 9);
 
-          if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) != RTEMS_SUCCESSFUL )
+          if ( 
+            rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) != 
+            RTEMS_SUCCESSFUL
+          ) {
             return -1;
+          }
         }
 
         /* If using the bus in polling mode. */
-        else 
+        else {
           /* Poll TXW bit until there is space available to write. */
-          while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 2)) == 0 )
+          while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 2)) == 0 ) {
             ;
+          }
+        }
         
         /* Write data to the TX FIFO. */
         BCM2835_REG(BCM2835_I2C_FIFO) = (*(uint8_t *)wr_buf);
 
-        wr_buf++;
+        ++wr_buf;
 
         /* Check for acknowledgment or clock stretching errors. */
-        if ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 8)) || (BCM2835_REG(BCM2835_I2C_S) & (1 << 9)) )
+        if ( 
+          (BCM2835_REG(BCM2835_I2C_S) & (1 << 8)) || 
+          (BCM2835_REG(BCM2835_I2C_S) & (1 << 9)) 
+        ) {
           return -1;
+        }
       }
-
       /* If reading. */
       else {
-        /* Send start bit. Before any read a libi2c_send_addr call should be made signaling a read operation. */
+        /* Send start bit. Before any read a libi2c_send_addr call should be 
+         * made signaling a read operation. */
         BCM2835_REG(BCM2835_I2C_C) |= (1 << 7);
 
         /* Check for an acknowledgment error. */
-        if ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 8)) != 0)
+        if ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 8)) != 0 ) {
           return -1;
+        }
         
         /* Poll RXD bit until there is data on the RX FIFO to read. */
-        while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 5)) == 0 ) 
+        while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 5)) == 0 ) {
           ;
+        }
 
         /* Read data from the RX FIFO. */
         (*(uint8_t *)rd_buf) = BCM2835_REG(BCM2835_I2C_FIFO) & 0xFF;
 
-        rd_buf++;
+        ++rd_buf;
 
         /* Check for acknowledgment or clock stretching errors. */
-        if ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 8)) || (BCM2835_REG(BCM2835_I2C_S) & (1 << 9)) )
+        if ( 
+          (BCM2835_REG(BCM2835_I2C_S) & (1 << 8)) || 
+          (BCM2835_REG(BCM2835_I2C_S) & (1 << 9))
+        ) {
           return -1;
+        }
       }
 
-      dlen_buffer_size--;
-      transfer_count--;
-      buffer_size--;
+      --dlen_buffer_size;
+      --transfer_count;
+      --buffer_size;
     }
   } while ( transfer_count > 0 );
 
@@ -204,15 +228,20 @@ static int bcm2835_i2c_read_write(rtems_libi2c_bus_t * bushdl, unsigned char *rd
     /* Generate interrupts on the DONE bit condition. */
     BCM2835_REG(BCM2835_I2C_C) |= (1 << 8);
 
-    if ( rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) != RTEMS_SUCCESSFUL )
+    if ( 
+      rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) != 
+      RTEMS_SUCCESSFUL
+    ) {
       return -1;
+    }
   }
-
   /* If using the bus in polling mode. */
-  else
+  else {
     /* Poll DONE bit until data has been sent. */
-    while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 1)) == 0 )
+    while ( (BCM2835_REG(BCM2835_I2C_S) & (1 << 1)) == 0 ) {
       ;
+    }
+  }
 
   bytes_sent -= buffer_size;
 
@@ -256,15 +285,16 @@ static void i2c_handler(void* arg)
   bcm2835_i2c_softc_t *softc_ptr = (bcm2835_i2c_softc_t *) arg;
 
   /* If the current enabled interrupt is on the TXW condition, disable it. */
-  if ( (BCM2835_REG(BCM2835_I2C_C) & (1 << 9)) ) 
+  if ( (BCM2835_REG(BCM2835_I2C_C) & (1 << 9)) ) {
     BCM2835_REG(BCM2835_I2C_C) &= ~(1 << 9);
-
+  }
   /* If the current enabled interrupt is on the DONE condition, disable it. */
-  else if ( (BCM2835_REG(BCM2835_I2C_C) & (1 << 8)) )
+  else if ( (BCM2835_REG(BCM2835_I2C_C) & (1 << 8)) ) {
     BCM2835_REG(BCM2835_I2C_C) &= ~(1 << 8);
 
     /* Release the irq semaphore. */
     rtems_semaphore_release(softc_ptr->irq_sema_id);
+  }
 }
 
 /**
@@ -282,8 +312,9 @@ rtems_status_code bcm2835_i2c_init(rtems_libi2c_bus_t * bushdl)
   bcm2835_i2c_softc_t *softc_ptr = &(((bcm2835_i2c_desc_t *)(bushdl))->softc);
   rtems_status_code sc = RTEMS_SUCCESSFUL;
 
-  if ( softc_ptr->initialized == 1 )
+  if ( softc_ptr->initialized == 1 ) {
     return sc;
+  }
 
   softc_ptr->initialized = 1;
 
@@ -292,9 +323,19 @@ rtems_status_code bcm2835_i2c_init(rtems_libi2c_bus_t * bushdl)
 
   /* If the access to the bus is configured to be interrupt-driven. */
   if ( I2C_IO_MODE == 1 ) {
-    sc = rtems_semaphore_create(rtems_build_name('i','2','c','s'), 0, RTEMS_FIFO | RTEMS_SIMPLE_BINARY_SEMAPHORE, 0, &softc_ptr->irq_sema_id);
+    sc = rtems_semaphore_create(rtems_build_name('i','2','c','s'), 
+                                0, 
+                                RTEMS_FIFO | RTEMS_SIMPLE_BINARY_SEMAPHORE, 
+                                0, 
+                                &softc_ptr->irq_sema_id
+                               );
 
-    sc = rtems_interrupt_handler_install(BCM2835_IRQ_ID_I2C, NULL, RTEMS_INTERRUPT_UNIQUE, (rtems_interrupt_handler) i2c_handler, softc_ptr);
+    sc = rtems_interrupt_handler_install(BCM2835_IRQ_ID_I2C, 
+                                         NULL, 
+                                         RTEMS_INTERRUPT_UNIQUE, 
+                                         (rtems_interrupt_handler) i2c_handler,
+                                         softc_ptr
+                                        );
   }
 
   return sc;
@@ -348,19 +389,21 @@ rtems_status_code bcm2835_i2c_stop(rtems_libi2c_bus_t * bushdl)
  *
  * @retval RTEMS_SUCCESSFUL The device has been successfully addressed.
  */
-rtems_status_code bcm2835_i2c_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t addr, int rw)
+rtems_status_code 
+bcm2835_i2c_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t addr, int rw)
 {
   /* Address slave device. */
   BCM2835_REG(BCM2835_I2C_A) = addr;
 
   /* Set read/write bit. 
    * If writing. */
-  if ( rw == 0 )
+  if ( rw == 0 ) {
     BCM2835_REG(BCM2835_I2C_C) &= ~(1 << 0);
-
+  }
   /* If reading. */
-  else
+  else {
     BCM2835_REG(BCM2835_I2C_C) |= (1 << 0);
+  }
 
   return RTEMS_SUCCESSFUL;
 }
@@ -372,11 +415,16 @@ rtems_status_code bcm2835_i2c_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t ad
  *
  * @param[in] bushdl Pointer to the libi2c API bus driver data structure.
  * @param[in] bytes Buffer where the data read from the bus will be stored.
- * @param[in] nbytes Number of bytes to be read from the bus to the bytes buffer.
+ * @param[in] nbytes Number of bytes to be read from the bus 
+ *                   to the bytes buffer.
  *
  * @retval @see bcm2835_i2c_read_write().
  */
-int bcm2835_i2c_read_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, int nbytes)
+int bcm2835_i2c_read_bytes(
+rtems_libi2c_bus_t * bushdl, 
+unsigned char *bytes, 
+int nbytes
+)
 {
   return bcm2835_i2c_read_write(bushdl, bytes, NULL, nbytes);
 }
@@ -393,7 +441,11 @@ int bcm2835_i2c_read_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, in
  *
  * @retval @see bcm2835_i2c_read_write().
  */
-int bcm2835_i2c_write_bytes(rtems_libi2c_bus_t * bushdl, unsigned char *bytes, int nbytes)
+int bcm2835_i2c_write_bytes(
+rtems_libi2c_bus_t * bushdl, 
+unsigned char *bytes, 
+int nbytes
+)
 {
   return bcm2835_i2c_read_write(bushdl, NULL, bytes, nbytes);
 }
@@ -416,7 +468,9 @@ int bcm2835_i2c_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg)
   switch ( cmd ) {
     case RTEMS_LIBI2C_IOCTL_SET_TFRMODE:
 
-      return bcm2835_i2c_set_tfr_mode(bushdl, (const rtems_libi2c_tfr_mode_t *)arg);
+      return bcm2835_i2c_set_tfr_mode(bushdl, 
+                                      (const rtems_libi2c_tfr_mode_t *)arg
+                                     );
 
     default:
       return -1;

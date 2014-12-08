@@ -25,9 +25,14 @@ extern "C" {
 
 /**
  * @brief  Number of total GPIOS on the Raspberry Pi,
- *         including the internal ones.
+ *         including inaccessible ones.
  */
 #define GPIO_PIN_COUNT 54
+
+/**
+ * @brief  Highest GPIO index directly accessible on the Raspberry Pi board.
+ */
+#define GPIO_EXTERNAL_TOP_PIN 32
 
 /**
  * @brief The set of possible configurations for a GPIO pull-up resistor.
@@ -37,7 +42,7 @@ extern "C" {
  */
 typedef enum
 {
-  PULL_UP,
+  PULL_UP=1,
   PULL_DOWN,
   NO_PULL_RESISTOR
 } rpi_gpio_input_mode;
@@ -49,14 +54,15 @@ typedef enum
  */
 typedef enum
 {
-  DIGITAL_INPUT,
+  DIGITAL_INPUT=0,
   DIGITAL_OUTPUT,
+  ALT_FUNC_5,
+  ALT_FUNC_4,
   ALT_FUNC_0,
   ALT_FUNC_1,
   ALT_FUNC_2,
   ALT_FUNC_3,
-  ALT_FUNC_4,
-  ALT_FUNC_5,
+  
   NOT_USED
 } rpi_pin;
 
@@ -129,67 +135,73 @@ extern void gpio_initialize(void);
 /**
  * @brief Turns on the given pin.
  */
-extern int gpio_set(int pin);
+extern rtems_status_code gpio_set(int pin);
 
 /**
  * @brief Turns off the given pin.
  */
-extern int gpio_clear(int pin);
+extern rtems_status_code gpio_clear(int pin);
 
 /**
  * @brief Returns the current value of a GPIO pin.
  */
-extern int gpio_get_val(int pin);
+extern int gpio_get_value(int pin);
 
 /**
  * @brief Selects a GPIO pin for a specific function.
  */
-extern int gpio_select_pin(int pin, rpi_pin type);
+extern rtems_status_code gpio_select_pin(int pin, rpi_pin type);
 
 /**
  * @brief Setups a JTAG pin configuration.
  */
-extern int gpio_select_jtag(void);
+extern rtems_status_code gpio_select_jtag(void);
 
 /**
  * @brief Setups the SPI interface on the RPI P1 GPIO header.
  */
-extern int gpio_select_spi_p1(void);
+extern rtems_status_code gpio_select_spi_p1(void);
 
 /**
  * @brief Setups the I2C interface on the main (P1) GPIO pin header (rev2).
  */
-extern int gpio_select_i2c_p1_rev2(void); 
+extern rtems_status_code gpio_select_i2c_p1_rev2(void); 
 
 /**
  * @brief Configures a input GPIO pin pull-up resistor.
  */
-extern int gpio_input_mode(int pin, rpi_gpio_input_mode mode);
+extern rtems_status_code gpio_input_mode(int pin, rpi_gpio_input_mode mode);
 
 /**
  * @brief Configures several input GPIO pins to the same pull-up resistor setup.
  */
-extern int gpio_setup_input_mode(int *pin, int pin_count, rpi_gpio_input_mode mode);
+extern rtems_status_code 
+gpio_setup_input_mode(int *pin, int pin_count, rpi_gpio_input_mode mode);
 
 /**
  * @brief Discards any configuration made on this pin.
  */
-extern int gpio_disable_pin(int dev_pin);
+extern rtems_status_code gpio_disable_pin(int dev_pin);
 
 /**
- * @brief Debouces a switch by requiring a number of clock ticks to pass between interruts.
+ * @brief Debouces a switch by requiring a number of clock ticks to 
+ *        pass between interruts.
  */
-extern int gpio_debounce_switch(int pin, int ticks);
+extern rtems_status_code gpio_debounce_switch(int pin, int ticks);
 
 /**
  * @brief Enables interrupts on the given GPIO pin.
  */
-extern int gpio_enable_interrupt(int dev_pin, gpio_interrupt interrupt, void (*handler) (void));
+extern rtems_status_code gpio_enable_interrupt(
+int dev_pin, 
+gpio_interrupt interrupt, 
+void (*handler) (void)
+);
 
 /**
  * @brief Disables any interrupt enabled on the given GPIO pin.
  */
-extern int gpio_disable_interrupt(int dev_pin);
+extern rtems_status_code gpio_disable_interrupt(int dev_pin);
 
 #ifdef __cplusplus
 }

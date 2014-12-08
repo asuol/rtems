@@ -66,14 +66,16 @@ int BSP_i2c_init(void)
   /* Enable the I2C interface on the Raspberry Pi P1 GPIO header. */
   gpio_initialize ();
 
-  if ( gpio_select_i2c_p1_rev2() < 0 )
+  if ( gpio_select_i2c_p1_rev2() < 0 ) {
     return RTEMS_RESOURCE_IN_USE;
+  }
 
   /* Register the I2C bus. */
   rv = rtems_libi2c_register_bus("/dev/i2c", &(bcm2835_i2c_bus_desc.bus_desc));
 
-  if ( rv < 0 )
+  if ( rv < 0 ) {
     return -rv;
+  }
   
   /* Register SPI device drivers. */
   rv =  BSP_i2c_register_drivers(rv);
