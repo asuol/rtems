@@ -7,7 +7,7 @@
  */
 
 /*
- *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2014-2015 Andre Marques <andre.lousa.marques at gmail.com>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -24,15 +24,16 @@ extern "C" {
 #endif /* __cplusplus */
 
 /**
- * @brief  Number of total GPIOS on the Raspberry Pi,
- *         including inaccessible ones.
+ * @brief  Total number of GPIOs on the Raspberry Pi,
+ *         including physical GPIO pins (available on the board hardware)
+ *         and system GPIOs (only accessible to the system).
  */
-#define GPIO_PIN_COUNT 54
+#define GPIO_COUNT 54
 
 /**
- * @brief  Highest GPIO index directly accessible on the Raspberry Pi board.
+ * @brief  Highest GPIO index physically accessible on the Raspberry Pi board.
  */
-#define GPIO_EXTERNAL_TOP_PIN 32
+#define GPIO_PHYSICAL_PIN_COUNT 32
 
 /**
  * @brief The set of possible configurations for a GPIO pull-up resistor.
@@ -42,7 +43,7 @@ extern "C" {
  */
 typedef enum
 {
-  PULL_UP=1,
+  PULL_UP = 1,
   PULL_DOWN,
   NO_PULL_RESISTOR
 } rpi_gpio_input_mode;
@@ -54,7 +55,7 @@ typedef enum
  */
 typedef enum
 {
-  DIGITAL_INPUT=0,
+  DIGITAL_INPUT = 0,
   DIGITAL_OUTPUT,
   ALT_FUNC_5,
   ALT_FUNC_4,
@@ -62,42 +63,64 @@ typedef enum
   ALT_FUNC_1,
   ALT_FUNC_2,
   ALT_FUNC_3,
-  
   NOT_USED
 } rpi_pin;
 
 /**
- * @brief The set of possible interrupts an input pin can generate.
+ * @brief The set of possible interrupts a GPIO pin can generate.
  *
- * Enumerated type to define an input pin interrupt.
+ * Enumerated type to define a GPIO pin interrupt.
  */
 typedef enum
 {
-  FALLING_EDGE,
+  FALLING_EDGE = 0,
   RISING_EDGE,
-  BOTH_EDGES,
   LOW_LEVEL,
   HIGH_LEVEL,
+  BOTH_EDGES,
   BOTH_LEVELS,
   NONE
 } gpio_interrupt;
 
 /**
- * @brief Object containing relevant information to a interrupt handler.
+ * @brief The set of possible handled states an user-defined interrupt
+ *        handler can return.
+ *
+ * Enumerated type to define an interrupt handler handled state.
+ */  
+typedef enum
+{
+  IRQ_HANDLED,
+  IRQ_NONE
+} gpio_irq_state;
+
+/**
+ * @brief The set of flags to specify an user-defined interrupt handler
+ *        uniqueness on a GPIO pin.
+ *
+ * Enumerated type to define an interrupt handler shared flag.
+ */  
+typedef enum
+{
+  SHARED_HANDLER,
+  UNIQUE_HANDLER
+} gpio_handler_flag;
+  
+/**
+ * @brief Object containing relevant information to a list of user-defined
+ *        interrupt handlers.
  *
  * Encapsulates relevant data for a GPIO interrupt handler.
  */
-typedef struct
+typedef struct _gpio_handler_list
 {
-  int pin_number;
+  struct _gpio_handler_list *next_isr;
 
-  void (*handler) (void);
+  gpio_irq_state (*handler) (void *arg);
 
-  int debouncing_tick_count;
- 
-  rtems_interval last_isr_tick;
-
-} handler_arguments;
+  void *arg;
+  
+} gpio_handler_list;
 
 /**
  * @brief Object containing information on a GPIO pin.
@@ -106,17 +129,27 @@ typedef struct
  */
 typedef struct
 { 
-  /* The pin type */
   rpi_pin pin_type;
 
-  /* Interrupt handler arguments*/
-  handler_arguments h_args;
-
+  /* Type of event which will trigger an interrupt. */
   gpio_interrupt enabled_interrupt;
+
+  /* If more than one interrupt handler is to be used, a task will be created
+   * to call each handler sequentially. */
+  rtems_id task_id;
+
+  gpio_handler_flag handler_flag;
+  
+  /* Linked list of interrupt handlers. */
+  gpio_handler_list *handler_list;
 
   /* GPIO input pin mode. */
   rpi_gpio_input_mode input_mode;
 
+  /* Switch-deboucing information. */
+  int debouncing_tick_count;
+  rtems_interval last_isr_tick;
+  
 } rpi_gpio_pin;
  
 /** @} */
@@ -190,14 +223,37 @@ extern rtems_status_code gpio_disable_pin(int dev_pin);
 extern rtems_status_code gpio_debounce_switch(int pin, int ticks);
 
 /**
- * @brief Enables interrupts on the given GPIO pin.
+ * @brief Connects a new user-defined interrupt handler to a given pin.
+ */
+extern rtems_status_code gpio_interrupt_handler_install(
+int dev_pin,
+gpio_irq_state (*handler) (void *arg),
+void *arg
+);
+  
+/**
+ * @brief Enables interrupts to be generated on a given GPIO pin.
+ *        When fired that interrupt will call the given handler.
  */
 extern rtems_status_code gpio_enable_interrupt(
 int dev_pin, 
-gpio_interrupt interrupt, 
-void (*handler) (void)
+gpio_interrupt interrupt,
+gpio_handler_flag flag,
+gpio_irq_state (*handler) (void *arg),
+void *arg
 );
 
+/**
+ * @brief Disconnects a new user-defined interrupt handler from the given pin.
+ *        If in the end there are no more user-defined handler connected
+ *        to the pin interrupts are disabled on the given pin.
+ */
+rtems_status_code gpio_interrupt_handler_remove(
+int dev_pin,
+gpio_irq_state (*handler) (void *arg),
+void *arg
+);
+  
 /**
  * @brief Disables any interrupt enabled on the given GPIO pin.
  */

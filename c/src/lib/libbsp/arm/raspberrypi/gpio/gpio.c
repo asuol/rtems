@@ -7,7 +7,7 @@
  */
 
 /*
- *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2014-2015 Andre Marques <andre.lousa.marques at gmail.com>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -16,50 +16,142 @@
 
 #include <bsp/raspberrypi.h>
 #include <bsp/irq.h>
+#include <bsp/irq-generic.h>
 #include <bsp/gpio.h>
+
 #include <assert.h>
+#include <stdlib.h>
 
 /* Calculates a bitmask to assign an alternate function to a given pin. */
 #define SELECT_PIN_FUNCTION(fn, pn) (fn << ((pn % 10) * 3))
 
 static bool is_initialized = false;
 
-rpi_gpio_pin gpio_pin[GPIO_PIN_COUNT];
+static int interrupt_counter = 0;
+
+static rpi_gpio_pin gpio_pin[GPIO_COUNT];
+
+/**
+ * @brief De-bounces a switch by requiring a certain time to pass between 
+ *        interrupts. Any interrupt fired too close to the last will be 
+ *        ignored as it is probably the result of an involuntary switch/button
+ *        bounce after being released.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ *
+ * @retval 0 Interrupt is likely provoked by a user press on the switch.
+ * @retval -1 Interrupt was generated too close to the last one. 
+ *            Probably a switch bounce.
+ */
+static int debounce_switch(int dev_pin)
+{
+  rtems_interval time;
+  rpi_gpio_pin *pin;
+
+  assert( dev_pin >= 1 && dev_pin <= GPIO_COUNT );
+  
+  pin = &gpio_pin[dev_pin];
+  
+  time = rtems_clock_get_ticks_since_boot();
+  
+  if ( (time - pin->last_isr_tick) < pin->debouncing_tick_count ) {
+    return -1;
+  }
+
+  pin->last_isr_tick = time;
+  
+  return 0;
+}
+
+static rtems_task generic_handler_task(rtems_task_argument arg)
+{
+  gpio_handler_list *handler_list;
+  rtems_event_set out;
+  int handled_count;
+  int pin;
+  int rv;
+
+  pin = (int) arg;
+
+  /* If this pin has the debouncing function attached, call it. */
+  if ( gpio_pin[pin].debouncing_tick_count > 0 ) {
+    rv = debounce_switch(pin);
+
+    /* If the handler call was caused by a switch bounce, simply returns. */
+    if ( rv < 0 ) {
+      return;
+    }
+
+    /* Record the current clock tick. */
+    gpio_pin[pin].last_isr_tick = rtems_clock_get_ticks_since_boot();
+  }
+  
+  while ( true ) {
+    handled_count = 0;
+
+    rtems_event_receive(RTEMS_EVENT_1, RTEMS_EVENT_ALL | RTEMS_WAIT,
+                        RTEMS_NO_TIMEOUT,
+                        &out);
+    
+    handler_list = gpio_pin[pin].handler_list;
+
+    while ( handler_list != NULL ) {
+      /* Call the user's ISR. */
+      if ( (handler_list->handler)(handler_list->arg) == IRQ_HANDLED ) {
+        ++handled_count;
+      }
+
+      handler_list = handler_list->next_isr;
+    }
+
+    /* If no handler assumed the interrupt, treat it as a spurious interrupt. */
+    if ( handled_count == 0 ) {
+      bsp_interrupt_handler_default(BCM2835_IRQ_ID_GPIO_0);
+    }
+  }
+}
 
 /**
  * @brief Waits a number of CPU cycles.
  *
  * @param[in] cycles The number of CPU cycles to wait.
- *
  */
 static void arm_delay (int cycles)
 {
   int i;
 
-  for ( i = 0; i < cycles; i++ ) {
+  for ( i = 0; i < cycles; ++i ) {
     asm volatile ("nop");
   }
 }
 
 /**
  * @brief Initializes the GPIO API and sets every pin as NOT_USED.
- *        If the API has already been initialized silently exits.
+ *
+ * @retval RTEMS_SUCCESSFUL GPIO API successfully initialized.
+ * @retval * @see rtems_semaphore_create()
  */
 void gpio_initialize(void)
 {
+  rtems_interval tick;
   int i;
-
+  
   if ( is_initialized ) {
     return;
   }
 
   is_initialized = true;
 
-  for ( i = 0; i < GPIO_PIN_COUNT; i++ ) {
+  tick = rtems_clock_get_ticks_since_boot();
+
+  for ( i = 0; i < GPIO_COUNT; ++i ) {
     gpio_pin[i].pin_type = NOT_USED;
     gpio_pin[i].enabled_interrupt = NONE;
-
-    gpio_pin[i].h_args.debouncing_tick_count = 0;
+    gpio_pin[i].task_id = RTEMS_ID_NONE;
+    gpio_pin[i].handler_list = NULL;
+    gpio_pin[i].debouncing_tick_count = 0;
+    gpio_pin[i].last_isr_tick = tick;
   }
 }
 
@@ -75,9 +167,9 @@ void gpio_initialize(void)
  */
 rtems_status_code gpio_set(int pin)
 {
-  assert( pin >= 0 && pin < GPIO_PIN_COUNT );
+  assert( pin >= 0 && pin < GPIO_COUNT );
 
-  if ( gpio_pin[pin - 1].pin_type != DIGITAL_OUTPUT ) {
+  if ( gpio_pin[pin].pin_type != DIGITAL_OUTPUT ) {
     return RTEMS_NOT_CONFIGURED;
   }
 
@@ -98,9 +190,9 @@ rtems_status_code gpio_set(int pin)
  */
 rtems_status_code gpio_clear(int pin)
 {
-  assert( pin >= 0 && pin < GPIO_PIN_COUNT );
+  assert( pin >= 0 && pin < GPIO_COUNT );
 
-  if ( gpio_pin[pin - 1].pin_type != DIGITAL_OUTPUT ) {
+  if ( gpio_pin[pin].pin_type != DIGITAL_OUTPUT ) {
     return RTEMS_NOT_CONFIGURED;
   }
 
@@ -120,7 +212,7 @@ rtems_status_code gpio_clear(int pin)
  */
 int gpio_get_value(int pin)
 {
-  assert( pin >= 0 && pin < GPIO_PIN_COUNT );
+  assert( pin >= 0 && pin < GPIO_COUNT );
 
   return (BCM2835_REG(BCM2835_GPIO_GPLEV0) & (1 << pin));
 }
@@ -137,14 +229,14 @@ int gpio_get_value(int pin)
  */
 rtems_status_code gpio_select_pin(int pin, rpi_pin type)
 {
-  assert( pin >= 0 && pin < GPIO_PIN_COUNT );
+  assert( pin >= 0 && pin < GPIO_COUNT );
 
   /* Calculate the pin function select register address. */
   volatile unsigned int *pin_addr = (unsigned int *)BCM2835_GPIO_REGS_BASE +
                                     (pin / 10);
   
   /* If the pin is already being used returns with an error. */
-  if ( gpio_pin[pin - 1].pin_type != NOT_USED ) {
+  if ( gpio_pin[pin].pin_type != NOT_USED ) {
     return RTEMS_RESOURCE_IN_USE;
   }
 
@@ -158,7 +250,7 @@ rtems_status_code gpio_select_pin(int pin, rpi_pin type)
 
   /* If the alternate function was successfuly assigned to the pin,
    * record that information on the gpio_pin structure. */
-  gpio_pin[pin - 1].pin_type = type;
+  gpio_pin[pin].pin_type = type;
 
   return RTEMS_SUCCESSFUL;
 }
@@ -213,8 +305,8 @@ set_input_mode(int *pins, int pin_count, int pin_mask, rpi_gpio_input_mode mode)
 
   /* If the operation was successful, record that information
    * on the gpio_pin structure so it can be recalled later. */
-  for ( i = 0; i < pin_count; i++ ) {
-    gpio_pin[pins[i] - 1].input_mode = mode;
+  for ( i = 0; i < pin_count; ++i ) {
+    gpio_pin[pins[i]].input_mode = mode;
   }
 
   return RTEMS_SUCCESSFUL;
@@ -232,13 +324,13 @@ set_input_mode(int *pins, int pin_count, int pin_mask, rpi_gpio_input_mode mode)
  */
 rtems_status_code gpio_input_mode(int pin, rpi_gpio_input_mode mode)
 {
-  assert( pin >= 0 && pin < GPIO_PIN_COUNT );
+  assert( pin >= 0 && pin < GPIO_COUNT );
 
   int pin_mask = (1 << pin);
   int pins[1];
 
   /* If the desired actuation mode is already set, silently exits. */
-  if ( gpio_pin[pin - 1].input_mode == mode ) {
+  if ( gpio_pin[pin].input_mode == mode ) {
     return RTEMS_SUCCESSFUL;
   }
 
@@ -268,7 +360,7 @@ gpio_setup_input_mode(int *pins, int pin_count, rpi_gpio_input_mode mode)
   int diff_mode_counter = 0;
   int i;
 
-  if ( pin_count > GPIO_EXTERNAL_TOP_PIN ) {
+  if ( pin_count > GPIO_PHYSICAL_PIN_COUNT ) {
     return RTEMS_INVALID_ID;
   }
 
@@ -277,10 +369,10 @@ gpio_setup_input_mode(int *pins, int pin_count, rpi_gpio_input_mode mode)
    * Every pin that currently uses a different pull resistor mode sets a bit
    * in its corresponding place on a bitmask. If the mode for a pin will not 
    * change then the diff_mode_counter variable is increased. */
-  for ( i = 0; i < pin_count; i++ ) {
-    assert( pins[i] >= 0 && pins[i] < GPIO_PIN_COUNT );
+  for ( i = 0; i < pin_count; ++i ) {
+    assert( pins[i] >= 0 && pins[i] < GPIO_COUNT );
 
-    if ( gpio_pin[pins[i] - 1].input_mode != mode ) {
+    if ( gpio_pin[pins[i]].input_mode != mode ) {
       pin_mask |= (1 << pins[i]);
     }
     else {
@@ -298,7 +390,7 @@ gpio_setup_input_mode(int *pins, int pin_count, rpi_gpio_input_mode mode)
 }
 
 /**
- * @brief Disables a GPIO pin on the APiI, making it available to be used 
+ * @brief Disables a GPIO pin on the API, making it available to be used 
  *        by anyone on the system.
  *
  * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
@@ -313,9 +405,9 @@ rtems_status_code gpio_disable_pin(int dev_pin)
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   rpi_gpio_pin *pin;
 
-  assert( dev_pin >= 1 && dev_pin <= GPIO_PIN_COUNT );
+  assert( dev_pin >= 1 && dev_pin <= GPIO_COUNT );
 
-  pin = &gpio_pin[dev_pin - 1];
+  pin = &gpio_pin[dev_pin];
 
   pin->pin_type = NOT_USED;
  
@@ -454,83 +546,53 @@ rtems_status_code gpio_select_i2c_p1_rev2(void)
 }
 
 /**
- * @brief De-bounces a switch by requiring a certain time to pass between 
- *        interrupts. Any interrupt fired too close to the last will be 
- *        ignored as it is probably the result of a involuntary switch/button
- *        bounce after being released.
- *
- * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
- *            on the header). 
- *
- * @retval 0 Interrupt is likely provoked by a user press on the switch.
- * @retval -1 Interrupt was generated too close to the last one. 
- *            Probably a switch bounce.
- */
-static int debounce_switch(int dev_pin)
-{
-  rtems_interval time;
-  rpi_gpio_pin *pin;
-
-  assert( dev_pin >= 1 && dev_pin <= GPIO_PIN_COUNT );
-
-  pin = &gpio_pin[dev_pin - 1];
-
-  time = rtems_clock_get_ticks_since_boot();
-
-  if ( (time - pin->h_args.last_isr_tick) < pin->h_args.debouncing_tick_count ) {
-    return -1;
-  }
-
-  pin->h_args.last_isr_tick = time;
-
-  return 0;
-}
-
-/**
  * @brief Generic ISR that clears the event register on the Raspberry Pi and 
  *        calls an user defined ISR. 
  *
  * @param[in] arg Void pointer to a handler_arguments structure. 
  */
-static void generic_handler(void* arg)
+static void generic_isr(void* arg)
 {
-  handler_arguments* handler_args;
-  int rv = 0;
-  int pin = 0;
+  uint32_t event_status;
+  rpi_gpio_pin *gpio;
+  int i;
 
-  handler_args = (handler_arguments*) arg;
-
-  pin = handler_args->pin_number;
-
-  /*  If the interrupt was generated by the pin attached to this ISR clear it. */
-  if ( BCM2835_REG(BCM2835_GPIO_GPEDS0) & (1 << pin) ) {
-    BCM2835_REG(BCM2835_GPIO_GPEDS0) &= (1 << pin);
-  }
-  /* If not lets the next ISR process the interrupt. */
-  else {
-    return;
-  }
+  gpio = (rpi_gpio_pin *) arg;
   
-  /* If this pin has the deboucing function attached, call it. */
-  if ( handler_args->debouncing_tick_count > 0 ) {
-    rv = debounce_switch(pin);
-   
-    if ( rv < 0 ) {
-      return;
+  /* Prevents more interrupts from being generated on GPIO. */
+  bsp_interrupt_vector_disable(BCM2835_IRQ_ID_GPIO_0);
+
+  /* TODO: Insert Memory Barrier */
+
+  /* Reads the GPIO Event register. */
+  event_status = BCM2835_REG(BCM2835_GPIO_GPEDS0);
+
+  /* Iterates through the register and calls the corresponding handler
+   * for active events. */
+  for ( i = 0; i < 32; ++i ) {
+    if ( event_status & (1 << i) ) {
+      rtems_event_send(gpio[i].task_id, RTEMS_EVENT_1);
     }
   }
 
-  /* Call the user's ISR. */  
-  (handler_args->handler) ();
+  /* Clear all active events. */
+  BCM2835_REG(BCM2835_GPIO_GPEDS0) = event_status;
+  
+  /* TODO: Insert Memory Barrier to prevent the interrupts being enabled before updating the event register. */
+
+  bsp_interrupt_vector_enable(BCM2835_IRQ_ID_GPIO_0);
 }
 
 /**
  * @brief Defines for a GPIO input pin the number of clock ticks that must pass
- *        before an generated interrupt is garanteed to be generated by the user
+ *        before an generated interrupt is guaranteed to be generated by the user
  *        and not by a bouncing switch/button.
  *
  * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
- *            on the header). 
+ *                    on the header). 
+ * @param[in] ticks Minimum number of clock ticks that must pass between 
+ *                  interrupts so it can be considered a legitimate
+ *                  interrupt. 
  *
  * @retval RTEMS_SUCCESSFUL De-bounce function successfully attached to the pin.
  * @retval RTEMS_NOT_CONFIGURED The current pin is not configured as a digital 
@@ -538,13 +600,75 @@ static void generic_handler(void* arg)
  */
 rtems_status_code gpio_debounce_switch(int dev_pin, int ticks)
 {
-  assert( dev_pin >= 1 && dev_pin <= GPIO_PIN_COUNT );
+  assert( dev_pin >= 1 && dev_pin <= GPIO_COUNT );
 
-  if ( gpio_pin[dev_pin - 1].pin_type != DIGITAL_INPUT ) {
+  if ( gpio_pin[dev_pin].pin_type != DIGITAL_INPUT ) {
     return RTEMS_NOT_CONFIGURED;
   }
 
-  gpio_pin[dev_pin - 1].h_args.debouncing_tick_count = ticks;
+  gpio_pin[dev_pin].debouncing_tick_count = ticks;
+  gpio_pin[dev_pin].last_isr_tick = rtems_clock_get_ticks_per_second();
+
+  return RTEMS_SUCCESSFUL;
+}
+
+/**
+ * @brief Connects a new user-defined interrupt handler to a given pin.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *                    on the header). 
+ * @param[in] handler Pointer to a function that will be called every time 
+ *                    the enabled interrupt for the given pin is generated. 
+ *                    This function must return information about its 
+ *                    handled/unhandled state.
+ * @param[in] arg Void pointer to the arguments of the user-defined handler.
+ *
+ * @retval RTEMS_SUCCESSFUL Handler successfully connected to this pin.
+ * @retval RTEMS_NO_MEMORY Could not connect more user-defined handlers to 
+ *                         the given pin.
+ * @retval RTEMS_NOT_CONFIGURED The given pin has no interrupt configured.
+ * @retval RTEMS_RESOURCE_IN_USE The current user-defined handler for this pin
+ *                               is unique.
+ */
+rtems_status_code gpio_interrupt_handler_install(
+int dev_pin,
+gpio_irq_state (*handler) (void *arg),
+void *arg
+)
+{
+  gpio_handler_list *isr_node;
+  rpi_gpio_pin *pin;
+
+  assert( dev_pin >= 1 && dev_pin <= GPIO_PHYSICAL_PIN_COUNT );
+
+  pin = &gpio_pin[dev_pin];
+
+  if ( pin->enabled_interrupt == NONE ) {
+    return RTEMS_NOT_CONFIGURED;
+  }
+  /* If the pin already has an enabled interrupt but the installed handler
+   * is set as unique. */
+  else if ( pin->handler_flag == UNIQUE_HANDLER && pin->handler_list != NULL ) {
+      return RTEMS_RESOURCE_IN_USE;
+  }
+  
+  isr_node = (gpio_handler_list *) malloc(sizeof(gpio_handler_list));
+
+  if ( isr_node == NULL ) {
+    return RTEMS_NO_MEMORY;
+  }
+  
+  isr_node->handler = handler;
+  isr_node->arg = arg;
+
+  if ( pin->handler_flag == SHARED_HANDLER ) {
+    isr_node->next_isr = pin->handler_list;
+  }
+  else {
+    isr_node->next_isr = NULL;
+  }
+
+  pin->handler_list = isr_node;
 
   return RTEMS_SUCCESSFUL;
 }
@@ -554,56 +678,91 @@ rtems_status_code gpio_debounce_switch(int dev_pin, int ticks)
  *        When fired that interrupt will call the given handler.
  *
  * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
- *            on the header). 
+ *                    on the header). 
  * @param[in] interrupt Type of interrupt to enable for the pin.
  * @param[in] handler Pointer to a function that will be called every time 
- *                    @var interrupt is generated. This function must have 
- *                    no receiving parameters and return void.
+ *                    @var interrupt is generated. This function must return
+ *                    information about its handled/unhandled state.
+ * @param[in] arg Void pointer to the arguments of the user-defined handler.
  *
  * @retval RTEMS_SUCCESSFUL Interrupt successfully enabled for this pin.
- * @retval RTEMS_UNSATISFIED Could not replace the currently active 
- *                           interrupt on this pin.
+ * @retval RTEMS_UNSATISFIED Could not install the GPIO ISR or create/start
+ *                           the handler task.
+ * @retval RTEMS_NOT_CONFIGURED The pin is not configured as a digital input,
+ *                              hence interrupts are not taken into account.
+ * @retval RTEMS_RESOURCE_IN_USE The current user-defined handler for this pin
+ *                               is unique.
  */
 rtems_status_code gpio_enable_interrupt(
 int dev_pin, 
-gpio_interrupt interrupt, 
-void (*handler)(void)
+gpio_interrupt interrupt,
+gpio_handler_flag flag,
+gpio_irq_state (*handler) (void *arg),
+void *arg
 )
 {
   rtems_status_code sc;
   rpi_gpio_pin *pin;
 
-  assert( dev_pin >= 1 && dev_pin <= GPIO_EXTERNAL_TOP_PIN );
+  assert( dev_pin >= 1 && dev_pin <= GPIO_PHYSICAL_PIN_COUNT && interrupt != NONE );
 
-  pin = &gpio_pin[dev_pin - 1];
+  pin = &gpio_pin[dev_pin];
 
-  /* If the pin already has an enabled interrupt removes it first,
-   * as well as its handler. */
-  if ( pin->enabled_interrupt != NONE ) {
-    sc = gpio_disable_interrupt(dev_pin);
-    
+  if ( pin->pin_type != DIGITAL_INPUT ) {
+    return RTEMS_NOT_CONFIGURED;
+  }
+
+  /* If the pin has no currently enabled interrupt, creates and starts
+   * a new task which will call the corresponding user-defined handlers. */
+  if ( pin->enabled_interrupt == NONE ) {
+    sc = rtems_task_create(rtems_build_name('G', 'P', 'I', 'O'),
+                           5,
+                           RTEMS_MINIMUM_STACK_SIZE * 2,
+                           RTEMS_NO_TIMESLICE,
+                           RTEMS_DEFAULT_ATTRIBUTES,
+                           &pin->task_id);
+
+    if ( sc != RTEMS_SUCCESSFUL ) {
+      return RTEMS_UNSATISFIED;
+    }
+
+    sc = rtems_task_start(pin->task_id, generic_handler_task, (rtems_task_argument) dev_pin);
+
+    if ( sc != RTEMS_SUCCESSFUL ) {
+
+      sc = rtems_task_delete(pin->task_id);
+
+      assert( sc == RTEMS_SUCCESSFUL );
+      
+      return RTEMS_UNSATISFIED;
+    } 
+
+    pin->enabled_interrupt = interrupt;
+    pin->handler_flag = flag;
+  }
+
+  /* Installs the interrupt handler and reactivates the GPIO interrupt vector. */
+  sc = gpio_interrupt_handler_install(dev_pin, handler, arg);
+
+  assert( sc == RTEMS_SUCCESSFUL );
+  
+  bsp_interrupt_vector_disable(BCM2835_IRQ_ID_GPIO_0);
+
+  /* If the generic ISR has not been yet installed, installs it.
+   * This ISR will be responsible for calling the handler tasks,
+   * which in turn will call the user-defined interrupt handlers.*/
+  if ( interrupt_counter == 0 ) {
+    sc = rtems_interrupt_handler_install(BCM2835_IRQ_ID_GPIO_0, 
+                                         "RPI_GPIO", 
+                                         RTEMS_INTERRUPT_UNIQUE, 
+                                         (rtems_interrupt_handler) generic_isr,
+                                         gpio_pin);
+
     if ( sc != RTEMS_SUCCESSFUL ) {
       return RTEMS_UNSATISFIED;
     }
   }
-
-  pin->h_args.pin_number = dev_pin;
-  pin->h_args.handler = handler;
-
-  pin->h_args.last_isr_tick = rtems_clock_get_ticks_since_boot();
-
-  /* Installs the generic_handler, which will call the user handler received 
-   * a parameter. */
-  sc = rtems_interrupt_handler_install(BCM2835_IRQ_ID_GPIO_0, 
-                                       NULL, 
-                                       RTEMS_INTERRUPT_SHARED, 
-                                       (rtems_interrupt_handler) generic_handler, 
-                                       &(pin->h_args));
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return RTEMS_UNSATISFIED;
-  }
-
+  
   switch ( interrupt ) {
     case FALLING_EDGE:
       /* Enables asynchronous falling edge detection. */
@@ -640,12 +799,70 @@ void (*handler)(void)
       /* Enables pin high level detection. */
       BCM2835_REG(BCM2835_GPIO_GPHEN0) |= (1 << dev_pin);
       break;
-
+      
     case NONE:
-      return RTEMS_SUCCESSFUL;
+      break;
+  }
+  
+  ++interrupt_counter;
+  
+  bsp_interrupt_vector_enable(BCM2835_IRQ_ID_GPIO_0);
+  
+  return RTEMS_SUCCESSFUL;
+}
+
+/**
+ * @brief Disconnects a new user-defined interrupt handler from the given pin.
+ *        If in the end there are no more user-defined handler connected
+ *        to the pin interrupts are disabled on the given pin.
+ *
+ * @param[in] dev_pin Raspberry Pi GPIO pin label number (not its position 
+ *            on the header). 
+ * @param[in] handler Pointer to the user-defined handler
+ * @param[in] arg Void pointer to the arguments of the user-defined handler.
+ *
+ * @retval RTEMS_SUCCESSFUL Handler successfully disconnected from this pin.
+ * @retval * @see gpio_disable_interrupt()
+ */
+rtems_status_code gpio_interrupt_handler_remove(
+int dev_pin,
+gpio_irq_state (*handler) (void *arg),
+void *arg
+)
+{
+  gpio_handler_list *isr_node, *next_node;
+  rpi_gpio_pin *pin;
+
+  assert( dev_pin >= 1 && dev_pin <= GPIO_PHYSICAL_PIN_COUNT );
+  
+  pin = &gpio_pin[dev_pin];
+
+  isr_node = pin->handler_list;
+
+  if ( isr_node != NULL ) {
+    if ( isr_node->handler == handler && isr_node->arg == arg ) {
+      pin->handler_list = isr_node->next_isr;
+
+      free(isr_node);
+    }
+    else {
+      while ( isr_node->next_isr != NULL ) {
+        if ( (isr_node->next_isr)->handler == handler && (isr_node->next_isr)->arg == arg ) {
+          next_node = (isr_node->next_isr)->next_isr;
+
+          free(isr_node->next_isr);
+
+          isr_node->next_isr = next_node;
+        }
+      }
+    }
   }
 
-  pin->enabled_interrupt = interrupt;
+  /* If the removed handler was the last for this pin, disables further
+   * interrupts on this pin. */
+  if ( pin->handler_list == NULL ) {
+    return gpio_disable_interrupt(dev_pin);
+  }
   
   return RTEMS_SUCCESSFUL;
 }
@@ -664,12 +881,19 @@ void (*handler)(void)
  */
 rtems_status_code gpio_disable_interrupt(int dev_pin)
 {
+  gpio_handler_list *isr_node;
   rtems_status_code sc;
   rpi_gpio_pin *pin;
 
-  assert( dev_pin >= 1 && dev_pin <= GPIO_EXTERNAL_TOP_PIN );
+  assert( dev_pin >= 1 && dev_pin <= GPIO_PHYSICAL_PIN_COUNT );
+  
+  if ( interrupt_counter == 0 ) {
+    return RTEMS_SUCCESSFUL;
+  }
 
-  pin = &gpio_pin[dev_pin - 1];
+  pin = &gpio_pin[dev_pin];
+
+  bsp_interrupt_vector_disable(BCM2835_IRQ_ID_GPIO_0);
 
   switch ( pin->enabled_interrupt ) {
     case FALLING_EDGE:
@@ -712,16 +936,36 @@ rtems_status_code gpio_disable_interrupt(int dev_pin)
       return RTEMS_SUCCESSFUL; 
   }
 
-  /* Removes the handler. */
-  sc = rtems_interrupt_handler_remove(BCM2835_IRQ_ID_GPIO_0, 
-                                      (rtems_interrupt_handler) generic_handler, 
-                                      &(pin->h_args));
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return RTEMS_UNSATISFIED;
-  }
-
   pin->enabled_interrupt = NONE;
 
+  while ( pin->handler_list != NULL ) {
+    isr_node = pin->handler_list;
+
+    pin->handler_list = isr_node->next_isr;
+
+    free(isr_node);
+  }
+
+  sc = rtems_task_delete(pin->task_id);
+
+  assert( sc == RTEMS_SUCCESSFUL );
+  
+  --interrupt_counter;
+
+  /* If no GPIO interrupts are left, removes the handler. */
+  if ( interrupt_counter == 0 ) {
+    sc = rtems_interrupt_handler_remove(BCM2835_IRQ_ID_GPIO_0, 
+                                        (rtems_interrupt_handler) generic_isr, 
+                                        gpio_pin);
+    
+    if ( sc != RTEMS_SUCCESSFUL ) {
+      return RTEMS_UNSATISFIED;
+    }
+  }
+
+  bsp_interrupt_vector_enable(BCM2835_IRQ_ID_GPIO_0);
+  
   return RTEMS_SUCCESSFUL;
 }
+
+

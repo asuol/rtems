@@ -102,7 +102,7 @@ rtems_status_code bsp_interrupt_vector_enable(rtems_vector_number vector)
   rtems_interrupt_level  level;
 
   rtems_interrupt_disable(level);
-
+  
   /* ARM Timer */
   if ( vector == BCM2835_IRQ_ID_TIMER_0 )
   {

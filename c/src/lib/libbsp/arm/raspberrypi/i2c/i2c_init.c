@@ -18,8 +18,6 @@
 #include <bsp/gpio.h>
 #include <bsp/i2c.h>
 
-#include <libchip/mcp23008.h>
-
 static rtems_libi2c_bus_ops_t bcm2835_i2c_ops = {
   init:             bcm2835_i2c_init,
   send_start:       bcm2835_i2c_send_start,
@@ -50,8 +48,6 @@ static bcm2835_i2c_desc_t bcm2835_i2c_bus_desc = {
 int BSP_i2c_register_drivers(int i2c_bus_number)
 {
   int rv = 0;
-
-  rv = rtems_libi2c_register_drv("mcp23008", &i2c_mcp23008_drv_t, i2c_bus_number, MCP23008_ADDR);
 
   return rv;
 }

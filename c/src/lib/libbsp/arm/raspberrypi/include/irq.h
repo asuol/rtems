@@ -36,7 +36,6 @@
 
 #define BCM2835_INTC_TOTAL_IRQ       64 + 8
 
-
 #define BCM2835_IRQ_ID_AUX           29
 #define BCM2835_IRQ_ID_SPI_SLAVE     43
 #define BCM2835_IRQ_ID_PWA0          45
@@ -50,7 +49,6 @@
 #define BCM2835_IRQ_ID_SPI           54
 #define BCM2835_IRQ_ID_PCM           55
 #define BCM2835_IRQ_ID_UART          57
-
 
 #define BCM2835_IRQ_ID_TIMER_0       64
 #define BCM2835_IRQ_ID_MAILBOX_0     65
