@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2013-2014 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -12,8 +12,8 @@
  * http://www.rtems.org/license/LICENSE.
  */
 
-#ifndef LIBBSP_ARM_ALTERY_CYCLONE_V_BSP_H
-#define LIBBSP_ARM_ALTERY_CYCLONE_V_BSP_H
+#ifndef LIBBSP_ARM_ALTERA_CYCLONE_V_BSP_H
+#define LIBBSP_ARM_ALTERA_CYCLONE_V_BSP_H
 
 #include <bspopts.h>
 
@@ -39,7 +39,9 @@ extern "C" {
 
 #define BSP_ARM_GIC_DIST_BASE ( BSP_ARM_A9MPCORE_SCU_BASE + 0x00001000 )
 
-#define BSP_ARM_L2CC_BASE 0xFFFEF000U
+#define BSP_ARM_L2C_310_BASE 0xfffef000
+
+#define BSP_ARM_L2C_310_ID 0x410000c9
 
 /* Forward declaration */
 struct rtems_bsdnet_ifconfig;
@@ -62,4 +64,4 @@ int altera_cyclone_v_network_if_attach_detach(
 
 #endif /* ASM */
 
-#endif /* LIBBSP_ARM_ALTERY_CYCLONE_V_BSP_H */
+#endif /* LIBBSP_ARM_ALTERA_CYCLONE_V_BSP_H */

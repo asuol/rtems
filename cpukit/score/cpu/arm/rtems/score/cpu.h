@@ -8,7 +8,7 @@
  *  This include file contains information pertaining to the ARM
  *  processor.
  *
- *  Copyright (c) 2009-2013 embedded brains GmbH.
+ *  Copyright (c) 2009-2014 embedded brains GmbH.
  *
  *  Copyright (c) 2007 Ray Xu <Rayx.cn@gmail.com>
  *
@@ -113,8 +113,6 @@
   #error "unknown endianness"
 #endif
 
-#define CPU_UNROLL_ENQUEUE_PRIORITY TRUE
-
 /*
  *  The ARM uses the PIC interrupt model.
  */
@@ -149,7 +147,7 @@
 /* XXX Why 32? */
 #define CPU_STRUCTURE_ALIGNMENT __attribute__ ((aligned (32)))
 
-#define CPU_TIMESTAMP_USE_INT64_INLINE TRUE
+#define CPU_TIMESTAMP_USE_STRUCT_TIMESPEC TRUE
 
 /*
  * The interrupt mask disables only normal interrupts (IRQ).
@@ -212,19 +210,19 @@
   #define ARM_CONTEXT_CONTROL_THREAD_ID_OFFSET 44
 #endif
 
-#ifdef ARM_MULTILIB_VFP_D32
+#ifdef ARM_MULTILIB_VFP
   #define ARM_CONTEXT_CONTROL_D8_OFFSET 48
 #endif
 
 #ifdef RTEMS_SMP
-  #ifdef ARM_MULTILIB_VFP_D32
+  #ifdef ARM_MULTILIB_VFP
     #define ARM_CONTEXT_CONTROL_IS_EXECUTING_OFFSET 112
   #else
     #define ARM_CONTEXT_CONTROL_IS_EXECUTING_OFFSET 48
   #endif
 #endif
 
-#define ARM_EXCEPTION_FRAME_SIZE 76
+#define ARM_EXCEPTION_FRAME_SIZE 80
 
 #define ARM_EXCEPTION_FRAME_REGISTER_SP_OFFSET 52
 
@@ -260,7 +258,7 @@ typedef struct {
   uint32_t register_fp;
   uint32_t register_sp;
   uint32_t register_lr;
-#elif defined(ARM_MULTILIB_ARCH_V7M)
+#elif defined(ARM_MULTILIB_ARCH_V6M) || defined(ARM_MULTILIB_ARCH_V7M)
   uint32_t register_r4;
   uint32_t register_r5;
   uint32_t register_r6;
@@ -278,7 +276,7 @@ typedef struct {
 #ifdef ARM_MULTILIB_HAS_THREAD_ID_REGISTER
   uint32_t thread_id;
 #endif
-#ifdef ARM_MULTILIB_VFP_D32
+#ifdef ARM_MULTILIB_VFP
   uint64_t register_d8;
   uint64_t register_d9;
   uint64_t register_d10;
@@ -301,17 +299,23 @@ extern uint32_t arm_cpu_mode;
 
 static inline void _ARM_Data_memory_barrier( void )
 {
+#ifdef ARM_MULTILIB_HAS_BARRIER_INSTRUCTIONS
   __asm__ volatile ( "dmb" : : : "memory" );
+#endif
 }
 
 static inline void _ARM_Data_synchronization_barrier( void )
 {
+#ifdef ARM_MULTILIB_HAS_BARRIER_INSTRUCTIONS
   __asm__ volatile ( "dsb" : : : "memory" );
+#endif
 }
 
 static inline void _ARM_Instruction_synchronization_barrier( void )
 {
+#ifdef ARM_MULTILIB_HAS_BARRIER_INSTRUCTIONS
   __asm__ volatile ( "isb" : : : "memory" );
+#endif
 }
 
 static inline uint32_t arm_interrupt_disable( void )
@@ -449,7 +453,7 @@ void _CPU_Context_Initialize(
     *(*(_destination)) = _CPU_Null_fp_context; \
   } while (0)
 
-#define _CPU_Fatal_halt( _err )             \
+#define _CPU_Fatal_halt( _source, _err )    \
    do {                                     \
      uint32_t _level;                       \
      uint32_t _error = _err;                \
@@ -482,7 +486,8 @@ void _CPU_Context_restore( Context_Control *new_context )
   RTEMS_COMPILER_NO_RETURN_ATTRIBUTE;
 
 #if defined(ARM_MULTILIB_ARCH_V7M)
-  void _ARMV7M_Start_multitasking( Context_Control *heir );
+  void _ARMV7M_Start_multitasking( Context_Control *heir )
+    RTEMS_COMPILER_NO_RETURN_ATTRIBUTE;
   #define _CPU_Start_multitasking _ARMV7M_Start_multitasking
 #endif
 
@@ -496,6 +501,8 @@ void _CPU_Context_validate( uintptr_t pattern );
   bool _CPU_SMP_Start_processor( uint32_t cpu_index );
 
   void _CPU_SMP_Finalize_initialization( uint32_t cpu_count );
+
+  void _CPU_SMP_Prepare_start_multitasking( void );
 
   static inline uint32_t _CPU_SMP_Get_current_processor( void )
   {
@@ -675,11 +682,12 @@ typedef struct {
 #if defined(ARM_MULTILIB_ARCH_V4)
   uint32_t register_cpsr;
   Arm_symbolic_exception_name vector;
-#elif defined(ARM_MULTILIB_ARCH_V7M)
+#elif defined(ARM_MULTILIB_ARCH_V6M) || defined(ARM_MULTILIB_ARCH_V7M)
   uint32_t register_xpsr;
   uint32_t vector;
 #endif
   const ARM_VFP_context *vfp_context;
+  uint32_t reserved_for_stack_alignment;
 } CPU_Exception_frame;
 
 typedef CPU_Exception_frame CPU_Interrupt_frame;
@@ -687,6 +695,12 @@ typedef CPU_Exception_frame CPU_Interrupt_frame;
 void _CPU_Exception_frame_print( const CPU_Exception_frame *frame );
 
 void _ARM_Exception_default( CPU_Exception_frame *frame );
+
+/*
+ * FIXME: In case your BSP uses this function, then convert it to use
+ * the shared start.S file for ARM.
+ */
+void rtems_exception_init_mngt( void );
 
 /** @} */
 

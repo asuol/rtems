@@ -33,6 +33,42 @@
   nop;
 
 /*
+ * System call optimized trap table entry
+ */
+#define IRQDIS_TRAP(_handler)  \
+  mov   %psr, %l0 ; \
+  sethi %hi(_handler), %l4 ; \
+  jmp   %l4+%lo(_handler); \
+   or   %l0, 0x0f00, %l3; ! Set PIL=0xf to disable IRQ
+
+/*
+ * System call optimized trap table entry
+ */
+#define IRQEN_TRAP(_handler)  \
+  mov   %psr, %l0 ; \
+  sethi %hi(_handler), %l4 ; \
+  jmp   %l4+%lo(_handler); \
+   andn %l0, 0xf00, %l3; ! Set PIL=0 to Enable IRQ
+
+/*
+ * Window Overflow optimized trap table entry
+ */
+#define WOTRAP(_vector, _handler)  \
+  sethi %hi(_handler), %l4; \
+  jmp   %l4+%lo(_handler); \
+    save; \
+  nop
+
+/*
+ * Window Underflow optimized trap table entry
+ */
+#define WUTRAP(_vector, _handler)  \
+  mov   %wim, %l3 ; \
+  sethi %hi(_handler), %l4 ; \
+  jmp   %l4+%lo(_handler); \
+   mov  %g0, %wim ! WIM = 0, so that we can restore regardless of WIM
+
+/*
  *  Software trap. Treat as BAD_TRAP for the time being...
  */
 
@@ -63,8 +99,8 @@ SYM(trap_table):
   BAD_TRAP;                                     ! 02 illegal instruction
   BAD_TRAP;                                     ! 03 privileged instruction
   BAD_TRAP;                                     ! 04 fp disabled
-  TRAP( 5, SYM(window_overflow_trap_handler) ); ! 05 window overflow
-  TRAP( 6, SYM(window_underflow_trap_handler) );! 06 window underflow
+  WOTRAP(5, SYM(window_overflow_trap_handler)); ! 05 window overflow
+  WUTRAP(6, SYM(window_underflow_trap_handler));! 06 window underflow
   BAD_TRAP;                                     ! 07 memory address not aligned
   BAD_TRAP;                                     ! 08 fp exception
   BAD_TRAP;                                     ! 09 data access exception
@@ -156,12 +192,23 @@ SYM(CLOCK_SPEED):
    *        installed before.
    */
 
-  TRAP( 0x80, SYM(syscall) ); 			! 80 syscall SW trap
-  SOFT_TRAP; SOFT_TRAP;  	            	! 81 - 82
+  TRAP( 0x80, SYM(syscall) );                   ! 80 halt syscall SW trap
+  SOFT_TRAP; SOFT_TRAP;                         ! 81 - 82
   TRAP( 0x83, SYM(window_flush_trap_handler) ); ! 83 flush windows SW trap
 
   SOFT_TRAP; SOFT_TRAP; SOFT_TRAP; SOFT_TRAP;   ! 84 - 87
-  SOFT_TRAP; SOFT_TRAP; SOFT_TRAP; SOFT_TRAP;   ! 88 - 8B
+  SOFT_TRAP;                                    ! 88
+
+  /*
+   *  SW Trap 9-15 Reserved for Operating System
+   *  
+   *  SPARC_SWTRAP_IRQDIS
+   *  SPARC_SWTRAP_IRQEN
+   */
+  IRQDIS_TRAP(SYM(syscall_irqdis));             ! 89 IRQ Disable syscall trap
+  IRQEN_TRAP(SYM(syscall_irqen));               ! 8A IRQ Enable syscall trap
+
+  SOFT_TRAP;                                    ! 8B
   SOFT_TRAP; SOFT_TRAP; SOFT_TRAP; SOFT_TRAP;   ! 8C - 8F
   SOFT_TRAP; SOFT_TRAP; SOFT_TRAP; SOFT_TRAP;   ! 90 - 93
   SOFT_TRAP; SOFT_TRAP; SOFT_TRAP; SOFT_TRAP;   ! 94 - 97
@@ -243,8 +290,6 @@ SYM(hard_reset):
 
 	call	SYM(bsp_start_on_secondary_processor) ! does not return
 	 sub	%sp, CPU_MINIMUM_STACK_FRAME_SIZE, %sp
-	ba	SYM(bsp_reset)		! just in case
-	 nop
 cpu0:
 #endif
 
@@ -355,18 +400,7 @@ zerobss:
         nop
 
         mov     %0, %o0                 ! command line
-        call    SYM(boot_card)
-        sub     %sp, 0x60, %sp          ! room for boot_card to save args
-        nop
-
-#if !defined(START_LEON3_ENABLE_SMP)
-        PUBLIC(BSP_fatal_return)
-        PUBLIC(bsp_reset)
-SYM(BSP_fatal_return):
-SYM(bsp_reset):
-	mov	1, %g1
-        ta      0                       ! Halt if _main returns ...
-        nop
-#endif
+        call    SYM(boot_card)          ! does not return
+         sub     %sp, 0x60, %sp         ! room for boot_card to save args
 
 /* end of file */

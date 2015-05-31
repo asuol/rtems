@@ -4,6 +4,7 @@ include $(top_srcdir)/automake/compile.am
 include_rtemsdir = $(includedir)/rtems
 
 include_rtems_HEADERS = include/confdefs.h
+include_rtems_HEADERS += include/rtems/bsd.h
 include_rtems_HEADERS += include/rtems/chain.h
 include_rtems_HEADERS += include/rtems/config.h
 include_rtems_HEADERS += include/rtems/counter.h
@@ -19,13 +20,12 @@ include_rtems_HEADERS += include/rtems/rbheap.h
 include_rtems_HEADERS += include/rtems/rbtree.h
 include_rtems_HEADERS += include/rtems/scheduler.h
 include_rtems_HEADERS += include/rtems/sptables.h
-include_rtems_HEADERS += include/rtems/test.h
+include_rtems_HEADERS += include/rtems/timecounter.h
 include_rtems_HEADERS += include/rtems/timespec.h
 
 EXTRA_DIST = include/rtems/README
 
 noinst_LIBRARIES = libsapi.a
-project_lib_LIBRARIES = libsapi.a
 libsapi_a_SOURCES = src/debug.c src/extension.c src/extensioncreate.c \
     src/extensiondelete.c src/extensionident.c src/fatal.c src/exinit.c \
     src/exshutdown.c src/io.c src/ioclose.c src/iocontrol.c src/iodata.c \
@@ -41,8 +41,7 @@ libsapi_a_SOURCES += src/delayticks.c
 libsapi_a_SOURCES += src/delaynano.c
 libsapi_a_SOURCES += src/profilingiterate.c
 libsapi_a_SOURCES += src/profilingreportxml.c
-libsapi_a_SOURCES += src/testbeginend.c
-libsapi_a_SOURCES += src/testextension.c
+libsapi_a_SOURCES += src/tcsimpleinstall.c
 libsapi_a_CPPFLAGS = $(AM_CPPFLAGS)
 
 include $(srcdir)/preinstall.am

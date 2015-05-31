@@ -13,6 +13,31 @@ all-am: $(PREINSTALL_FILES)
 PREINSTALL_FILES =
 CLEANFILES = $(PREINSTALL_FILES)
 
+$(PROJECT_INCLUDE)/sys/$(dirstamp):
+	@$(MKDIR_P) $(PROJECT_INCLUDE)/sys
+	@: > $(PROJECT_INCLUDE)/sys/$(dirstamp)
+PREINSTALL_DIRS += $(PROJECT_INCLUDE)/sys/$(dirstamp)
+
+$(PROJECT_INCLUDE)/sys/_ffcounter.h: include/sys/_ffcounter.h $(PROJECT_INCLUDE)/sys/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/sys/_ffcounter.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/sys/_ffcounter.h
+
+$(PROJECT_INCLUDE)/sys/timeffc.h: include/sys/timeffc.h $(PROJECT_INCLUDE)/sys/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/sys/timeffc.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/sys/timeffc.h
+
+$(PROJECT_INCLUDE)/sys/timepps.h: include/sys/timepps.h $(PROJECT_INCLUDE)/sys/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/sys/timepps.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/sys/timepps.h
+
+$(PROJECT_INCLUDE)/sys/timetc.h: include/sys/timetc.h $(PROJECT_INCLUDE)/sys/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/sys/timetc.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/sys/timetc.h
+
+$(PROJECT_INCLUDE)/sys/timex.h: include/sys/timex.h $(PROJECT_INCLUDE)/sys/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/sys/timex.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/sys/timex.h
+
 $(PROJECT_INCLUDE)/rtems/$(dirstamp):
 	@$(MKDIR_P) $(PROJECT_INCLUDE)/rtems
 	@: > $(PROJECT_INCLUDE)/rtems/$(dirstamp)
@@ -50,6 +75,10 @@ PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/apimutex.h
 $(PROJECT_INCLUDE)/rtems/score/assert.h: include/rtems/score/assert.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/assert.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/assert.h
+
+$(PROJECT_INCLUDE)/rtems/score/atomic.h: include/rtems/score/atomic.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/atomic.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/atomic.h
 
 $(PROJECT_INCLUDE)/rtems/score/chain.h: include/rtems/score/chain.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/chain.h
@@ -107,6 +136,10 @@ $(PROJECT_INCLUDE)/rtems/score/cpusetimpl.h: include/rtems/score/cpusetimpl.h $(
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/cpusetimpl.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/cpusetimpl.h
 
+$(PROJECT_INCLUDE)/rtems/score/cpustdatomic.h: include/rtems/score/cpustdatomic.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/cpustdatomic.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/cpustdatomic.h
+
 $(PROJECT_INCLUDE)/rtems/score/heap.h: include/rtems/score/heap.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/heap.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/heap.h
@@ -138,6 +171,14 @@ PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/isrlock.h
 $(PROJECT_INCLUDE)/rtems/score/freechain.h: include/rtems/score/freechain.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/freechain.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/freechain.h
+
+$(PROJECT_INCLUDE)/rtems/score/mrsp.h: include/rtems/score/mrsp.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/mrsp.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/mrsp.h
+
+$(PROJECT_INCLUDE)/rtems/score/mrspimpl.h: include/rtems/score/mrspimpl.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/mrspimpl.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/mrspimpl.h
 
 $(PROJECT_INCLUDE)/rtems/score/object.h: include/rtems/score/object.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/object.h
@@ -178,6 +219,14 @@ PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/rbtree.h
 $(PROJECT_INCLUDE)/rtems/score/rbtreeimpl.h: include/rtems/score/rbtreeimpl.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/rbtreeimpl.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/rbtreeimpl.h
+
+$(PROJECT_INCLUDE)/rtems/score/resource.h: include/rtems/score/resource.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/resource.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/resource.h
+
+$(PROJECT_INCLUDE)/rtems/score/resourceimpl.h: include/rtems/score/resourceimpl.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/resourceimpl.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/resourceimpl.h
 
 $(PROJECT_INCLUDE)/rtems/score/scheduler.h: include/rtems/score/scheduler.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/scheduler.h
@@ -287,10 +336,6 @@ $(PROJECT_INCLUDE)/rtems/score/threadqimpl.h: include/rtems/score/threadqimpl.h 
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/threadqimpl.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/threadqimpl.h
 
-$(PROJECT_INCLUDE)/rtems/score/threadsync.h: include/rtems/score/threadsync.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/threadsync.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/threadsync.h
-
 $(PROJECT_INCLUDE)/rtems/score/timespec.h: include/rtems/score/timespec.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/timespec.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/timespec.h
@@ -299,9 +344,13 @@ $(PROJECT_INCLUDE)/rtems/score/timestamp.h: include/rtems/score/timestamp.h $(PR
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/timestamp.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/timestamp.h
 
-$(PROJECT_INCLUDE)/rtems/score/timestamp64.h: include/rtems/score/timestamp64.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/timestamp64.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/timestamp64.h
+$(PROJECT_INCLUDE)/rtems/score/timecounter.h: include/rtems/score/timecounter.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/timecounter.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/timecounter.h
+
+$(PROJECT_INCLUDE)/rtems/score/timecounterimpl.h: include/rtems/score/timecounterimpl.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/timecounterimpl.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/timecounterimpl.h
 
 $(PROJECT_INCLUDE)/rtems/score/tls.h: include/rtems/score/tls.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/tls.h
@@ -382,13 +431,9 @@ $(PROJECT_INCLUDE)/rtems/score/threadmp.h: include/rtems/score/threadmp.h $(PROJ
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/threadmp.h
 endif
 if HAS_SMP
-$(PROJECT_INCLUDE)/rtems/score/atomic.h: include/rtems/score/atomic.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/atomic.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/atomic.h
-
-$(PROJECT_INCLUDE)/rtems/score/cpustdatomic.h: include/rtems/score/cpustdatomic.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/cpustdatomic.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/cpustdatomic.h
+$(PROJECT_INCLUDE)/rtems/score/schedulerprioritysmpimpl.h: include/rtems/score/schedulerprioritysmpimpl.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/schedulerprioritysmpimpl.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/score/schedulerprioritysmpimpl.h
 
 $(PROJECT_INCLUDE)/rtems/score/schedulerpriorityaffinitysmp.h: include/rtems/score/schedulerpriorityaffinitysmp.h $(PROJECT_INCLUDE)/rtems/score/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/score/schedulerpriorityaffinitysmp.h

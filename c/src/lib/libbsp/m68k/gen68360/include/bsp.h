@@ -31,10 +31,6 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
 
@@ -42,6 +38,10 @@ extern "C" {
 #include <rtems/console.h>
 #include <rtems/iosupp.h>
 #include <rtems/clockdrv.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  *  @defgroup gen68360_bsp Network driver
@@ -101,6 +101,11 @@ rtems_isr_entry set_vector(
 #define PGH360_PB_SPI_DISP4_CE_MSK   (1<<14)
 #define PGH360_PB_SPI_EEP_CE_MSK     (1<< 0)
 #endif /* defined(PGH360) */
+
+/*
+ * Prototypes for BSP methods which cross file boundaries
+ */
+void _Init68360(void);
 
 #ifdef __cplusplus
 }

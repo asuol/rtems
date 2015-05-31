@@ -28,7 +28,18 @@ volatile bool clock_driver_enabled;
     clock_driver_enabled = false; \
   } while (0)
 
+#define CLOCK_DRIVER_USE_DUMMY_TIMECOUNTER
+
 #include "clockdrv_shell.h"
+
+/*
+ * If this is defined, then the BSP has defined a delay of some sort so
+ * time passage appears somewhat correctly. Otherwise, it runs extremely
+ * fast with no delays.
+ */
+#ifndef BSP_CLOCK_DRIVER_DELAY
+#define BSP_CLOCK_DRIVER_DELAY()
+#endif
 
 /*
  *  Since there is no interrupt on this simulator, let's just
@@ -46,6 +57,7 @@ Thread clock_driver_sim_idle_body(
 	rtems_clock_tick();
       _ISR_Nest_level--;
       _Thread_Enable_dispatch();
+      BSP_CLOCK_DRIVER_DELAY();
     }
   }
   return 0;   /* to avoid warning */

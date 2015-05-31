@@ -1,8 +1,10 @@
 /*
- *  This include file contains all board IO definitions.
- *
  *  generic sh1
  *
+ *  This include file contains all board IO definitions.
+ */
+
+/*
  *  Author: Ralf Corsepius (corsepiu@faw.uni-ulm.de)
  *
  *  COPYRIGHT (c) 1997-1998, FAW Ulm, Germany
@@ -23,16 +25,17 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <rtems.h>
 #include <rtems/clockdrv.h>
 #include <rtems/console.h>
+#include <termios.h> /* for tcflag_t */
 
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* EDIT: To activate the sci driver, change the define below */
 #if 1
@@ -68,8 +71,15 @@ extern void *CPU_Interrupt_stack_high;
       console_read, console_write, console_control }
 
 /*
- * NOTE: Use the standard Clock driver entry
+ * BSP methods that cross file boundaries.
  */
+void bsp_hw_init(void);
+
+extern int _sci_get_brparms(
+  tcflag_t      cflag,
+  unsigned char *smr,
+  unsigned char *brr
+);
 
 #ifdef __cplusplus
 }

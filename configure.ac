@@ -1,7 +1,7 @@
 ## Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([rtems],[_RTEMS_VERSION],[http://www.rtems.org/bugzilla])
+AC_INIT([rtems],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([c])
 RTEMS_TOP([.])
 
@@ -28,6 +28,7 @@ RTEMS_ENABLE_RTEMS_DEBUG
 RTEMS_ENABLE_RTEMSBSP
 RTEMS_ENABLE_MULTILIB
 RTEMS_ENABLE_PARAVIRT
+RTEMS_ENABLE_DRVMGR
 
 AC_ARG_ENABLE([docs],
   [AS_HELP_STRING([--enable-docs],[enable building documentation

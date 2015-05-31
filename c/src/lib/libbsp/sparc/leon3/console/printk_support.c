@@ -21,9 +21,11 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdio.h>
+#include <bsp/apbuart.h>
+#include <bsp/apbuart_termios.h>
 
 int debug_uart_index __attribute__((weak)) = 0;
-static struct apbuart_regs *dbg_uart = NULL;
+struct apbuart_regs *dbg_uart = NULL;
 
 /* Before UART driver has registered (or when no UART is available), calls to
  * printk that gets to bsp_out_char() will be filling data into the
@@ -69,60 +71,9 @@ void bsp_debug_uart_init(void)
      */
     apb = (struct ambapp_apb_info *)adev->devinfo;
     dbg_uart = (struct apbuart_regs *)apb->start;
-    dbg_uart->ctrl |= LEON_REG_UART_CTRL_RE | LEON_REG_UART_CTRL_TE;
+    dbg_uart->ctrl |= APBUART_CTRL_RE | APBUART_CTRL_TE;
     dbg_uart->status = 0;
   }
-}
-
-/*
- *  apbuart_outbyte_polled
- *
- *  This routine transmits a character using polling.
- */
-void apbuart_outbyte_polled(
-  struct apbuart_regs *regs,
-  unsigned char ch,
-  int do_cr_on_newline,
-  int wait_sent
-)
-{
-send:
-  while ( (regs->status & LEON_REG_UART_STATUS_THE) == 0 ) {
-    /* Lower bus utilization while waiting for UART */
-    __asm__ volatile ("nop"::); __asm__ volatile ("nop"::);
-    __asm__ volatile ("nop"::); __asm__ volatile ("nop"::);
-    __asm__ volatile ("nop"::); __asm__ volatile ("nop"::);
-    __asm__ volatile ("nop"::); __asm__ volatile ("nop"::);
-  }
-  regs->data = (unsigned int) ch;
-
-  if ((ch == '\n') && do_cr_on_newline) {
-    ch = '\r';
-    goto send;
-  }
-
-  /* Wait until the character has been sent? */
-  if (wait_sent) {
-    while ((regs->status & LEON_REG_UART_STATUS_THE) == 0)
-      ;
-  }
-}
-
-/*
- *  apbuart_inbyte_nonblocking
- *
- *  This routine polls for a character.
- */
-int apbuart_inbyte_nonblocking(struct apbuart_regs *regs)
-{
-  /* Clear errors */
-  if (regs->status & LEON_REG_UART_STATUS_ERR)
-    regs->status = ~LEON_REG_UART_STATUS_ERR;
-
-  if ((regs->status & LEON_REG_UART_STATUS_DR) == 0)
-    return EOF;
-  else
-    return (int) regs->data;
 }
 
 /* putchar/getchar for printk */

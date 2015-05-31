@@ -108,5 +108,15 @@ rtems_status_code rtems_io_register_driver(
 
   _Thread_Enable_dispatch();
 
-  return rtems_io_initialize( major, 0, NULL );
+  if ( _IO_All_drivers_initialized ) {
+    /* Other drivers have already been initialized, we initialize
+     * the driver directly.
+     */
+    return rtems_io_initialize( major, 0, NULL );
+  } else {
+    /* The driver will be initialized together with all other drivers
+     * in a later stage by _IO_Initialize_all_drivers().
+     */
+    return RTEMS_SUCCESSFUL;
+  }
 }

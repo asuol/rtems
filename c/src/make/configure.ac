@@ -5,7 +5,7 @@
 ##
 
 AC_PREREQ([2.69])
-AC_INIT([rtems-c-src-make],[_RTEMS_VERSION],[http://www.rtems.org/bugzilla])
+AC_INIT([rtems-c-src-make],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([bsp.cfg.in])
 RTEMS_TOP(../../..)
 AC_SUBST(RTEMS_TOPdir,../../..)
@@ -20,6 +20,7 @@ RTEMS_ENABLE_MULTIPROCESSING
 RTEMS_ENABLE_POSIX
 RTEMS_ENABLE_NETWORKING
 RTEMS_ENABLE_CXX
+RTEMS_ENABLE_DRVMGR
 
 RTEMS_ENV_RTEMSBSP
 

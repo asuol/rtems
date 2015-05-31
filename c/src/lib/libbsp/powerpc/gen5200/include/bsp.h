@@ -141,11 +141,6 @@ LINKER_SYMBOL(MBAR);
 
 #ifndef ASM
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
 #include <rtems.h>
 #include <rtems/console.h>
 #include <rtems/clockdrv.h>
@@ -155,6 +150,10 @@ extern "C" {
 #include <bsp/vectors.h>
 #include <bsp/u-boot.h>
 #include <bsp/default-initial-extension.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  * Network driver configuration
@@ -253,6 +252,13 @@ void BSP_IRQ_Benchmarking_Report(void);
 #endif
 
 void cpu_init(void);
+
+int mpc5200_eth_mii_read(
+  int phyAddr,
+  void *arg,
+  unsigned regAddr,
+  uint32_t *retVal
+);
 
 #ifdef __cplusplus
 }

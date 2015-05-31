@@ -51,8 +51,7 @@ rtems_status_code rtems_timer_reset(
 
     case OBJECTS_LOCAL:
       if ( the_timer->the_class == TIMER_INTERVAL ) {
-        _Watchdog_Remove( &the_timer->Ticker );
-        _Watchdog_Insert( &_Watchdog_Ticks_chain, &the_timer->Ticker );
+        _Watchdog_Reset_ticks( &the_timer->Ticker );
       } else if ( the_timer->the_class == TIMER_INTERVAL_ON_TASK ) {
         Timer_server_Control *timer_server = _Timer_server;
 
@@ -68,7 +67,7 @@ rtems_status_code rtems_timer_reset(
             return RTEMS_INCORRECT_STATE;
           }
         #endif
-        _Watchdog_Remove( &the_timer->Ticker );
+        (*timer_server->cancel)( timer_server, the_timer );
         (*timer_server->schedule_operation)( timer_server, the_timer );
       } else {
         /*

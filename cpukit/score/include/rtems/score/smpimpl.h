@@ -21,6 +21,7 @@
 #include <rtems/score/smp.h>
 #include <rtems/score/percpu.h>
 #include <rtems/fatal.h>
+#include <rtems/rtems/cache.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,14 +52,22 @@ extern "C" {
 #define SMP_MESSAGE_TEST 0x2UL
 
 /**
+ * @brief SMP message to request a multicast action.
+ *
+ * @see _SMP_Send_message().
+ */
+#define SMP_MESSAGE_MULTICAST_ACTION 0x4UL
+
+/**
  * @brief SMP fatal codes.
  */
 typedef enum {
-  SMP_FATAL_SHUTDOWN,
-  SMP_FATAL_SHUTDOWN_EARLY,
   SMP_FATAL_BOOT_PROCESSOR_NOT_ASSIGNED_TO_SCHEDULER,
   SMP_FATAL_MANDATORY_PROCESSOR_NOT_PRESENT,
+  SMP_FATAL_MULTITASKING_START_ON_INVALID_PROCESSOR,
   SMP_FATAL_MULTITASKING_START_ON_UNASSIGNED_PROCESSOR,
+  SMP_FATAL_SHUTDOWN,
+  SMP_FATAL_SHUTDOWN_RESPONSE,
   SMP_FATAL_START_OF_MANDATORY_PROCESSOR_FAILED
 } SMP_Fatal_code;
 
@@ -126,6 +135,11 @@ static inline void _SMP_Set_test_message_handler(
 }
 
 /**
+ * @brief Processes all pending multicast actions.
+ */
+void _SMP_Multicast_actions_process( void );
+
+/**
  * @brief Interrupt handler for inter-processor interrupts.
  */
 static inline void _SMP_Inter_processor_interrupt_handler( void )
@@ -140,15 +154,30 @@ static inline void _SMP_Inter_processor_interrupt_handler( void )
     );
 
     if ( ( message & SMP_MESSAGE_SHUTDOWN ) != 0 ) {
-      rtems_fatal( RTEMS_FATAL_SOURCE_SMP, SMP_FATAL_SHUTDOWN );
+      _SMP_Fatal( SMP_FATAL_SHUTDOWN_RESPONSE );
       /* does not continue past here */
     }
 
     if ( ( message & SMP_MESSAGE_TEST ) != 0 ) {
       ( *_SMP_Test_message_handler )( cpu_self );
     }
+
+    if ( ( message & SMP_MESSAGE_MULTICAST_ACTION ) != 0 ) {
+      _SMP_Multicast_actions_process();
+    }
   }
 }
+
+/**
+ *  @brief Returns true, if the processor with the specified index should be
+ *  started.
+ *
+ *  @param[in] cpu_index The processor index.
+ *
+ *  @retval true The processor should be started.
+ *  @retval false Otherwise.
+ */
+bool _SMP_Should_start_processor( uint32_t cpu_index );
 
 /**
  *  @brief Sends a SMP message to a processor.
@@ -170,8 +199,42 @@ void _SMP_Send_message( uint32_t cpu_index, unsigned long message );
  *
  *  @param [in] message is message to send
  */
-void _SMP_Broadcast_message(
-  uint32_t  message
+void _SMP_Send_message_broadcast(
+  unsigned long message
+);
+
+/**
+ *  @brief Sends a SMP message to a set of processors.
+ *
+ *  The sending processor may be part of the set.
+ *
+ *  @param[in] setsize The size of the set of target processors of the message.
+ *  @param[in] cpus The set of target processors of the message.
+ *  @param[in] message The message.
+ */
+void _SMP_Send_message_multicast(
+  const size_t setsize,
+  const cpu_set_t *cpus,
+  unsigned long message
+);
+
+typedef void ( *SMP_Multicast_action_handler )( void *arg );
+
+/**
+ *  @brief Initiates a SMP multicast action to a set of processors.
+ *
+ *  The current processor may be part of the set.
+ *
+ *  @param[in] setsize The size of the set of target processors of the message.
+ *  @param[in] cpus The set of target processors of the message.
+ *  @param[in] handler The multicast action handler.
+ *  @param[in] arg The multicast action argument.
+ */
+void _SMP_Multicast_action(
+  const size_t setsize,
+  const cpu_set_t *cpus,
+  SMP_Multicast_action_handler handler,
+  void *arg
 );
 
 #endif /* defined( RTEMS_SMP ) */

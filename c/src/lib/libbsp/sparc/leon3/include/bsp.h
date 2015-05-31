@@ -28,10 +28,6 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
 
@@ -40,6 +36,10 @@ extern "C" {
 #include <rtems/clockdrv.h>
 #include <rtems/console.h>
 #include <rtems/irq-extension.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  *  @defgroup sparc_leon3 LEON3 Support
@@ -62,6 +62,9 @@ void *bsp_idle_thread( uintptr_t ignored );
 /* Maximum supported APBUARTs by BSP */
 #define BSP_NUMBER_OF_TERMIOS_PORTS 8
 
+/* Make sure maximum number of consoles fit in filesystem */
+#define BSP_MAXIMUM_DEVICES 8
+
 /*
  * Network driver configuration
  */
@@ -79,12 +82,15 @@ extern int rtems_leon_greth_driver_attach(
   int attach
 );
 
-#define RTEMS_BSP_NETWORK_DRIVER_NAME_OPENETH	"open_eth1"
-#define RTEMS_BSP_NETWORK_DRIVER_ATTACH_OPENETH	 rtems_leon_open_eth_driver_attach
-#define RTEMS_BSP_NETWORK_DRIVER_NAME_SMC91111	"smc_eth1"
-#define RTEMS_BSP_NETWORK_DRIVER_ATTACH_SMC91111 rtems_smc91111_driver_attach_leon3
-#define RTEMS_BSP_NETWORK_DRIVER_NAME_GRETH	 "gr_eth1"
-#define RTEMS_BSP_NETWORK_DRIVER_ATTACH_GRETH    rtems_leon_greth_driver_attach
+#define RTEMS_BSP_NETWORK_DRIVER_NAME_OPENETH "open_eth1"
+#define RTEMS_BSP_NETWORK_DRIVER_ATTACH_OPENETH   \
+    rtems_leon_open_eth_driver_attach
+#define RTEMS_BSP_NETWORK_DRIVER_NAME_SMC91111 "smc_eth1"
+#define RTEMS_BSP_NETWORK_DRIVER_ATTACH_SMC91111 \
+    rtems_smc91111_driver_attach_leon3
+#define RTEMS_BSP_NETWORK_DRIVER_NAME_GRETH "gr_eth1"
+#define RTEMS_BSP_NETWORK_DRIVER_ATTACH_GRETH \
+    rtems_leon_greth_driver_attach
 
 #ifndef RTEMS_BSP_NETWORK_DRIVER_NAME
 #define RTEMS_BSP_NETWORK_DRIVER_NAME   RTEMS_BSP_NETWORK_DRIVER_NAME_GRETH
@@ -95,7 +101,7 @@ extern int rtems_leon_greth_driver_attach(
 
 /* Configure GRETH driver */
 #define GRETH_SUPPORTED
-#define GRETH_MEM_LOAD(addr) leon_r32_no_cache(addr)
+#define GRETH_MEM_LOAD(addr) leon_r32_no_cache((uintptr_t)addr)
 
 extern int   CPU_SPARC_HAS_SNOOPING;
 
@@ -125,14 +131,19 @@ rtems_isr_entry set_vector(                     /* returns old vector */
     int                 type                    /* RTEMS or RAW intr  */
 );
 
-void BSP_fatal_return( void );
+void BSP_fatal_exit(uint32_t error);
 
 void bsp_spurious_initialize( void );
 
+/*
+ *  Delay for the specified number of microseconds.
+ */
+void rtems_bsp_delay(int usecs);
+
 /* Allocate 8-byte aligned non-freeable pre-malloc() memory. The function
  * can be called at any time. The work-area will shrink when called before
- * bsp_work_area_initialize(). malloc() is called to get memory when this function
- * is called after bsp_work_area_initialize().
+ * bsp_work_area_initialize(). malloc() is called to get memory when this
+ * function is called after bsp_work_area_initialize().
  */
 void *bsp_early_malloc(int size);
 
@@ -141,6 +152,9 @@ typedef void (*bsp_shared_isr)(void *arg);
 
 /* Initializes the Shared System Interrupt service */
 extern void BSP_shared_interrupt_init(void);
+
+/* Called directly from IRQ trap handler TRAP[0x10..0x1F] = IRQ[0..15] */
+void bsp_isr_handler(rtems_vector_number vector);
 
 /* Registers a shared IRQ handler, and enable it at IRQ controller. Multiple
  * interrupt handlers may use the same IRQ number, all ISRs will be called
@@ -209,10 +223,44 @@ extern void BSP_shared_interrupt_unmask(int irq);
  */
 extern void BSP_shared_interrupt_mask(int irq);
 
+#if defined(RTEMS_SMP) || defined(RTEMS_MULTIPROCESSING)
+/* Irq used by the shared memory driver and for inter-processor interrupts.
+ * The variable is weakly linked. Redefine the variable in your application
+ * to override the BSP default.
+ */
+extern const unsigned char LEON3_mp_irq;
+#endif
+
+#ifdef RTEMS_SMP
+/* Weak table used to implement static interrupt CPU affinity in a SMP
+ * configuration. The array index is the interrupt to be looked up, and
+ * the array[INTERRUPT] content is the CPU number relative to boot CPU
+ * index that will be servicing the interrupts from the IRQ source. The
+ * default is to let the first CPU (the boot cpu) to handle all
+ * interrupts (all zeros).
+ */
+extern const unsigned char LEON3_irq_to_cpu[32];
+#endif
+
+/* BSP PCI Interrupt support */
+#define BSP_PCI_shared_interrupt_register    BSP_shared_interrupt_register
+#define BSP_PCI_shared_interrupt_unregister  BSP_shared_interrupt_unregister
+#define BSP_PCI_shared_interrupt_unmask      BSP_shared_interrupt_unmask
+#define BSP_PCI_shared_interrupt_mask        BSP_shared_interrupt_mask
+#define BSP_PCI_shared_interrupt_clear       BSP_shared_interrupt_clear
+
+/* Common driver build-time configurations. On small systems undefine
+ * [DRIVER]_INFO_AVAIL to avoid info routines get dragged in. It is good
+ * for debugging and printing information about the system, but makes the
+ * image bigger.
+ */
+#define AMBAPPBUS_INFO_AVAIL          /* AMBAPP Bus driver */
+#define APBUART_INFO_AVAIL            /* APBUART Console driver */
+#define GPTIMER_INFO_AVAIL            /* GPTIMER Timer driver */
+#define GRETH_INFO_AVAIL              /* GRETH Ethernet driver */
+
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-
-

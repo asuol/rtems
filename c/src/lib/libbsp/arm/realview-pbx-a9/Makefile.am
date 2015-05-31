@@ -31,7 +31,6 @@ include_bsp_HEADERS += ../../shared/include/utility.h
 include_bsp_HEADERS += ../../shared/include/irq-generic.h
 include_bsp_HEADERS += ../../shared/include/irq-info.h
 include_bsp_HEADERS += ../../shared/include/stackalloc.h
-include_bsp_HEADERS += ../../shared/tod.h
 include_bsp_HEADERS += ../shared/include/start.h
 include_bsp_HEADERS += ../shared/include/arm-a9mpcore-clock.h
 include_bsp_HEADERS += ../shared/include/arm-a9mpcore-irq.h
@@ -91,7 +90,6 @@ libbsp_a_SOURCES += ../../shared/gnatinstallhandler.c
 libbsp_a_SOURCES += ../../shared/sbrk.c
 libbsp_a_SOURCES += ../../shared/timerstub.c
 libbsp_a_SOURCES += ../../shared/src/stackalloc.c
-libbsp_a_SOURCES += ../shared/abort/simple_abort.c
 libbsp_a_SOURCES += ../shared/startup/bsp-start-memcpy.S
 libbsp_a_SOURCES += ../shared/arm-cp15-set-exception-handler.c
 libbsp_a_SOURCES += ../shared/arm-cp15-set-ttb-entries.c
@@ -99,6 +97,10 @@ libbsp_a_SOURCES += ../shared/arm-cp15-set-ttb-entries.c
 # Startup
 libbsp_a_SOURCES += startup/bspreset.c
 libbsp_a_SOURCES += startup/bspstart.c
+if HAS_SMP
+libbsp_a_SOURCES += ../shared/arm-a9mpcore-smp.c
+libbsp_a_SOURCES += startup/bspsmp.c
+endif
 
 # IRQ
 libbsp_a_SOURCES += ../../shared/src/irq-default-handler.c
@@ -110,12 +112,8 @@ libbsp_a_SOURCES += ../../shared/src/irq-shell.c
 libbsp_a_SOURCES += ../shared/arm-gic-irq.c
 
 # Console
-libbsp_a_SOURCES += ../../shared/console.c
-libbsp_a_SOURCES += ../../shared/console_control.c
-libbsp_a_SOURCES += ../../shared/console_read.c
-libbsp_a_SOURCES += ../../shared/console_select.c
-libbsp_a_SOURCES += ../../shared/console_write.c
-libbsp_a_SOURCES += ../../shared/console-output-char.c
+libbsp_a_SOURCES += ../../shared/console-termios-init.c
+libbsp_a_SOURCES += ../../shared/console-termios.c
 libbsp_a_SOURCES += ../../shared/get-serial-mouse-ps2.c
 libbsp_a_SOURCES += ../shared/arm-pl011.c
 libbsp_a_SOURCES += ../shared/arm-pl050.c
@@ -136,10 +134,6 @@ libbsp_a_SOURCES += startup/bspstarthooks.c
 # Framebuffer
 libbsp_a_SOURCES += ../shared/arm-pl111-fb.c
 libbsp_a_SOURCES += startup/fb-config.c
-
-if HAS_SMP
-libbsp_a_SOURCES += ../shared/arm-a9mpcore-smp.c
-endif
 
 ###############################################################################
 #                  Special Rules                                              #

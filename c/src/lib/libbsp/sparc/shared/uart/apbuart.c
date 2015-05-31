@@ -23,7 +23,7 @@
 
 #include <ambapp.h>
 #include <grlib.h>
-#include <apbuart.h>
+#include <bsp/apbuart.h>
 
 #ifndef DEFAULT_TXBUF_SIZE
  #define DEFAULT_TXBUF_SIZE 32
@@ -158,7 +158,7 @@ static void apbuart_hw_open(apbuart_priv *uart);
 #if 0
 static int apbuart_outbyte_try(struct apbuart_regs *regs, unsigned char ch)
 {
-	if ( (READ_REG(&regs->status) & LEON_REG_UART_STATUS_THE) == 0 )
+	if ( (READ_REG(&regs->status) & APBUART_STATUS_TE) == 0 )
 		return -1; /* Failed */
 
 	/* There is room in fifo, put ch in it */
@@ -171,12 +171,12 @@ static int apbuart_inbyte_try(struct apbuart_regs *regs)
 {
 	unsigned int status;
 	/* Clear errors if any */
-	if ( (status=READ_REG(&regs->status)) & LEON_REG_UART_STATUS_ERR) {
-		regs->status = status & ~LEON_REG_UART_STATUS_ERR;
+	if ( (status=READ_REG(&regs->status)) & APBUART_STATUS_ERR) {
+		regs->status = status & ~APBUART_STATUS_ERR;
 	}
 
 	/* Is Data available? */
-	if ( (READ_REG(&regs->status) & LEON_REG_UART_STATUS_DR) == 0 )
+	if ( (READ_REG(&regs->status) & APBUART_STATUS_DR) == 0 )
 		return -1; /* No data avail */
 
 	/* Return Data */
@@ -378,13 +378,11 @@ static rtems_device_driver apbuart_initialize(rtems_device_major_number  major, 
 	DBG("Found %d APBUART(s)\n\r",dev_cnt);
 
 	/* Allocate memory for device structures */
-	apbuarts = malloc(sizeof(apbuart_priv) * dev_cnt);
+	apbuarts = calloc(dev_cnt, sizeof(*apbuarts));
 	if ( !apbuarts ){
 		printk("APBUART: Failed to allocate SW memory\n\r");
 		return -1;
 	}
-
-  memset(apbuarts,0,sizeof(sizeof(apbuart_priv) * dev_cnt));
 
 	/* Detect System Frequency from initialized timer */
 #ifndef SYS_FREQ_HZ

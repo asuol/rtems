@@ -1,7 +1,7 @@
 ## Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([rtems-c-src-lib-libbsp-i386-pc386],[_RTEMS_VERSION],[http://www.rtems.org/bugzilla])
+AC_INIT([rtems-c-src-lib-libbsp-i386-pc386],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
 
@@ -16,6 +16,31 @@ RTEMS_PROG_CCAS
 
 RTEMS_CHECK_NETWORKING
 RTEMS_CHECK_SMP
+
+# Is this an Intel Edison?
+# NOTE: As we learn more, this could be trimmed if more issues
+#       turn out fo lack of legacy peripherals
+RTEMS_BSPOPTS_SET([BSP_IS_EDISON],[edison],[1])
+RTEMS_BSPOPTS_SET([BSP_IS_EDISON],[*],[0])
+RTEMS_BSPOPTS_HELP([BSP_IS_EDISON],[Set if the BSP variant is Intel Edison.])
+AM_CONDITIONAL(RTEMS_EDISON,[test "$BSP_IS_EDISON" = "1"])
+
+RTEMS_BSPOPTS_SET([BSP_ENABLE_VGA],[edison],[0])
+RTEMS_BSPOPTS_SET([BSP_ENABLE_VGA],[*],[1])
+RTEMS_BSPOPTS_HELP([BSP_ENABLE_VGA],
+[Set if the VGA and keyboard console support is enabled.])
+AM_CONDITIONAL(RTEMS_VGA,[test "$BSP_ENABLE_VGA" = "1"])
+
+RTEMS_BSPOPTS_SET([BSP_ENABLE_COM1_COM4],[*],[1])
+RTEMS_BSPOPTS_HELP([BSP_ENABLE_COM1_COM4],
+[Set if COM1..COM4 support is enabled.])
+AM_CONDITIONAL(RTEMS_VGA,[test "$BSP_ENABLE_COM1_COM4" = "1"])
+
+RTEMS_BSPOPTS_SET([BSP_ENABLE_IDE],[edison],[0])
+RTEMS_BSPOPTS_SET([BSP_ENABLE_IDE],[*],[1])
+RTEMS_BSPOPTS_HELP([BSP_ENABLE_IDE],
+[Set if IDE support is enabled.])
+AM_CONDITIONAL(HAS_IDE,[test "$BSP_ENABLE_IDE" = "1"])
 
 RTEMS_BSPOPTS_SET([USE_COM1_AS_CONSOLE],[*],[0])
 RTEMS_BSPOPTS_HELP([USE_COM1_AS_CONSOLE],
@@ -74,13 +99,39 @@ RTEMS_BSPOPTS_HELP([CLOCK_DRIVER_USE_8254],
  - you do not mind adding roughly 5 microseconds to each context switch.
 ])
 
+if test "${USE_CIRRUS_GD5446}" != "1" -a "${USE_VGA}" != "1"; then
+  USE_VBE_RM=1;
+  if test -z "${NUM_APP_DRV_GDT_DESCRIPTORS}"; then
+      NUM_APP_DRV_GDT_DESCRIPTORS=2 ;
+  else
+      NUM_APP_DRV_GDT_DESCRIPTORS+=2 ;
+  fi
+fi
+RTEMS_BSPOPTS_SET([NUM_APP_DRV_GDT_DESCRIPTORS],[*],[0])
+RTEMS_BSPOPTS_HELP([NUM_APP_DRV_GDT_DESCRIPTORS],
+[Defines how many descriptors in GDT may be allocated for application or
+ driver usage.])
+
 RTEMS_BSPOPTS_SET([USE_CIRRUS_GD5446],[*],[0])
 RTEMS_BSPOPTS_HELP([USE_CIRRUS_GD5446],
-[If defined, enable use of the Cirrus GD5446 controller rather than the very basic
- VGA driver for frame buffer support.
+[If defined, enables use of the Cirrus GD5446 controller rather than the
+ controller utilizing Vesa Bios Extensions - real mode interface.
 
  NOTE: This has only been tested on Qemu.])
 AM_CONDITIONAL(USE_CIRRUS_GD5446,test "$USE_CIRRUS_GD5446" = "1")
+
+RTEMS_BSPOPTS_SET([USE_VGA],[*],[0])
+RTEMS_BSPOPTS_HELP([USE_VGA],
+[If defined, enables use of the very basic VGA driver for framebuffer support
+ rather than the controller utilizing Vesa Bios Extensions - real mode
+ interface.])
+AM_CONDITIONAL(USE_VGA,test "$USE_VGA" = "1")
+
+RTEMS_BSPOPTS_SET([USE_VBE_RM],[*],[0])
+RTEMS_BSPOPTS_HELP([USE_VBE_RM],
+[Defined by default. Enables use of the Vesa Bios Extensions - real mode
+ interface, which enables graphical mode and introduce it upon bootup.])
+AM_CONDITIONAL(USE_VBE_RM,test "$USE_VBE_RM" = "1")
 
 if test X${CLOCK_DRIVER_USE_TSC} = X1 -a X${CLOCK_DRIVER_USE_8254} = X1 ; then
   AC_MSG_ERROR([pc386 both TSC and 8254 specified for clock driver])

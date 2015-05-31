@@ -20,9 +20,13 @@
  *  rtems/c/src/lib/libcpu/CPU/cache_.h
  *
  *  The cache implementation header file can define
- *  CPU_CACHE_SUPPORT_PROVIDES_RANGE_FUNCTIONS
+ *
+ *    #define CPU_CACHE_SUPPORT_PROVIDES_RANGE_FUNCTIONS
+ *
  *  if it provides cache maintenance functions which operate on multiple lines.
- *  Otherwise a generic loop with single line operations will be used.
+ *  Otherwise a generic loop with single line operations will be used.  It is
+ *  strongly recommended to provide the implementation in terms of static
+ *  inline functions for performance reasons.
  *
  *  The functions below are implemented with CPU dependent inline routines
  *  found in the cache.c files for each CPU. In the event that a CPU does
@@ -37,6 +41,97 @@
 
 #include <rtems.h>
 #include "cache_.h"
+
+#if defined(RTEMS_SMP)
+
+#include <rtems/score/smpimpl.h>
+
+typedef struct {
+  const void *addr;
+  size_t size;
+} smp_cache_area;
+
+#if defined(CPU_DATA_CACHE_ALIGNMENT)
+
+static void smp_cache_data_flush(void *arg)
+{
+  smp_cache_area *area = arg;
+
+  rtems_cache_flush_multiple_data_lines(area->addr, area->size);
+}
+
+static void smp_cache_data_inv(void *arg)
+{
+  smp_cache_area *area = arg;
+
+  rtems_cache_invalidate_multiple_data_lines(area->addr, area->size);
+}
+
+static void smp_cache_data_flush_all(void *arg)
+{
+  rtems_cache_flush_entire_data();
+}
+
+static void smp_cache_data_inv_all(void *arg)
+{
+  rtems_cache_invalidate_entire_data();
+}
+
+#endif /* defined(CPU_DATA_CACHE_ALIGNMENT) */
+
+void
+rtems_cache_flush_multiple_data_lines_processor_set(
+  const void *addr,
+  size_t size,
+  const size_t setsize,
+  const cpu_set_t *set
+)
+{
+#if defined(CPU_DATA_CACHE_ALIGNMENT)
+  smp_cache_area area = { addr, size };
+
+  _SMP_Multicast_action( setsize, set, smp_cache_data_flush, &area );
+#endif
+}
+
+void
+rtems_cache_invalidate_multiple_data_lines_processor_set(
+  const void *addr,
+  size_t size,
+  const size_t setsize,
+  const cpu_set_t *set
+)
+{
+#if defined(CPU_DATA_CACHE_ALIGNMENT)
+  smp_cache_area area = { addr, size };
+
+  _SMP_Multicast_action( setsize, set, smp_cache_data_inv, &area );
+#endif
+}
+
+void
+rtems_cache_flush_entire_data_processor_set(
+  const size_t setsize,
+  const cpu_set_t *set
+)
+{
+#if defined(CPU_DATA_CACHE_ALIGNMENT)
+  _SMP_Multicast_action( setsize, set, smp_cache_data_flush_all, NULL );
+#endif
+}
+
+void
+rtems_cache_invalidate_entire_data_processor_set(
+  const size_t setsize,
+  const cpu_set_t *set
+)
+{
+#if defined(CPU_DATA_CACHE_ALIGNMENT)
+  _SMP_Multicast_action( setsize, set, smp_cache_data_inv_all, NULL );
+#endif
+}
+
+#endif /* defined(RTEMS_SMP) */
 
 /*
  * THESE FUNCTIONS ONLY HAVE BODIES IF WE HAVE A DATA CACHE
@@ -219,18 +314,38 @@ rtems_cache_disable_data( void )
  * THESE FUNCTIONS ONLY HAVE BODIES IF WE HAVE AN INSTRUCTION CACHE
  */
 
+#if defined(CPU_INSTRUCTION_CACHE_ALIGNMENT) \
+  && defined(RTEMS_SMP) \
+  && defined(CPU_CACHE_NO_INSTRUCTION_CACHE_SNOOPING)
+
+static void smp_cache_inst_inv(void *arg)
+{
+  smp_cache_area *area = arg;
+
+  _CPU_cache_invalidate_instruction_range(area->addr, area->size);
+}
+
+static void smp_cache_inst_inv_all(void *arg)
+{
+  _CPU_cache_invalidate_entire_instruction();
+}
+
+#endif
+
 /*
  * This function is responsible for performing an instruction cache
  * invalidate. It must determine how many cache lines need to be invalidated
  * and then perform the invalidations.
  */
-void
-rtems_cache_invalidate_multiple_instruction_lines( const void * i_addr, size_t n_bytes )
+
+#if defined(CPU_INSTRUCTION_CACHE_ALIGNMENT) \
+  && !defined(CPU_CACHE_SUPPORT_PROVIDES_RANGE_FUNCTIONS)
+static void
+_CPU_cache_invalidate_instruction_range(
+  const void * i_addr,
+  size_t n_bytes
+)
 {
-#if defined(CPU_INSTRUCTION_CACHE_ALIGNMENT)
-#if defined(CPU_CACHE_SUPPORT_PROVIDES_RANGE_FUNCTIONS)
-  _CPU_cache_invalidate_instruction_range( i_addr, n_bytes );
-#else
   const void * final_address;
 
  /*
@@ -249,6 +364,22 @@ rtems_cache_invalidate_multiple_instruction_lines( const void * i_addr, size_t n
     _CPU_cache_invalidate_1_instruction_line( i_addr );
     i_addr = (void *)((size_t)i_addr + CPU_INSTRUCTION_CACHE_ALIGNMENT);
   }
+}
+#endif
+
+void
+rtems_cache_invalidate_multiple_instruction_lines(
+  const void * i_addr,
+  size_t n_bytes
+)
+{
+#if defined(CPU_INSTRUCTION_CACHE_ALIGNMENT)
+#if defined(RTEMS_SMP) && defined(CPU_CACHE_NO_INSTRUCTION_CACHE_SNOOPING)
+  smp_cache_area area = { i_addr, n_bytes };
+
+  _SMP_Multicast_action( 0, NULL, smp_cache_inst_inv, &area );
+#else
+  _CPU_cache_invalidate_instruction_range( i_addr, n_bytes );
 #endif
 #endif
 }
@@ -262,11 +393,11 @@ void
 rtems_cache_invalidate_entire_instruction( void )
 {
 #if defined(CPU_INSTRUCTION_CACHE_ALIGNMENT)
- /*
-  * Call the CPU-specific routine
-  */
-
+#if defined(RTEMS_SMP) && defined(CPU_CACHE_NO_INSTRUCTION_CACHE_SNOOPING)
+  _SMP_Multicast_action( 0, NULL, smp_cache_inst_inv_all, NULL );
+#else
  _CPU_cache_invalidate_entire_instruction();
+#endif
 #endif
 }
 

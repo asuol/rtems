@@ -23,27 +23,20 @@
 
 #include "imfs.h"
 
-static void get_type_and_info_by_mode_and_dev(
-  mode_t mode,
-  dev_t dev,
-  IMFS_jnode_types_t *type,
-  IMFS_types_union *info
+static const IMFS_mknod_control *get_control(
+  const IMFS_mknod_controls *controls,
+  mode_t mode
 )
 {
   if ( S_ISDIR( mode ) ) {
-    *type = IMFS_DIRECTORY;
+    return controls->directory;
   } else if ( S_ISBLK( mode ) || S_ISCHR( mode ) ) {
-    *type = IMFS_DEVICE;
-    rtems_filesystem_split_dev_t(
-      dev,
-      info->device.major,
-      info->device.minor
-    );
-  } else if (S_ISFIFO( mode )) {
-    *type = IMFS_FIFO;
+    return controls->device;
+  } else if ( S_ISFIFO( mode ) ) {
+    return controls->fifo;
   } else {
     IMFS_assert( S_ISREG( mode ) );
-    *type = IMFS_MEMORY_FILE;
+    return controls->file;
   }
 }
 
@@ -56,13 +49,20 @@ int IMFS_mknod(
 )
 {
   int rv = 0;
-  IMFS_jnode_types_t type;
-  IMFS_types_union info;
+  const IMFS_fs_info_t *fs_info = parentloc->mt_entry->fs_info;
+  const IMFS_mknod_control *mknod_control =
+    get_control( fs_info->mknod_controls, mode );
   IMFS_jnode_t *new_node;
 
-  get_type_and_info_by_mode_and_dev( mode, dev, &type, &info );
-
-  new_node = IMFS_create_node( parentloc, type, name, namelen, mode, &info );
+  new_node = IMFS_create_node(
+    parentloc,
+    &mknod_control->node_control,
+    mknod_control->node_size,
+    name,
+    namelen,
+    mode,
+    &dev
+  );
   if ( new_node != NULL ) {
     IMFS_jnode_t *parent = parentloc->node_access;
 

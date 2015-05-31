@@ -80,13 +80,6 @@ rtems_task Init(
 #define CONFIGURE_MAXIMUM_PRIORITY 15
 
 /*
- *  This disables Classic API Notepads and saves 16 uint32_t's of RAM
- *  per Task Control Block.  If you aren't using these and are tight
- *  on RAM, this is an option.
- */
-#define CONFIGURE_DISABLE_CLASSIC_API_NOTEPADS
-
-/*
  *  This configures RTEMS to use a single memory pool for the RTEMS Workspace
  *  and C Program Heap.  If not defined, there will be separate memory pools
  *  for the RTEMS Workspace and C Program Heap.  Having separate pools
@@ -105,7 +98,7 @@ rtems_task Init(
  *  In this application, the initialization task performs the system
  *  initialization and then transforms itself into the idle task.
  */
-#define CONFIGURE_IDLE_TASK_BODY Init
+#define CONFIGURE_IDLE_TASK_BODY (Thread_Entry_numeric) Init
 #define CONFIGURE_IDLE_TASK_INITIALIZES_APPLICATION
 
 /*

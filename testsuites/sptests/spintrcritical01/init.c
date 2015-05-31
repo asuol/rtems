@@ -14,12 +14,7 @@
 #include <tmacros.h>
 #include <intrcritical.h>
 
-#include <rtems/rtems/semimpl.h>
-
-/* forward declarations to avoid warnings */
-rtems_task Init(rtems_task_argument argument);
-rtems_timer_service_routine test_release_from_isr(rtems_id  timer, void *arg);
-Thread_blocking_operation_States getState(void);
+#include <rtems/score/threadimpl.h>
 
 #if defined(FIFO_NO_TIMEOUT)
   #define TEST_NAME                "1"
@@ -58,34 +53,28 @@ Thread_blocking_operation_States getState(void);
 
 const char rtems_test_name[] = "SPINTRCRITICAL " TEST_NAME;
 
-rtems_id Main_task;
-rtems_id Semaphore;
-volatile bool case_hit;
+static Thread_Control *thread;
 
-Thread_blocking_operation_States getState(void)
+static rtems_id Semaphore;
+
+static bool case_hit;
+
+static bool interrupts_blocking_op(void)
 {
-  Objects_Locations  location;
-  Semaphore_Control *sem;
+  Thread_Wait_flags flags = _Thread_Wait_flags_get( thread );
 
-  sem = (Semaphore_Control *)_Objects_Get(
-    &_Semaphore_Information, Semaphore, &location );
-  if ( location != OBJECTS_LOCAL ) {
-    puts( "Bad object lookup" );
-    rtems_test_exit(0);
-  }
-  _Thread_Unnest_dispatch();
-
-  return sem->Core_control.semaphore.Wait_queue.sync_state;
+  return
+    flags == ( THREAD_WAIT_CLASS_OBJECT | THREAD_WAIT_STATE_INTEND_TO_BLOCK );
 }
 
-rtems_timer_service_routine test_release_from_isr(
+static rtems_timer_service_routine test_release_from_isr(
   rtems_id  timer,
   void     *arg
 )
 {
   rtems_status_code     status;
 
-  if ( getState() == THREAD_BLOCKING_OPERATION_NOTHING_HAPPENED ) {
+  if ( interrupts_blocking_op() ) {
     case_hit = true;
   }
 
@@ -94,8 +83,23 @@ rtems_timer_service_routine test_release_from_isr(
 }
 
 
+static bool test_body( void *arg )
+{
+  rtems_status_code status;
 
-rtems_task Init(
+  (void) arg;
+
+  status = rtems_semaphore_obtain(
+    Semaphore,
+    RTEMS_DEFAULT_OPTIONS,
+    SEMAPHORE_OBTAIN_TIMEOUT
+  );
+  directive_failed( status, "rtems_semaphore_obtain" );
+
+  return case_hit;
+}
+
+static rtems_task Init(
   rtems_task_argument ignored
 )
 {
@@ -103,33 +107,20 @@ rtems_task Init(
 
   TEST_BEGIN();
 
+  thread = _Thread_Get_executing();
+
   puts( "Init - Trying to generate semaphore release from ISR while blocking" );
   puts( "Init - Variation is: " TEST_STRING );
   status = rtems_semaphore_create(
     rtems_build_name( 'S', 'M', '1', ' ' ),
-    1,
+    0,
     SEMAPHORE_ATTRIBUTES,
     RTEMS_NO_PRIORITY,
     &Semaphore
   );
   directive_failed( status, "rtems_semaphore_create of SM1" );
 
-  Main_task = rtems_task_self();
-
-  interrupt_critical_section_test_support_initialize( test_release_from_isr );
-
-  case_hit = false;
-
-  while (!case_hit) {
-    interrupt_critical_section_test_support_delay();
-
-    status = rtems_semaphore_obtain(
-      Semaphore,
-      RTEMS_DEFAULT_OPTIONS,
-      SEMAPHORE_OBTAIN_TIMEOUT
-    );
-    directive_failed( status, "rtems_semaphore_obtain" );
-  }
+  interrupt_critical_section_test( test_body, NULL, test_release_from_isr );
 
   if ( case_hit ) {
     puts( "Init - Case hit" );
@@ -148,6 +139,7 @@ rtems_task Init(
 #define CONFIGURE_MAXIMUM_TASKS       1
 #define CONFIGURE_MAXIMUM_TIMERS      1
 #define CONFIGURE_MAXIMUM_SEMAPHORES  1
+#define CONFIGURE_MAXIMUM_USER_EXTENSIONS 1
 #define CONFIGURE_MICROSECONDS_PER_TICK  1000
 #if defined(PRIORITY_NO_TIMEOUT_REVERSE)
   #define CONFIGURE_INIT_TASK_PRIORITY   250

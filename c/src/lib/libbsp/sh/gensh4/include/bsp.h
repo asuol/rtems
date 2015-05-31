@@ -1,8 +1,10 @@
 /*
- *  This include file contains all board IO definitions.
- *
  *  generic sh4 BSP
  *
+ *  This include file contains all board IO definitions.
+ */
+
+/*
  *  Copyright (C) 2001 OKTET Ltd., St.-Petersburg, Russia
  *  Author: Victor V. Vengerov <vvv@oktet.ru>
  *
@@ -38,10 +40,6 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <rtems.h>
 #include <rtems/clockdrv.h>
 #include <rtems/console.h>
@@ -49,6 +47,10 @@ extern "C" {
 #include <bsp/default-initial-extension.h>
 
 #include "rtems/score/sh7750_regs.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Constants */
 
@@ -79,8 +81,11 @@ extern uint32_t   boot_mode;
       console_read, console_write, console_control }
 
 /*
- * NOTE: Use the standard Clock driver entry
+ * BSP methods that cross file boundaries.
  */
+void bsp_hw_init(void);
+void early_hw_init(void);
+void bsp_cache_on(void);
 
 #ifdef __cplusplus
 }

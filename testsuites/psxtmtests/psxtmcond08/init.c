@@ -30,7 +30,7 @@
 #include <sched.h>
 #include <timesys.h>
 #include <tmacros.h>
-#include <rtems/timerdrv.h>
+#include <rtems/btimer.h>
 #include "test_support.h"
 
 #include <pthread.h>
@@ -50,7 +50,7 @@ void *Low(
   void *argument
 )
 {
-  long end_time;
+  uint32_t end_time;
 
   end_time = benchmark_timer_read();
 
@@ -85,7 +85,9 @@ void *Middle(
     rtems_test_assert( rc == 0 );
 
   #elif defined(USE_TIMEDWAIT_WITH_VALUE)
-   
+    /* adjust sleepTime to get something obviously in the future */
+    ++sleepTime.tv_sec;
+
     rc = pthread_cond_timedwait( &CondID, &MutexID, &sleepTime );
     rtems_test_assert( rc == 0 );
 
@@ -133,7 +135,6 @@ void *POSIX_Init(
   /* Convert from timeval to timespec */
   sleepTime.tv_sec  = tp.tv_sec;
   sleepTime.tv_nsec = tp.tv_usec * 1000;
-  sleepTime.tv_nsec += 1;
 
   rc = pthread_cond_init(&CondID, NULL);
   rtems_test_assert( rc == 0 );

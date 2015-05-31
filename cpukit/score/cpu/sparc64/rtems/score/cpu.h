@@ -10,12 +10,11 @@
 /*
  *
  *
- *  COPYRIGHT (c) 1989-2006.
- *  On-Line Applications Research Corporation (OAR).
+ *  COPYRIGHT (c) 1989-2006. On-Line Applications Research Corporation (OAR).
  *
  *  This file is based on the SPARC cpu.h file. Modifications are made
  *  to support the SPARC64 processor.
- *    COPYRIGHT (c) 2010. Gedare Bloom.
+ *  COPYRIGHT (c) 2010. Gedare Bloom.
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -42,23 +41,6 @@ extern "C" {
  */
 
 #define CPU_INLINE_ENABLE_DISPATCH       TRUE
-
-/*
- *  Should the body of the search loops in _Thread_queue_Enqueue_priority
- *  be unrolled one time?  In unrolled each iteration of the loop examines
- *  two "nodes" on the chain being searched.  Otherwise, only one node
- *  is examined per iteration.
- *
- *  If TRUE, then the loops are unrolled.
- *  If FALSE, then the loops are not unrolled.
- *
- *  This parameter could go either way on the SPARC.  The interrupt flash
- *  code is relatively lengthy given the requirements for nops following
- *  writes to the psr.  But if the clock speed were high enough, this would
- *  not represent a great deal of time.
- */
-
-#define CPU_UNROLL_ENQUEUE_PRIORITY      TRUE
 
 /*
  *  Does the executive manage a dedicated interrupt stack in software?
@@ -406,8 +388,6 @@ typedef struct {
 #define ISR_DISPATCH_DISABLE_STACK_OFFSET 0xF8
 #define ISR_PAD_OFFSET 0xFC
 
-#define CONTEXT_CONTROL_SIZE 0x100
-
 /*
  *  The floating point context area.
  */
@@ -536,7 +516,6 @@ typedef struct {
  *  Offsets of fields with CPU_Interrupt_frame for assembly routines.
  */
 
-#define ISF_STACK_FRAME_OFFSET 0x00
 #define ISF_TSTATE_OFFSET      CPU_MINIMUM_STACK_FRAME_SIZE + 0x00
 #define ISF_TPC_OFFSET         CPU_MINIMUM_STACK_FRAME_SIZE + 0x08
 #define ISF_TNPC_OFFSET        CPU_MINIMUM_STACK_FRAME_SIZE + 0x10
@@ -905,7 +884,7 @@ void _CPU_Context_Initialize(
  *  halts/stops the CPU.
  */
 
-#define _CPU_Fatal_halt( _error ) \
+#define _CPU_Fatal_halt( _source, _error ) \
   do { \
     uint32_t   level; \
     \

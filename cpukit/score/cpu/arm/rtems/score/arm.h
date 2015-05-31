@@ -32,6 +32,9 @@ extern "C" {
 #if defined(__ARM_ARCH_7M__)
   #define CPU_MODEL_NAME "ARMv7M"
   #define ARM_MULTILIB_ARCH_V7M
+#elif defined(__ARM_ARCH_6M__)
+  #define CPU_MODEL_NAME "ARMv6M"
+  #define ARM_MULTILIB_ARCH_V6M
 #else
   #define CPU_MODEL_NAME "ARMv4"
   #define ARM_MULTILIB_ARCH_V4
@@ -42,6 +45,7 @@ extern "C" {
   || defined(__ARM_ARCH_7M__)
   #define ARM_MULTILIB_HAS_WFI
   #define ARM_MULTILIB_HAS_LOAD_STORE_EXCLUSIVE
+  #define ARM_MULTILIB_HAS_BARRIER_INSTRUCTIONS
 #endif
 
 #if defined(__ARM_ARCH_7A__) \
@@ -49,10 +53,19 @@ extern "C" {
   #define ARM_MULTILIB_HAS_THREAD_ID_REGISTER
 #endif
 
-#if defined(__ARM_NEON__)
-  #define ARM_MULTILIB_VFP_D32
-#elif !defined(__SOFTFP__)
-  #error "FPU support not implemented"
+#if !defined(__SOFTFP__)
+  #if defined(__ARM_NEON__)
+    #define ARM_MULTILIB_VFP_D32
+  #elif defined(__VFP_FP__)
+    #define ARM_MULTILIB_VFP_D16
+  #else
+    #error "FPU support not implemented"
+  #endif
+#endif
+
+#if defined(ARM_MULTILIB_VFP_D16) \
+  || defined(ARM_MULTILIB_VFP_D32)
+  #define ARM_MULTILIB_VFP
 #endif
 
 /*

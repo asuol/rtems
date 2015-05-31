@@ -20,6 +20,7 @@
 #include <rtems/rtems/region.h>
 #include <rtems/score/heapimpl.h>
 #include <rtems/score/objectimpl.h>
+#include <rtems/score/threadqimpl.h>
 #include <rtems/debug.h>
 
 #ifdef __cplusplus
@@ -84,6 +85,7 @@ RTEMS_INLINE_ROUTINE void _Region_Free (
   Region_Control *the_region
 )
 {
+  _Thread_queue_Destroy( &the_region->Wait_queue );
   _Objects_Free( &_Region_Information, &the_region->Object );
 }
 
@@ -131,18 +133,6 @@ RTEMS_INLINE_ROUTINE bool _Region_Free_segment (
 )
 {
   return _Heap_Free( &the_region->Memory, the_segment );
-}
-
-/**
- *  @brief Region_Is_null
- *
- *  This function returns TRUE if the_region is NULL and FALSE otherwise.
- */
-RTEMS_INLINE_ROUTINE bool _Region_Is_null (
-  Region_Control *the_region
-)
-{
-  return ( the_region == NULL  );
 }
 
 /**

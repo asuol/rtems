@@ -15,12 +15,14 @@
 
 #include <bsp.h>
 #include <bsp/bootcard.h>
+#include <bsp/fatal.h>
+#include <cache_.h>
 #include <leon.h>
 #include <rtems/bspIo.h>
 #include <rtems/score/smpimpl.h>
 #include <stdlib.h>
 
-#if !defined(__leon__)
+#if !defined(__leon__) || defined(RTEMS_PARAVIRT)
 uint32_t _CPU_SMP_Get_current_processor( void )
 {
   return _LEON3_Get_current_processor();
@@ -38,20 +40,29 @@ void bsp_start_on_secondary_processor()
 {
   uint32_t cpu_index_self = _CPU_SMP_Get_current_processor();
 
-  leon3_set_cache_control_register(0x80000F);
+  /*
+   * If data cache snooping is not enabled we terminate using BSP_fatal_exit()
+   * instead of bsp_fatal().  This is done since the latter function tries to
+   * acquire a ticket lock, an operation which requires data cache snooping to
+   * be enabled.
+   */
+  if ( !leon3_data_cache_snooping_enabled() )
+    BSP_fatal_exit( LEON3_FATAL_INVALID_CACHE_CONFIG_SECONDARY_PROCESSOR );
+
   /* Unmask IPI interrupts at Interrupt controller for this CPU */
-  LEON3_IrqCtrl_Regs->mask[cpu_index_self] |= 1U << LEON3_MP_IRQ;
+  LEON3_IrqCtrl_Regs->mask[cpu_index_self] |= 1U << LEON3_mp_irq;
 
   _SMP_Start_multitasking_on_secondary_processor();
 }
 
 uint32_t _CPU_SMP_Initialize( void )
 {
-  leon3_set_cache_control_register(0x80000F);
+  if ( !leon3_data_cache_snooping_enabled() )
+    bsp_fatal( LEON3_FATAL_INVALID_CACHE_CONFIG_MAIN_PROCESSOR );
 
   if ( rtems_configuration_get_maximum_processors() > 1 ) {
-    LEON_Unmask_interrupt(LEON3_MP_IRQ);
-    set_vector(bsp_inter_processor_interrupt, LEON_TRAP_TYPE(LEON3_MP_IRQ), 1);
+    LEON_Unmask_interrupt(LEON3_mp_irq);
+    set_vector(bsp_inter_processor_interrupt, LEON_TRAP_TYPE(LEON3_mp_irq), 1);
   }
 
   return leon3_get_cpu_count(LEON3_IrqCtrl_Regs);
@@ -75,8 +86,13 @@ void _CPU_SMP_Finalize_initialization( uint32_t cpu_count )
   /* Nothing to do */
 }
 
+void _CPU_SMP_Prepare_start_multitasking( void )
+{
+  _CPU_cache_invalidate_entire_instruction();
+}
+
 void _CPU_SMP_Send_interrupt(uint32_t target_processor_index)
 {
   /* send interrupt to destination CPU */
-  LEON3_IrqCtrl_Regs->force[target_processor_index] = 1 << LEON3_MP_IRQ;
+  LEON3_IrqCtrl_Regs->force[target_processor_index] = 1 << LEON3_mp_irq;
 }

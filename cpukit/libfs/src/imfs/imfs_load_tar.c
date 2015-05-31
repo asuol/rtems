@@ -20,15 +20,15 @@
 
 #include "imfs.h"
 
+#include <sys/param.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <tar.h>
+#include <unistd.h>
 
 #include <rtems/untar.h>
 
 #define MAX_NAME_FIELD_SIZE      99
-
-#define MIN(a,b)   ((a)>(b)?(b):(a))
 
 int rtems_tarfs_load(
   const char *mountpoint,
@@ -45,7 +45,6 @@ int rtems_tarfs_load(
    unsigned long                    file_mode;
    int                              offset;
    unsigned long                    nblocks;
-   IMFS_jnode_t                    *node;
    int rv = 0;
    int eval_flags = RTEMS_FS_FOLLOW_LINK;
    rtems_filesystem_eval_path_context_t ctx;
@@ -59,10 +58,7 @@ int rtems_tarfs_load(
      RTEMS_FS_MAKE | RTEMS_FS_EXCLUSIVE
    );
 
-   if (
-     rootloc.mt_entry->ops != &IMFS_ops
-       && rootloc.mt_entry->ops != &fifoIMFS_ops
-   ) {
+   if ( !IMFS_is_imfs_instance( &rootloc ) ) {
      rv = -1;
    }
 
@@ -97,6 +93,7 @@ int rtems_tarfs_load(
      * Generate an IMFS node depending on the file type.
      * - For directories, just create directories as usual.  IMFS
      *   will take care of the rest.
+     * - For symbolic links, create as usual
      * - For files, create a file node with special tarfs properties.
      */
     if (linkflag == DIRTYPE) {
@@ -122,20 +119,40 @@ int rtems_tarfs_load(
       rtems_filesystem_eval_path_continue( &ctx );
 
       if ( !rtems_filesystem_location_is_null( currentloc ) ) {
-        node = IMFS_create_node(
-          currentloc,
-          IMFS_LINEAR_FILE,
-          rtems_filesystem_eval_path_get_token( &ctx ),
-          rtems_filesystem_eval_path_get_tokenlen( &ctx ),
-          (file_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) | S_IFREG,
-          NULL
-        );
-        node->info.linearfile.size   = file_size;
-        node->info.linearfile.direct = &tar_image[offset];
+        IMFS_linearfile_t *linfile = (IMFS_linearfile_t *)
+          IMFS_create_node(
+            currentloc,
+            &IMFS_node_control_linfile,
+            sizeof( IMFS_file_t ),
+            rtems_filesystem_eval_path_get_token( &ctx ),
+            rtems_filesystem_eval_path_get_tokenlen( &ctx ),
+            (file_mode & (S_IRWXU | S_IRWXG | S_IRWXO)) | S_IFREG,
+            NULL
+          );
+
+        if ( linfile != NULL ) {
+          linfile->File.size = file_size;
+          linfile->direct    = &tar_image[offset];
+        }
       }
 
       nblocks = (((file_size) + 511) & ~511) / 512;
       offset += 512 * nblocks;
+    }
+    /*
+     * Create a symbolic link
+     */
+    else if (linkflag == SYMTYPE) {
+      const char *linkto = hdr_ptr + 157;
+      int len;
+
+      strncpy(full_filename, mountpoint, 255);
+      if (full_filename[(len=strlen(full_filename))-1] != '/')
+        strcat(full_filename, "/");
+      ++len;
+      strncat(full_filename, filename, 256-len-1);
+
+      rv = symlink(linkto, full_filename);
     }
   }
 

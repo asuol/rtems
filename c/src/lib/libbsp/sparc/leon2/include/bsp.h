@@ -28,10 +28,6 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
 
@@ -40,6 +36,10 @@ extern "C" {
 #include <rtems/clockdrv.h>
 #include <rtems/console.h>
 #include <rtems/irq-extension.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  *  @defgroup sparc_leon2 LEON2 Support
@@ -69,7 +69,7 @@ extern int rtems_leon_open_eth_driver_attach(
 extern int rtems_smc91111_driver_attach_leon2(
   struct rtems_bsdnet_ifconfig *config
 );
-#define RTEMS_BSP_NETWORK_DRIVER_NAME	"open_eth1"
+#define RTEMS_BSP_NETWORK_DRIVER_NAME "open_eth1"
 #define RTEMS_BSP_NETWORK_DRIVER_ATTACH_OPENETH \
           rtems_leon_open_eth_driver_attach
 #define RTEMS_BSP_NETWORK_DRIVER_ATTACH_SMC91111 \
@@ -79,7 +79,7 @@ extern int rtems_smc91111_driver_attach_leon2(
 
 /* Configure GRETH driver */
 #define GRETH_SUPPORTED
-#define GRETH_MEM_LOAD(addr) leon_r32_no_cache(addr)
+#define GRETH_MEM_LOAD(addr) leon_r32_no_cache((uintptr_t) addr)
 
 /*
  *  The synchronous trap is an arbitrarily chosen software trap.
@@ -113,14 +113,14 @@ rtems_isr_entry set_vector(                     /* returns old vector */
     int                 type                    /* RTEMS or RAW intr  */
 );
 
-void BSP_fatal_return( void );
+void BSP_fatal_exit(uint32_t error);
 
 void bsp_spurious_initialize( void );
 
 /* Allocate 8-byte aligned non-freeable pre-malloc() memory. The function
  * can be called at any time. The work-area will shrink when called before
- * bsp_work_area_initialize(). malloc() is called to get memory when this function
- * is called after bsp_work_area_initialize().
+ * bsp_work_area_initialize(). malloc() is called to get memory when this
+ * function is called after bsp_work_area_initialize().
  */
 void *bsp_early_malloc(int size);
 
@@ -129,6 +129,9 @@ typedef void (*bsp_shared_isr)(void *arg);
 
 /* Initializes the Shared System Interrupt service */
 extern void BSP_shared_interrupt_init(void);
+
+/* Called directly from IRQ trap handler TRAP[0x10..0x1F] = IRQ[0..15] */
+void bsp_isr_handler(rtems_vector_number vector);
 
 /* Registers a shared IRQ handler, and enable it at IRQ controller. Multiple
  * interrupt handlers may use the same IRQ number, all ISRs will be called
@@ -196,6 +199,35 @@ extern void BSP_shared_interrupt_unmask(int irq);
  *  irq         System IRQ number
  */
 extern void BSP_shared_interrupt_mask(int irq);
+
+/*
+ * Delay method
+ */
+void rtems_bsp_delay(int usecs);
+
+/*
+ * Prototypes for BSP methods that are used across file boundaries
+ */
+int cchip1_register(void);
+
+/* BSP PCI Interrupt support */
+#define BSP_PCI_shared_interrupt_register    BSP_shared_interrupt_register
+#define BSP_PCI_shared_interrupt_unregister  BSP_shared_interrupt_unregister
+#define BSP_PCI_shared_interrupt_unmask      BSP_shared_interrupt_unmask
+#define BSP_PCI_shared_interrupt_mask        BSP_shared_interrupt_mask
+#define BSP_PCI_shared_interrupt_clear       BSP_shared_interrupt_clear
+
+/* AT697 has PCI defined as big endian */
+#define BSP_PCI_BIG_ENDIAN
+
+/* Common driver build-time configurations. On small systems undefine
+ * [DRIVER]_INFO_AVAIL to avoid info routines get dragged in. It is good
+ * for debugging and printing information about the system, but makes the
+ * image bigger.
+ */
+#define AMBAPPBUS_INFO_AVAIL          /* AMBAPP Bus driver */
+#define GPTIMER_INFO_AVAIL            /* GPTIMER Timer driver */
+#define GRETH_INFO_AVAIL              /* GRETH Ethernet driver */
 
 #ifdef __cplusplus
 }

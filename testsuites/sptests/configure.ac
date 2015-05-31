@@ -1,7 +1,7 @@
 ## Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([rtems-c-src-tests-sptests],[_RTEMS_VERSION],[http://www.rtems.org/bugzilla])
+AC_INIT([rtems-c-src-tests-sptests],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([sp01])
 AC_CONFIG_HEADER([config.h])
 RTEMS_TOP([../..],[..])
@@ -40,6 +40,15 @@ AM_CONDITIONAL(HAS_SMP,test "$rtems_cv_RTEMS_SMP" = "yes")
 
 # Explicitly list all Makefiles here
 AC_CONFIG_FILES([Makefile
+spintrcritical23/Makefile
+sptimecounter01/Makefile
+sptimecounter02/Makefile
+spatomic01/Makefile
+spglobalcon01/Makefile
+spintrcritical22/Makefile
+spsem03/Makefile
+spresource01/Makefile
+spmrsp01/Makefile
 spscheduler01/Makefile
 spfatal28/Makefile
 spthreadlife01/Makefile
@@ -50,6 +59,7 @@ spcpucounter01/Makefile
 sptls02/Makefile
 sptls01/Makefile
 spintrcritical20/Makefile
+spintrcritical21/Makefile
 spcontext01/Makefile
 spfatal26/Makefile
 spinternalerror02/Makefile
@@ -95,7 +105,6 @@ sp35/Makefile
 sp36/Makefile
 sp37/Makefile
 sp38/Makefile
-sp39/Makefile
 sp40/Makefile
 sp41/Makefile
 sp42/Makefile
@@ -170,7 +179,6 @@ spfatal17/Makefile
 spfatal18/Makefile
 spfatal19/Makefile
 spfatal20/Makefile
-spfatal22/Makefile
 spfatal24/Makefile
 spfatal25/Makefile
 spfatal27/Makefile
@@ -204,6 +212,7 @@ spmountmgr01/Makefile
 spmsgq_err01/Makefile
 spmsgq_err02/Makefile
 spnotepad01/Makefile
+spnotepad02/Makefile
 spnsext01/Makefile
 spobjgetnext/Makefile
 sppagesize/Makefile

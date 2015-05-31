@@ -54,29 +54,6 @@ extern "C" {
 #define CPU_INLINE_ENABLE_DISPATCH       FALSE
 
 /*
- *  Should the body of the search loops in _Thread_queue_Enqueue_priority
- *  be unrolled one time?  In unrolled each iteration of the loop examines
- *  two "nodes" on the chain being searched.  Otherwise, only one node
- *  is examined per iteration.
- *
- *  If TRUE, then the loops are unrolled.
- *  If FALSE, then the loops are not unrolled.
- *
- *  The primary factor in making this decision is the cost of disabling
- *  and enabling interrupts (_ISR_Flash) versus the cost of rest of the
- *  body of the loop.  On some CPUs, the flash is more expensive than
- *  one iteration of the loop body.  In this case, it might be desirable
- *  to unroll the loop.  It is important to note that on some CPUs, this
- *  code is the longest interrupt disable period in RTEMS.  So it is
- *  necessary to strike a balance when setting this parameter.
- *
- *  MOXIE Specific Information:
- *
- *  XXX
- */
-#define CPU_UNROLL_ENQUEUE_PRIORITY      FALSE
-
-/*
  *  Should this target use 16 or 32 bit object Ids?
  *
  */
@@ -570,9 +547,12 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
  *
  *  MOXIE Specific Information:
  *
- *  XXX
+ *  TODO: As of 7 October 2014, this method is not implemented.
  */
-#define _CPU_ISR_Disable( _isr_cookie ) (_isr_cookie) = 0
+#define _CPU_ISR_Disable( _isr_cookie ) \
+  do { \
+    (_isr_cookie) = 0; \
+  } while (0)
 
 /*
  *  Enable interrupts to the previous level (returned by _CPU_ISR_Disable).
@@ -581,9 +561,12 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
  *
  *  MOXIE Specific Information:
  *
- *  XXX
+ *  TODO: As of 7 October 2014, this method is not implemented.
  */
-#define _CPU_ISR_Enable( _isr_cookie )
+#define _CPU_ISR_Enable( _isr_cookie ) \
+  do { \
+    (_isr_cookie) = (_isr_cookie); \
+  } while (0)
 
 /*
  *  This temporarily restores the interrupt to _level before immediately
@@ -593,9 +576,13 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
  *
  *  MOXIE Specific Information:
  *
- *  XXX
+ *  TODO: As of 7 October 2014, this method is not implemented.
  */
-#define _CPU_ISR_Flash( _isr_cookie )
+#define _CPU_ISR_Flash( _isr_cookie ) \
+  do { \
+    _CPU_ISR_Enable( _isr_cookie ); \
+    _CPU_ISR_Disable( _isr_cookie ); \
+  } while (0)
 
 /*
  *  Map interrupt level in task mode onto the hardware that the CPU
@@ -609,7 +596,7 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
  *
  *  MOXIE Specific Information:
  *
- *  XXX
+ *  TODO: As of 7 October 2014, this method is not implemented.
  */
 #define _CPU_ISR_Set_level( _new_level )        \
   {                                                     \
@@ -645,7 +632,8 @@ uint32_t   _CPU_ISR_Get_level( void );
  *
  *  MOXIE Specific Information:
  *
- *  XXX
+ *  TODO: As of 7 October 2014, this method does not ensure that the context
+ *  is set up with interrupts disabled/enabled as requested.
  */
 #define CPU_CCR_INTERRUPTS_ON  0x80
 #define CPU_CCR_INTERRUPTS_OFF 0x00
@@ -656,6 +644,8 @@ uint32_t   _CPU_ISR_Get_level( void );
   do {                                                             \
     uintptr_t   _stack;                                            \
                                                                    \
+    (void) _is_fp; /* avoid warning for being unused */            \
+    (void) _isr;   /* avoid warning for being unused */            \
     _stack = ((uintptr_t)(_stack_base)) + (_size) - 8;             \
     *((proc_ptr *)(_stack)) = (_entry_point);                      \
     _stack -= 4;                                                   \
@@ -733,8 +723,8 @@ uint32_t   _CPU_ISR_Get_level( void );
  *
  *  XXX
  */
-#define _CPU_Fatal_halt( _error ) \
-        printk("Fatal Error %d Halted\n",_error); \
+#define _CPU_Fatal_halt( _source, _error ) \
+        printk("Fatal Error %d.%d Halted\n",_source,_error); \
         for(;;)
 
 /* end of Fatal Error manager macros */
@@ -948,7 +938,7 @@ void _CPU_Context_switch(
  */
 void _CPU_Context_restore(
   Context_Control *new_context
-);
+) RTEMS_COMPILER_NO_RETURN_ATTRIBUTE;
 
 /*
  *  _CPU_Context_save_fp

@@ -43,8 +43,21 @@ extern "C" {
  *  can be reported.
  */
 typedef enum {
+  /**
+   * @brief Errors of the core system.
+   *
+   * @see Internal_errors_Core_list.
+   */
   INTERNAL_ERROR_CORE,
+
+  /**
+   * @brief Errors of the RTEMS API.
+   */
   INTERNAL_ERROR_RTEMS_API,
+
+  /**
+   * @brief Errors of the POSIX API.
+   */
   INTERNAL_ERROR_POSIX_API,
 
   /**
@@ -140,7 +153,7 @@ typedef enum {
   INTERNAL_ERROR_BAD_STACK_HOOK,
   INTERNAL_ERROR_BAD_ATTRIBUTES,
   INTERNAL_ERROR_IMPLEMENTATION_KEY_CREATE_INCONSISTENCY,
-  INTERNAL_ERROR_IMPLEMENTATION_BLOCKING_OPERATION_CANCEL,
+  OBSOLETE_INTERNAL_ERROR_IMPLEMENTATION_BLOCKING_OPERATION_CANCEL,
   INTERNAL_ERROR_MUTEX_OBTAIN_FROM_BAD_STATE,
   INTERNAL_ERROR_UNLIMITED_AND_MAXIMUM_IS_0,
   OBSOLETE_INTERNAL_ERROR_SHUTDOWN_WHEN_NOT_UP,
@@ -151,7 +164,7 @@ typedef enum {
   INTERNAL_ERROR_RESOURCE_IN_USE
 } Internal_errors_Core_list;
 
-typedef uint32_t Internal_errors_t;
+typedef CPU_Uint32ptr Internal_errors_t;
 
 /**
  *  This type holds the fatal error information.

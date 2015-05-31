@@ -7,7 +7,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 1989-2011.
+ *  COPYRIGHT (c) 1989-2014.
  *  On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
@@ -21,95 +21,115 @@
 
 #include <rtems/score/threadimpl.h>
 #include <rtems/score/schedulerimpl.h>
-#include <rtems/score/threadqimpl.h>
-
-/**
- *  @brief Invoked when a thread changes priority and is blocked.
- *
- *  This routine is invoked when a thread changes priority and is
- *  blocked on a thread queue.  If the queue is priority ordered,
- *  the_thread is removed from the_thread_queue and reinserted using
- *  its new priority.  This method has no impact on the state of the_thread
- *  or of any timeouts associated with this blocking.
- *
- *  @param[in] the_thread_queue pointer to a threadq header
- *  @param[in] the_thread pointer to a thread control block
- */
-static void _Thread_queue_Requeue(
-  Thread_queue_Control *the_thread_queue,
-  Thread_Control       *the_thread
-)
-{
-  /*
-   * Just in case the thread really wasn't blocked on a thread queue
-   * when we get here.
-   */
-  if ( !the_thread_queue )
-    return;
-
-  /*
-   * If queueing by FIFO, there is nothing to do. This only applies to
-   * priority blocking discipline.
-   */
-  if ( the_thread_queue->discipline == THREAD_QUEUE_DISCIPLINE_PRIORITY ) {
-    Thread_queue_Control *tq = the_thread_queue;
-    ISR_Level             level;
-    ISR_Level             level_ignored;
-
-    _ISR_Disable( level );
-    if ( _States_Is_waiting_on_thread_queue( the_thread->current_state ) ) {
-      _Thread_queue_Enter_critical_section( tq );
-      _Thread_queue_Extract_priority_helper(
-        the_thread,
-        the_thread->Wait.return_code,
-        true
-      );
-      (void) _Thread_queue_Enqueue_priority( tq, the_thread, &level_ignored );
-    }
-    _ISR_Enable( level );
-  }
-}
 
 void _Thread_Change_priority(
-  Thread_Control   *the_thread,
-  Priority_Control  new_priority,
-  bool              prepend_it
+  Thread_Control                *the_thread,
+  Priority_Control               new_priority,
+  void                          *arg,
+  Thread_Change_priority_filter  filter,
+  bool                           prepend_it
 )
 {
+  ISR_lock_Context  lock_context;
+  ISR_lock_Control *lock;
+
+  lock = _Thread_Lock_acquire( the_thread, &lock_context );
+
+  /*
+   * For simplicity set the priority restore hint unconditionally since this is
+   * an average case optimization.  Otherwise complicated atomic operations
+   * would be necessary.  Synchronize with a potential read of the resource
+   * count in the filter function.  See also _CORE_mutex_Surrender(),
+   * _Thread_Set_priority_filter() and _Thread_Restore_priority_filter().
+   */
+  the_thread->priority_restore_hint = true;
+  _Atomic_Fence( ATOMIC_ORDER_ACQ_REL );
+
   /*
    *  Do not bother recomputing all the priority related information if
    *  we are not REALLY changing priority.
    */
-  if ( the_thread->current_priority != new_priority ) {
-    ISR_Level                level;
-    const Scheduler_Control *scheduler;
+  if ( ( *filter )( the_thread, &new_priority, arg ) ) {
+    uint32_t my_generation;
 
-    _ISR_Disable( level );
-
-    scheduler = _Scheduler_Get( the_thread );
+    my_generation = the_thread->priority_generation + 1;
     the_thread->current_priority = new_priority;
+    the_thread->priority_generation = my_generation;
 
-    if ( _States_Is_ready( the_thread->current_state ) ) {
-      _Scheduler_Change_priority(
-        scheduler,
-        the_thread,
-        new_priority,
-        prepend_it
-      );
+    ( *the_thread->Wait.operations->priority_change )(
+      the_thread,
+      new_priority,
+      the_thread->Wait.queue
+    );
 
-      _ISR_Flash( level );
+    _Thread_Lock_release( lock, &lock_context );
 
-      /*
-       *  We altered the set of thread priorities.  So let's figure out
-       *  who is the heir and if we need to switch to them.
-       */
-      scheduler = _Scheduler_Get( the_thread );
-      _Scheduler_Schedule( scheduler, the_thread );
-    } else {
-      _Scheduler_Update( scheduler, the_thread );
+    _Scheduler_Acquire( the_thread, &lock_context );
+
+    if ( the_thread->priority_generation == my_generation ) {
+      if ( _States_Is_ready( the_thread->current_state ) ) {
+        _Scheduler_Change_priority(
+          the_thread,
+          new_priority,
+          prepend_it
+        );
+      } else {
+        _Scheduler_Update_priority( the_thread, new_priority );
+      }
     }
-    _ISR_Enable( level );
 
-    _Thread_queue_Requeue( the_thread->Wait.queue, the_thread );
+    _Scheduler_Release( the_thread, &lock_context );
+  } else {
+    _Thread_Lock_release( lock, &lock_context );
   }
+}
+
+static bool _Thread_Raise_priority_filter(
+  Thread_Control   *the_thread,
+  Priority_Control *new_priority,
+  void             *arg
+)
+{
+  return _Thread_Priority_less_than(
+    the_thread->current_priority,
+    *new_priority
+  );
+}
+
+void _Thread_Raise_priority(
+  Thread_Control   *the_thread,
+  Priority_Control  new_priority
+)
+{
+  _Thread_Change_priority(
+    the_thread,
+    new_priority,
+    NULL,
+    _Thread_Raise_priority_filter,
+    false
+  );
+}
+
+static bool _Thread_Restore_priority_filter(
+  Thread_Control   *the_thread,
+  Priority_Control *new_priority,
+  void             *arg
+)
+{
+  *new_priority = the_thread->real_priority;
+
+  the_thread->priority_restore_hint = false;
+
+  return *new_priority != the_thread->current_priority;
+}
+
+void _Thread_Restore_priority( Thread_Control *the_thread )
+{
+  _Thread_Change_priority(
+    the_thread,
+    0,
+    NULL,
+    _Thread_Restore_priority_filter,
+    true
+  );
 }

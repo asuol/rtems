@@ -85,19 +85,6 @@ extern const rtems_filesystem_file_handlers_r  msdos_file_handlers;
  * of ticks to help debugging or if you need such a  */
 #define MSDOS_VOLUME_SEMAPHORE_TIMEOUT    RTEMS_NO_TIMEOUT
 
-/* Node types */
-#define MSDOS_DIRECTORY     RTEMS_FILESYSTEM_DIRECTORY
-#define MSDOS_REGULAR_FILE  RTEMS_FILESYSTEM_MEMORY_FILE
-#define MSDOS_HARD_LINK     RTEMS_FILESYSTEM_HARD_LINK /* pseudo type */
-
-/**
- *  @brief Type of node that loc refers to.
- *
- *  The following returns the type of node that the loc refers to.
- *
- */
-typedef rtems_filesystem_node_types_t msdos_node_type_t;
-
 /*
  * Macros for fetching fields from 32 bytes long FAT Directory Entry
  * Structure
@@ -134,6 +121,8 @@ typedef rtems_filesystem_node_types_t msdos_node_type_t;
 #define MSDOS_FILE_WDATE_OFFSET           24
 #define MSDOS_FILE_WTIME_OFFSET           22
 #define MSDOS_FILE_ADATE_OFFSET           18
+#define MSDOS_FILE_CDATE_OFFSET           16
+#define MSDOS_FILE_CTIME_OFFSET           14
 
 /*
  * Possible values of DIR_Attr field of 32 bytes long FAT Directory Entry
@@ -272,10 +261,6 @@ void msdos_eval_path(rtems_filesystem_eval_path_context_t *ctx);
  */
 void msdos_free_node_info(const rtems_filesystem_location_info_t *pathloc);
 
-rtems_filesystem_node_types_t msdos_node_type(
-  const rtems_filesystem_location_info_t *loc
-);
-
 /**
  * @brief Routine for node creation in a MSDOS filesystem.
  *
@@ -333,8 +318,6 @@ int msdos_initialize_support(
   rtems_dosfs_convert_control             *converter
 );
 
-int msdos_file_close(rtems_libio_t *iop /* IN  */);
-
 ssize_t msdos_file_read(
   rtems_libio_t *iop,              /* IN  */
   void          *buffer,           /* IN  */
@@ -360,8 +343,6 @@ msdos_file_ftruncate(
 
 int msdos_file_sync(rtems_libio_t *iop);
 
-int msdos_file_datasync(rtems_libio_t *iop);
-
 ssize_t msdos_dir_read(
   rtems_libio_t *iop,              /* IN  */
   void          *buffer,           /* IN  */
@@ -382,7 +363,7 @@ int msdos_dir_stat(
  *
  */
 int msdos_creat_node(const rtems_filesystem_location_info_t *parent_loc,
-                     msdos_node_type_t                       type,
+                     fat_file_type_t                         type,
                      const char                             *name,
                      int                                     name_len,
                      mode_t                                  mode,
@@ -461,27 +442,11 @@ void msdos_date_unix2dos(
 
 unsigned int msdos_date_dos2unix(unsigned int dd, unsigned int dt);
 
-int msdos_set_first_cluster_num(
-  rtems_filesystem_mount_table_entry_t *mt_entry,
-  fat_file_fd_t                        *fat_fd
-);
-
-int msdos_set_file_size(
-  rtems_filesystem_mount_table_entry_t *mt_entry,
-  fat_file_fd_t                        *fat_fd
-);
-
 int msdos_set_first_char4file_name(
   rtems_filesystem_mount_table_entry_t *mt_entry,
   fat_dir_pos_t                        *dir_pos,
   unsigned char                         first_char
 );
-
-int msdos_set_dir_wrt_time_and_date(
-    rtems_filesystem_mount_table_entry_t *mt_entry,
-    fat_file_fd_t                        *fat_fd
-);
-
 
 int msdos_dir_is_empty(
   rtems_filesystem_mount_table_entry_t *mt_entry,

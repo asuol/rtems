@@ -11,3 +11,9 @@ required by the BSP (the whole hwlib was considered too big).
 The directory structure within the hwlib directory is equivalent to Alteras
 hwlib directory structure. For easy maintenance only whole files have been
 left out.
+
+Altera provides the hwlib with their SoC Embedded Design Suite (EDS).
+
+HWLIB Version:
+--------------
+All files are from hwlib 13.1 distributed with SoC EDS 14.0.0.200.

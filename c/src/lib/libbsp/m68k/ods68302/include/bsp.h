@@ -15,9 +15,7 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef ASM
 
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
@@ -27,6 +25,10 @@ extern "C" {
 #include <rtems/iosupp.h>
 #include <rtems/clockdrv.h>
 #include <rtems/m68k/m68302.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef VARIANT
 #define VARIANT bare
@@ -62,8 +64,37 @@ rtems_isr_entry set_vector(
   int                 type
 );
 
+/*
+ * Prototypes for methods called only from .S files
+ */
+void boot_phase_1(void);
+void boot_phase_2(void);
+void boot_phase_3(void);
+void trace_exception(
+  unsigned long d0,
+  unsigned long d1,
+  unsigned long d2,
+  unsigned long d3,
+  unsigned long d4,
+  unsigned long d5,
+  unsigned long d6,
+  unsigned long d7,
+  unsigned long a0,
+  unsigned long a1,
+  unsigned long a2,
+  unsigned long a3,
+  unsigned long a4,
+  unsigned long a5,
+  unsigned long a6,
+  unsigned long a7,
+  unsigned long sr_pch,
+  unsigned long pcl_format
+);
+
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 #endif

@@ -24,10 +24,10 @@ int ppc_exc_alignment_handler(BSP_Exception_frame *frame, unsigned excNum)
     unsigned clsz = rtems_cache_get_data_line_size();
     unsigned a = (opcode >> 16) & 0x1f;
     unsigned b = (opcode >> 11) & 0x1f;
-    unsigned *regs = &frame->GPR0;
+    PPC_GPR_TYPE *regs = &frame->GPR0;
     unsigned *current = (unsigned *)
-      (((a == 0 ? 0 : regs [a]) + regs [b]) & (clsz - 1));
-    unsigned *end = current + clsz / 4;
+      (((a == 0 ? 0 : (unsigned) regs[a]) + (unsigned) regs[b]) & (clsz - 1));
+    unsigned *end = current + clsz / sizeof(*current);
 
     while (current != end) {
       *current = 0;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2013-2015 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -30,7 +30,8 @@ const char rtems_test_name[] = "SPCONTEXT 1";
 
 typedef struct {
   rtems_id control_task;
-  rtems_id validate_tasks[2];
+  rtems_id validate_tasks[3];
+  rtems_id timer;
   size_t task_index;
   int iteration_counter;
 } test_context;
@@ -46,17 +47,21 @@ static void validate_task(rtems_task_argument arg)
 static void start_validate_task(
   rtems_id *id,
   uintptr_t pattern,
-  rtems_task_priority priority
+  rtems_task_priority priority,
+  bool fp_unit
 )
 {
   rtems_status_code sc;
+  rtems_attribute fpu_state;
+
+  fpu_state = fp_unit ? RTEMS_FLOATING_POINT : RTEMS_DEFAULT_ATTRIBUTES;
 
   sc = rtems_task_create(
     rtems_build_name('V', 'A', 'L', 'I'),
     priority,
     RTEMS_MINIMUM_STACK_SIZE,
     RTEMS_DEFAULT_MODES,
-    RTEMS_DEFAULT_ATTRIBUTES,
+    fpu_state,
     id
   );
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
@@ -85,22 +90,22 @@ static void switch_priorities(test_context *self)
 {
   rtems_status_code sc;
   size_t index = self->task_index;
-  size_t next = (index + 1) & 0x1;
-  size_t task_high = index;
-  size_t task_low = next;
+  size_t next = (index + 1) % RTEMS_ARRAY_SIZE(self->validate_tasks);
+  size_t task_current_high = index;
+  size_t task_next_high = next;
   rtems_task_priority priority;
 
   self->task_index = next;
 
   sc = rtems_task_set_priority(
-    self->validate_tasks[task_high],
+    self->validate_tasks[task_next_high],
     PRIORITY_HIGH,
     &priority
   );
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
   sc = rtems_task_set_priority(
-    self->validate_tasks[task_low],
+    self->validate_tasks[task_current_high],
     PRIORITY_LOW,
     &priority
   );
@@ -112,7 +117,7 @@ static void clobber_and_switch_timer(rtems_id timer, void *arg)
   uintptr_t pattern = (uintptr_t) 0xffffffffffffffffU;
   test_context *self = arg;
 
-  reset_timer_or_finish(self, timer);
+  reset_timer_or_finish(self, self->timer);
   switch_priorities(self);
 
   _CPU_Context_volatile_clobber(pattern);
@@ -121,12 +126,11 @@ static void clobber_and_switch_timer(rtems_id timer, void *arg)
 static void start_timer(test_context *self)
 {
   rtems_status_code sc;
-  rtems_id timer;
 
-  sc = rtems_timer_create(rtems_build_name('C', 'L', 'S', 'W'), &timer);
+  sc = rtems_timer_create(rtems_build_name('C', 'L', 'S', 'W'), &self->timer);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  sc = rtems_timer_fire_after(timer, 2, clobber_and_switch_timer, self);
+  sc = rtems_timer_fire_after(self->timer, 2, clobber_and_switch_timer, self);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 }
 
@@ -145,24 +149,64 @@ static void wait_for_finish(void)
   rtems_test_assert(out == FINISH_EVENT);
 }
 
-static void test(test_context *self)
+static void test(
+  test_context *self,
+  bool task_0_fpu,
+  bool task_1_fpu,
+  bool task_2_fpu
+)
 {
+  rtems_status_code sc;
   uintptr_t pattern_0 = (uintptr_t) 0xaaaaaaaaaaaaaaaaU;
   uintptr_t pattern_1 = (uintptr_t) 0x5555555555555555U;
+  uintptr_t pattern_2 = (uintptr_t) 0x0000000000000000U;
 
   memset(self, 0, sizeof(*self));
 
   self->control_task = rtems_task_self();
-
-  start_validate_task(&self->validate_tasks[0], pattern_0, PRIORITY_LOW);
-  start_validate_task(&self->validate_tasks[1], pattern_1, PRIORITY_HIGH);
+  start_validate_task(
+    &self->validate_tasks[0],
+    pattern_0,
+    PRIORITY_HIGH,
+    task_0_fpu
+  );
+  start_validate_task(
+    &self->validate_tasks[1],
+    pattern_1,
+    PRIORITY_LOW,
+    task_1_fpu
+  );
+  start_validate_task(
+    &self->validate_tasks[2],
+    pattern_2,
+    PRIORITY_LOW,
+    task_2_fpu
+  );
   start_timer(self);
   wait_for_finish();
+
+  sc = rtems_task_delete(self->validate_tasks[0]);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+
+  sc = rtems_task_delete(self->validate_tasks[1]);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+
+  sc = rtems_task_delete(self->validate_tasks[2]);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+
+  sc = rtems_timer_delete(self->timer);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 }
 
 static void test_context_is_executing(void)
 {
 #if defined(RTEMS_SMP)
+  /*
+   * Provide a stack area, since on some architectures the top/bottom of stack
+   * is initialized by _CPU_Context_Initialize().
+   */
+  static char stack[1024];
+
   Context_Control context;
   bool is_executing;
 
@@ -180,7 +224,15 @@ static void test_context_is_executing(void)
   rtems_test_assert(!is_executing);
 
   _CPU_Context_Set_is_executing(&context, true);
-  _CPU_Context_Initialize(&context, NULL, 0, 0, NULL, false, NULL);
+  _CPU_Context_Initialize(
+    &context,
+    (void *) &stack[0],
+    sizeof(stack),
+    0,
+    NULL,
+    false,
+    NULL
+  );
   is_executing = _CPU_Context_Get_is_executing(&context);
   rtems_test_assert(is_executing);
 #endif
@@ -189,11 +241,23 @@ static void test_context_is_executing(void)
 static void Init(rtems_task_argument arg)
 {
   test_context *self = &test_instance;
+  int i;
+  int j;
+  int k;
 
   TEST_BEGIN();
 
   test_context_is_executing();
-  test(self);
+
+  for (i = 0; i < 2; ++i) {
+    for (j = 0; j < 2; ++j) {
+      for (k = 0; k < 2; ++k) {
+        printf("Test configuration %d %d %d... ", i, j, k);
+        test(self, i == 0, j == 0, k == 0);
+        printf("done\n");
+      }
+    }
+  }
 
   TEST_END();
 
@@ -205,9 +269,7 @@ static void Init(rtems_task_argument arg)
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
-#define CONFIGURE_USE_IMFS_AS_BASE_FILESYSTEM
-
-#define CONFIGURE_MAXIMUM_TASKS 3
+#define CONFIGURE_MAXIMUM_TASKS 4
 #define CONFIGURE_MAXIMUM_TIMERS 1
 
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION

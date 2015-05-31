@@ -16,10 +16,6 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
 
@@ -34,6 +30,10 @@ extern "C" {
 #include <rtems/iosupp.h>
 #include <rtems/console.h>
 #include <rtems/clockdrv.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define BSP_FEATURE_IRQ_EXTENSION
 
@@ -174,13 +174,13 @@ extern "C" {
  * @{
  */
 
-//#define FLASH_SIZE      (0x200000-FLASH_BOOT)   // Total area of Flash region in words 8 bit
+//#define RTL22XX_FLASH_SIZE      (0x200000-RTL22XX_FLASH_BOOT)   // Total area of Flash region in words 8 bit
 /** @brief Total area of Flash region in words 8 bit */
-#define FLASH_SIZE        (0x80000-FLASH_BOOT)
-//#define FLASH_SIZE      (0x80000-FLASH_BOOT)      // Total area of Flash region in words 8 bit
-#define FLASH_BEGIN       0x80000000
+#define RTL22XX_FLASH_SIZE        (0x80000-RTL22XX_FLASH_BOOT)
+//#define RTL22XX_FLASH_SIZE      (0x80000-RTL22XX_FLASH_BOOT)      // Total area of Flash region in words 8 bit
+#define RTL22XX_FLASH_BEGIN       0x80000000
 /** @brief First 0x8000 bytes reserved for boot loader etc. */
-#define FLASH_BASE        (FLASH_BEGIN+FLASH_BOOT)
+#define RTL22XX_FLASH_BASE        (RTL22XX_FLASH_BEGIN+RTL22XX_FLASH_BOOT)
 
 /** @} */
 
@@ -214,6 +214,11 @@ int cs8900_driver_attach (struct rtems_bsdnet_ifconfig *config,
 #define RTEMS_BSP_NETWORK_DRIVER_ATTACH	cs8900_driver_attach
 
 /** @} */
+
+/*
+ * Prototypes for methods used across file boundaries in the BSP.
+ */
+extern void  UART0_Ini(void);
 
 /** @} */
 

@@ -86,6 +86,7 @@ RTEMS_INLINE_ROUTINE void _Barrier_Free (
   Barrier_Control *the_barrier
 )
 {
+  _CORE_barrier_Destroy( &the_barrier->Barrier );
   _Objects_Free( &_Barrier_Information, &the_barrier->Object );
 }
 
@@ -109,17 +110,6 @@ RTEMS_INLINE_ROUTINE Barrier_Control *_Barrier_Get (
     _Objects_Get( &_Barrier_Information, id, location );
 }
 
-/**
- *  @brief _Barrier_Is_null
- *
- *  This function returns TRUE if the_barrier is NULL and FALSE otherwise.
- */
-RTEMS_INLINE_ROUTINE bool _Barrier_Is_null (
-  Barrier_Control *the_barrier
-)
-{
-  return ( the_barrier == NULL );
-}
 /**
  * @brief Translate SuperCore Barrier Status Code to RTEMS Status Code
  *

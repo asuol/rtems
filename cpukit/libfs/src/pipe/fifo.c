@@ -18,6 +18,7 @@
 #include "config.h"
 #endif
 
+#include <sys/param.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,9 +29,6 @@
 #include <rtems/score/statesimpl.h>
 
 #include "pipe.h"
-
-
-#define MIN(a, b) ((a) < (b)? (a): (b))
 
 #define LIBIO_ACCMODE(_iop) ((_iop)->flags & LIBIO_FLAGS_READ_WRITE)
 #define LIBIO_NODELAY(_iop) ((_iop)->flags & LIBIO_FLAGS_NO_DELAY)
@@ -62,27 +60,6 @@ static rtems_id pipe_semaphore = RTEMS_ID_NONE;
 
 #define PIPE_WAKEUPWRITERS(_pipe) \
   do {uint32_t n; rtems_barrier_release(_pipe->writeBarrier, &n); } while(0)
-
-
-#ifdef RTEMS_POSIX_API
-#include <rtems/rtems/barrier.h>
-#include <rtems/score/thread.h>
-
-/* Set barriers to be interruptible by signals. */
-static void pipe_interruptible(pipe_control_t *pipe)
-{
-  Objects_Locations  location;
-  Barrier_Control   *the_barrier;
-
-  the_barrier = _Barrier_Get(pipe->readBarrier, &location);
-  the_barrier->Barrier.Wait_queue.state |= STATES_INTERRUPTIBLE_BY_SIGNAL;
-  _Objects_Put( &the_barrier->Object );
-
-  the_barrier = _Barrier_Get(pipe->writeBarrier, &location);
-  the_barrier->Barrier.Wait_queue.state |= STATES_INTERRUPTIBLE_BY_SIGNAL;
-  _Objects_Put( &the_barrier->Object );
-}
-#endif
 
 /*
  * Alloc pipe control structure, buffer, and resources.
@@ -123,10 +100,6 @@ static int pipe_alloc(
         RTEMS_BINARY_SEMAPHORE | RTEMS_FIFO,
         RTEMS_NO_PRIORITY, &pipe->Semaphore) != RTEMS_SUCCESSFUL)
     goto err_sem;
-
-#ifdef RTEMS_POSIX_API
-  pipe_interruptible(pipe);
-#endif
 
   *pipep = pipe;
   if (c ++ == 'z')
@@ -214,6 +187,7 @@ static int pipe_new(
   pipe_control_t *pipe;
   int err = 0;
 
+  _Assert( pipep );
   err = pipe_lock();
   if (err)
     return err;
@@ -225,7 +199,7 @@ static int pipe_new(
       goto out;
   }
 
-  if (! PIPE_LOCK(pipe))
+  if (!PIPE_LOCK(pipe))
     err = -EINTR;
 
   if (*pipep == NULL) {

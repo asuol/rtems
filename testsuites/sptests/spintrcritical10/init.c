@@ -16,6 +16,7 @@
 #include <tmacros.h>
 #include <intrcritical.h>
 
+#include <rtems/score/threadimpl.h>
 #include <rtems/rtems/eventimpl.h>
 
 const char rtems_test_name[] = "SPINTRCRITICAL 10";
@@ -34,16 +35,28 @@ typedef struct {
   bool hit;
 } test_context;
 
+static bool blocks_for_event(Thread_Wait_flags flags)
+{
+  return flags == (THREAD_WAIT_CLASS_EVENT | THREAD_WAIT_STATE_INTEND_TO_BLOCK)
+    || flags == (THREAD_WAIT_CLASS_EVENT | THREAD_WAIT_STATE_BLOCKED);
+}
+
+static bool interrupts_blocking_op(Thread_Wait_flags flags)
+{
+  return
+    flags == (THREAD_WAIT_CLASS_EVENT | THREAD_WAIT_STATE_INTEND_TO_BLOCK);
+}
+
 static void any_satisfy_before_timeout(rtems_id timer, void *arg)
 {
   rtems_status_code sc;
   test_context *ctx = arg;
-  const Thread_Control *thread = ctx->thread;
+  Thread_Control *thread = ctx->thread;
+  Thread_Wait_flags flags = _Thread_Wait_flags_get(thread);
 
-  if (thread->Wait.count != 0) {
-    ctx->hit = _Event_Sync_state == THREAD_BLOCKING_OPERATION_NOTHING_HAPPENED;
+  if (blocks_for_event(flags)) {
+    ctx->hit = interrupts_blocking_op(flags);
 
-    rtems_test_assert(thread->Wait.count == EVENTS);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == DEADBEEF
     );
@@ -52,7 +65,6 @@ static void any_satisfy_before_timeout(rtems_id timer, void *arg)
     sc = rtems_event_send(thread->Object.id, GREEN);
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-    rtems_test_assert(thread->Wait.count == 0);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == GREEN
     );
@@ -61,15 +73,13 @@ static void any_satisfy_before_timeout(rtems_id timer, void *arg)
     sc = rtems_event_send(thread->Object.id, RED);
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-    rtems_test_assert(thread->Wait.count == 0);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == GREEN
     );
     rtems_test_assert(thread->Wait.return_code == RTEMS_SUCCESSFUL);
 
-    _Event_Timeout(thread->Object.id, &_Event_Sync_state);
+    _Thread_Timeout(0, thread);
 
-    rtems_test_assert(thread->Wait.count == 0);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == GREEN
     );
@@ -77,19 +87,40 @@ static void any_satisfy_before_timeout(rtems_id timer, void *arg)
 
     if (ctx->hit) {
       rtems_test_assert(
-        _Event_Sync_state == THREAD_BLOCKING_OPERATION_SATISFIED
+        _Thread_Wait_flags_get(thread)
+          == (THREAD_WAIT_CLASS_EVENT | THREAD_WAIT_STATE_READY_AGAIN)
       );
     }
+
+    rtems_test_assert(thread->Wait.count == EVENTS);
   }
 
   sc = rtems_timer_reset(timer);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 }
 
+static bool test_body_any_satisfy_before_timeout(void *arg)
+{
+  test_context *ctx = arg;
+  rtems_status_code sc;
+  rtems_event_set out;
+
+  out = DEADBEEF;
+  sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ANY | RTEMS_WAIT, 1, &out);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+  rtems_test_assert(out == GREEN);
+
+  out = DEADBEEF;
+  sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ANY | RTEMS_NO_WAIT, 0, &out);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+  rtems_test_assert(out == RED);
+
+  return ctx->hit;
+}
+
 static void test_any_satisfy_before_timeout(test_context *ctx)
 {
   rtems_status_code sc;
-  int resets = 0;
 
   puts(
     "Init - Trying to generate any satisfied before timeout "
@@ -98,27 +129,14 @@ static void test_any_satisfy_before_timeout(test_context *ctx)
 
   ctx->hit = false;
 
-  interrupt_critical_section_test_support_initialize(NULL);
-
   sc = rtems_timer_fire_after(ctx->timer, 1, any_satisfy_before_timeout, ctx);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  while (!ctx->hit && resets < 2) {
-    rtems_event_set out;
-
-    if (interrupt_critical_section_test_support_delay())
-      resets++;
-
-    out = DEADBEEF;
-    sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ANY | RTEMS_WAIT, 1, &out);
-    rtems_test_assert(sc == RTEMS_SUCCESSFUL);
-    rtems_test_assert(out == GREEN);
-
-    out = DEADBEEF;
-    sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ANY | RTEMS_NO_WAIT, 0, &out);
-    rtems_test_assert(sc == RTEMS_SUCCESSFUL);
-    rtems_test_assert(out == RED);
-  }
+  interrupt_critical_section_test(
+    test_body_any_satisfy_before_timeout,
+    ctx,
+    NULL
+  );
 
   sc = rtems_timer_cancel(ctx->timer);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
@@ -130,12 +148,12 @@ static void all_satisfy_before_timeout(rtems_id timer, void *arg)
 {
   rtems_status_code sc;
   test_context *ctx = arg;
-  const Thread_Control *thread = ctx->thread;
+  Thread_Control *thread = ctx->thread;
+  Thread_Wait_flags flags = _Thread_Wait_flags_get(thread);
 
-  if (thread->Wait.count != 0) {
-    ctx->hit = _Event_Sync_state == THREAD_BLOCKING_OPERATION_NOTHING_HAPPENED;
+  if (blocks_for_event(flags)) {
+    ctx->hit = interrupts_blocking_op(flags);
 
-    rtems_test_assert(thread->Wait.count == EVENTS);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == DEADBEEF
     );
@@ -144,7 +162,6 @@ static void all_satisfy_before_timeout(rtems_id timer, void *arg)
     sc = rtems_event_send(thread->Object.id, GREEN);
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-    rtems_test_assert(thread->Wait.count == EVENTS);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == DEADBEEF
     );
@@ -153,15 +170,13 @@ static void all_satisfy_before_timeout(rtems_id timer, void *arg)
     sc = rtems_event_send(thread->Object.id, RED);
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-    rtems_test_assert(thread->Wait.count == 0);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == EVENTS
     );
     rtems_test_assert(thread->Wait.return_code == RTEMS_SUCCESSFUL);
 
-    _Event_Timeout(thread->Object.id, &_Event_Sync_state);
+    _Thread_Timeout(0, thread);
 
-    rtems_test_assert(thread->Wait.count == 0);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == EVENTS
     );
@@ -169,19 +184,35 @@ static void all_satisfy_before_timeout(rtems_id timer, void *arg)
 
     if (ctx->hit) {
       rtems_test_assert(
-        _Event_Sync_state == THREAD_BLOCKING_OPERATION_SATISFIED
+        _Thread_Wait_flags_get(thread)
+          == (THREAD_WAIT_CLASS_EVENT | THREAD_WAIT_STATE_READY_AGAIN)
       );
     }
+
+    rtems_test_assert(thread->Wait.count == EVENTS);
   }
 
   sc = rtems_timer_reset(timer);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 }
 
+static bool test_body_all_satisfy_before_timeout(void *arg)
+{
+  test_context *ctx = arg;
+  rtems_status_code sc;
+  rtems_event_set out;
+
+  out = DEADBEEF;
+  sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ALL | RTEMS_WAIT, 1, &out);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+  rtems_test_assert(out == EVENTS);
+
+  return ctx->hit;
+}
+
 static void test_all_satisfy_before_timeout(test_context *ctx)
 {
   rtems_status_code sc;
-  int resets = 0;
 
   puts(
     "Init - Trying to generate all satisfied before timeout "
@@ -190,22 +221,14 @@ static void test_all_satisfy_before_timeout(test_context *ctx)
 
   ctx->hit = false;
 
-  interrupt_critical_section_test_support_initialize(NULL);
-
   sc = rtems_timer_fire_after(ctx->timer, 1, all_satisfy_before_timeout, ctx);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  while (!ctx->hit && resets < 2) {
-    rtems_event_set out;
-
-    if (interrupt_critical_section_test_support_delay())
-      resets++;
-
-    out = DEADBEEF;
-    sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ALL | RTEMS_WAIT, 1, &out);
-    rtems_test_assert(sc == RTEMS_SUCCESSFUL);
-    rtems_test_assert(out == EVENTS);
-  }
+  interrupt_critical_section_test(
+    test_body_all_satisfy_before_timeout,
+    ctx,
+    NULL
+  );
 
   sc = rtems_timer_cancel(ctx->timer);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
@@ -217,21 +240,19 @@ static void timeout_before_satisfied(rtems_id timer, void *arg)
 {
   rtems_status_code sc;
   test_context *ctx = arg;
-  const Thread_Control *thread = ctx->thread;
+  Thread_Control *thread = ctx->thread;
+  Thread_Wait_flags flags = _Thread_Wait_flags_get(thread);
 
-  if (thread->Wait.count != 0) {
-    ctx->hit =
-      _Event_Sync_state == THREAD_BLOCKING_OPERATION_NOTHING_HAPPENED;
+  if (blocks_for_event(flags)) {
+    ctx->hit = interrupts_blocking_op(flags);
 
-    rtems_test_assert(thread->Wait.count == EVENTS);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == DEADBEEF
     );
     rtems_test_assert(thread->Wait.return_code == RTEMS_SUCCESSFUL);
 
-    _Event_Timeout(thread->Object.id, &_Event_Sync_state);
+    _Thread_Timeout(0, thread);
 
-    rtems_test_assert(thread->Wait.count == 0);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == DEADBEEF
     );
@@ -240,7 +261,6 @@ static void timeout_before_satisfied(rtems_id timer, void *arg)
     sc = rtems_event_send(thread->Object.id, EVENTS);
     rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-    rtems_test_assert(thread->Wait.count == 0);
     rtems_test_assert(
       *(rtems_event_set *) thread->Wait.return_argument == DEADBEEF
     );
@@ -248,19 +268,40 @@ static void timeout_before_satisfied(rtems_id timer, void *arg)
 
     if (ctx->hit) {
       rtems_test_assert(
-        _Event_Sync_state == THREAD_BLOCKING_OPERATION_TIMEOUT
+        _Thread_Wait_flags_get(thread)
+          == (THREAD_WAIT_CLASS_EVENT | THREAD_WAIT_STATE_READY_AGAIN)
       );
     }
+
+    rtems_test_assert(thread->Wait.count == EVENTS);
   }
 
   sc = rtems_timer_reset(timer);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 }
 
+static bool test_body_timeout_before_all_satisfy(void *arg)
+{
+  test_context *ctx = arg;
+  rtems_event_set out;
+  rtems_status_code sc;
+
+  out = DEADBEEF;
+  sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ALL | RTEMS_WAIT, 1, &out);
+  rtems_test_assert(sc == RTEMS_TIMEOUT);
+  rtems_test_assert(out == DEADBEEF);
+
+  out = DEADBEEF;
+  sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ALL | RTEMS_NO_WAIT, 0, &out);
+  rtems_test_assert(sc == RTEMS_SUCCESSFUL);
+  rtems_test_assert(out == EVENTS);
+
+  return ctx->hit;
+}
+
 static void test_timeout_before_all_satisfy(test_context *ctx)
 {
   rtems_status_code sc;
-  int resets = 0;
 
   puts(
     "Init - Trying to generate timeout before all satisfied "
@@ -269,27 +310,14 @@ static void test_timeout_before_all_satisfy(test_context *ctx)
 
   ctx->hit = false;
 
-  interrupt_critical_section_test_support_initialize(NULL);
-
   sc = rtems_timer_fire_after(ctx->timer, 1, timeout_before_satisfied, ctx);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
 
-  while (!ctx->hit && resets < 2) {
-    rtems_event_set out;
-
-    if (interrupt_critical_section_test_support_delay())
-      resets++;
-
-    out = DEADBEEF;
-    sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ALL | RTEMS_WAIT, 1, &out);
-    rtems_test_assert(sc == RTEMS_TIMEOUT);
-    rtems_test_assert(out == DEADBEEF);
-
-    out = DEADBEEF;
-    sc = rtems_event_receive(EVENTS, RTEMS_EVENT_ALL | RTEMS_NO_WAIT, 0, &out);
-    rtems_test_assert(sc == RTEMS_SUCCESSFUL);
-    rtems_test_assert(out == EVENTS);
-  }
+  interrupt_critical_section_test(
+    test_body_timeout_before_all_satisfy,
+    ctx,
+    NULL
+  );
 
   sc = rtems_timer_cancel(ctx->timer);
   rtems_test_assert(sc == RTEMS_SUCCESSFUL);
@@ -326,6 +354,7 @@ static rtems_task Init(
 
 #define CONFIGURE_MAXIMUM_TASKS       1
 #define CONFIGURE_MAXIMUM_TIMERS      1
+#define CONFIGURE_MAXIMUM_USER_EXTENSIONS 1
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 
 #define CONFIGURE_RTEMS_INIT_TASKS_TABLE

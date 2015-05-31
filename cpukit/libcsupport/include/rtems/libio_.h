@@ -64,9 +64,8 @@ extern rtems_id                          rtems_libio_semaphore;
  *  File descriptor Table Information
  */
 
-extern uint32_t        rtems_libio_number_iops;
-extern rtems_libio_t  *rtems_libio_iops;
-extern rtems_libio_t  *rtems_libio_last_iop;
+extern const uint32_t rtems_libio_number_iops;
+extern rtems_libio_t rtems_libio_iops[];
 extern rtems_libio_t *rtems_libio_iop_freelist;
 
 extern const rtems_filesystem_file_handlers_r rtems_filesystem_null_handlers;
@@ -108,7 +107,7 @@ extern rtems_filesystem_global_location_t rtems_filesystem_global_location_null;
  */
 
 #define rtems_libio_iop_to_descriptor(_iop) \
-   ((!(_iop)) ? -1 : (_iop - rtems_libio_iops))
+  ((_iop) - &rtems_libio_iops[0])
 
 /*
  *  rtems_libio_check_is_open
@@ -203,21 +202,6 @@ extern rtems_filesystem_global_location_t rtems_filesystem_global_location_null;
 void rtems_filesystem_location_clone(
   rtems_filesystem_location_info_t *clone,
   const rtems_filesystem_location_info_t *master
-);
-
-/**
- * @brief Returns the type of a node.
- *
- * This function obtains and releases the file system instance lock.
- *
- * @param[in] loc The location of the node.
- *
- * @retval type The node type.
- *
- * @see rtems_filesystem_instance_lock().
- */
-rtems_filesystem_node_types_t rtems_filesystem_node_type(
-  const rtems_filesystem_location_info_t *loc
 );
 
 /**
@@ -374,7 +358,7 @@ void rtems_filesystem_eval_path_cleanup_with_parent(
  * Sets the start and current location to the new start location.  The caller
  * must terminate its current evaluation process.  The path evaluation
  * continues in the next loop iteration within
- * rtems_filesystem_eval_path_continue().  This avoids recursive invokations.
+ * rtems_filesystem_eval_path_continue().  This avoids recursive invocations.
  * The function obtains the new start location and clones it to set the new
  * current location.  The previous start and current locations are released.
  *
@@ -810,11 +794,30 @@ int rtems_filesystem_location_exists_in_same_instance_as(
   const rtems_filesystem_location_info_t *b
 );
 
+/**
+ * @brief Checks if access to an object is allowed for the current user.
+ *
+ * If the effective UID is zero or equals the UID of the object, then the user
+ * permission flags of the object will be used.  Otherwise if the effective GID
+ * is zero or equals the GID of the object or one of the supplementary group
+ * IDs is equal to the GID of the object, then the group permission flags of
+ * the object will be used.  Otherwise the other permission flags of the object
+ * will be used.
+ *
+ * @param[in] flags The flags determining the access type.  It can be
+ *   RTEMS_FS_PERMS_READ, RTEMS_FS_PERMS_WRITE or RTEMS_FS_PERMS_EXEC.
+ * @param[in] object_mode The mode of the object specifying the permission flags.
+ * @param[in] object_uid The UID of the object.
+ * @param[in] object_gid The GID of the object.
+ *
+ * @retval true Access is allowed.
+ * @retval false Otherwise.
+ */
 bool rtems_filesystem_check_access(
-  int eval_flags,
-  mode_t node_mode,
-  uid_t node_uid,
-  gid_t node_gid
+  int flags,
+  mode_t object_mode,
+  uid_t object_uid,
+  gid_t object_gid
 );
 
 bool rtems_filesystem_eval_path_check_access(
@@ -898,6 +901,26 @@ static inline ssize_t rtems_libio_iovec_eval(
   }
 
   return total;
+}
+
+/**
+ * @brief Returns the file type of the file referenced by the filesystem
+ * location.
+ *
+ * @brief[in] loc The filesystem location.
+ *
+ * @return The type of the file or an invalid file type in case of an error.
+ */
+static inline mode_t rtems_filesystem_location_type(
+  const rtems_filesystem_location_info_t *loc
+)
+{
+  struct stat st;
+
+  st.st_mode = 0;
+  (void) ( *loc->handlers->fstat_h )( loc, &st );
+
+  return st.st_mode;
 }
 
 /** @} */

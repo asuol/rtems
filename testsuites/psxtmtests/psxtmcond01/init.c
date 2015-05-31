@@ -17,7 +17,7 @@
 #include "test_support.h"
 #include <pthread.h>
 #include <sched.h>
-#include <rtems/timerdrv.h>
+#include <rtems/btimer.h>
 
 const char rtems_test_name[] = "PSXTMCOND 01";
 
@@ -30,8 +30,8 @@ pthread_cond_t mycondvar;
 
 void benchmark_create_cond_var(void)
 {
-  long end_time;
-  int  status;
+  uint32_t end_time;
+  int      status;
 
   benchmark_timer_initialize();
   status = pthread_cond_init(&mycondvar, NULL);
@@ -49,8 +49,8 @@ void benchmark_create_cond_var(void)
 
 void benchmark_destroy_cond_var(void)
 {
-  long end_time;
-  int  status;
+  uint32_t end_time;
+  int      status;
 
   benchmark_timer_initialize();
   status = pthread_cond_destroy(&mycondvar);

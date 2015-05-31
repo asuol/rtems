@@ -7,6 +7,7 @@
  */
 
 #include <bsp.h>
+#include <bsp/bootcard.h>
 #include <lpc22xx.h>
 
 void bsp_reset(void)
@@ -16,9 +17,10 @@ void bsp_reset(void)
 
   SKYEYE_MAGIC_ADDRESS = 0xff;
 #else
-    rtems_interrupt_level level;
+  rtems_interrupt_level level;
 
-    rtems_interrupt_disable(level);
+  (void) level;
+  rtems_interrupt_disable(level);
 
   #ifdef __thumb__
     int tmp;

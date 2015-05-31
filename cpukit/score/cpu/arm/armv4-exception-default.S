@@ -99,6 +99,14 @@ _ARMV4_Exception_fiq_default:
 	stmdb	sp!, {r0-r12}
 	mov	r4, #7
 
+	/*
+	 * Don't enable FIQs yet. Set the FIQ disable bit in the SPSR
+	 * (which we'll load into the CPSR in save_more_context).
+	 */
+	mrs r2, spsr
+	orr r2, #ARM_PSR_F
+	msr spsr_c, r2
+
 save_more_context:
 
 	/* Save more context */
@@ -118,13 +126,18 @@ save_more_context:
 	/* Argument for high level handler */
 	mov	r0, sp
 
-#ifdef ARM_MULTILIB_VFP_D32
+	/* Clear VFP context pointer */
+	add	r3, sp, #ARM_EXCEPTION_FRAME_VFP_CONTEXT_OFFSET
+	mov	r1, #0
+	str	r1, [r3]
+
+#ifdef ARM_MULTILIB_VFP
 	/* Ensure that the FPU is enabled */
 	vmrs	r1, FPEXC
 	tst	r1, #(1 << 30)
-	beq	fpu_save_done
+	beq	1f
 
-	add	r3, sp, #ARM_EXCEPTION_FRAME_VFP_CONTEXT_OFFSET
+	/* Save VFP context */
 	sub	sp, #(ARM_VFP_CONTEXT_SIZE + 4)
 	add	r4, sp, #4
 	bic	r4, r4, #7
@@ -132,10 +145,19 @@ save_more_context:
 	vmrs	r2, FPSCR
 	stmia	r4!, {r1-r2}
 	vstmia	r4!, {d0-d15}
+#ifdef ARM_MULTILIB_VFP_D32
 	vstmia	r4!, {d16-d31}
-
-fpu_save_done:
+#else
+	mov	r1, #0
+	mov	r2, #0
+	adds	r3, r4, #128
+2:
+	stmia	r4!, {r1-r2}
+	cmp	r4, r3
+	bne	2b
 #endif
+1:
+#endif /* ARM_MULTILIB_VFP */
 
 	/* Call high level handler */
 	SWITCH_FROM_ARM_TO_THUMB	r1

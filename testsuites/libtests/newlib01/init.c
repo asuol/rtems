@@ -232,13 +232,11 @@ static const rtems_filesystem_file_handlers_r node_handlers = {
   .writev_h = handler_writev
 };
 
-static const IMFS_node_control node_control = {
-  .imfs_type = IMFS_GENERIC,
-  .handlers = &node_handlers,
-  .node_initialize = IMFS_node_initialize_default,
-  .node_remove = IMFS_node_remove_default,
-  .node_destroy = IMFS_node_destroy_default
-};
+static const IMFS_node_control node_control = IMFS_GENERIC_INITIALIZER(
+  &node_handlers,
+  IMFS_node_initialize_default,
+  IMFS_node_destroy_default
+);
 
 static void test(void)
 {
@@ -295,8 +293,6 @@ static void Init(rtems_task_argument arg)
 
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
-
-#define CONFIGURE_USE_IMFS_AS_BASE_FILESYSTEM
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
 

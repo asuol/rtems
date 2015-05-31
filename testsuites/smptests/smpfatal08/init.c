@@ -20,6 +20,7 @@
 #include <rtems/test.h>
 #include <rtems/score/smpimpl.h>
 
+#include <bsp.h>
 #include <bsp/bootcard.h>
 
 #include <assert.h>
@@ -36,6 +37,13 @@ void bsp_start_on_secondary_processor(void)
 {
   /* Provided to avoid multiple definitions of the CPU SMP support functions */
 }
+
+#if QORIQ_THREAD_COUNT > 1
+void qoriq_start_thread(void)
+{
+  /* Provided to avoid multiple definitions of the CPU SMP support functions */
+}
+#endif
 
 uint32_t _CPU_SMP_Initialize(void)
 {
@@ -56,7 +64,13 @@ void _CPU_SMP_Finalize_initialization(uint32_t cpu_count)
   assert(0);
 }
 
-#if !defined(__leon__) && !defined(__PPC__) && !defined(__arm__)
+void _CPU_SMP_Prepare_start_multitasking(void)
+{
+  assert(0);
+}
+
+#if defined(RTEMS_PARAVIRT) \
+  || (!defined(__leon__) && !defined(__PPC__) && !defined(__arm__))
 uint32_t _CPU_SMP_Get_current_processor(void)
 {
   return 0;

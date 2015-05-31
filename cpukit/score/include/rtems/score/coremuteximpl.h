@@ -119,6 +119,11 @@ CORE_mutex_Status _CORE_mutex_Initialize(
   bool                          initially_locked
 );
 
+RTEMS_INLINE_ROUTINE void _CORE_mutex_Destroy( CORE_mutex_Control *the_mutex )
+{
+  _Thread_queue_Destroy( &the_mutex->Wait_queue );
+}
+
 /**
  *  @brief Attempt to receive a unit from the_mutex.
  *
@@ -129,7 +134,7 @@ CORE_mutex_Status _CORE_mutex_Initialize(
  *
  *  @param[in,out] executing The currently executing thread.
  *  @param[in,out] the_mutex is the mutex to attempt to lock
- *  @param[in] level is the interrupt level
+ *  @param[in] lock_context is the interrupt level
  *
  *  @retval This routine returns 0 if "trylock" can resolve whether or not
  *  the mutex is immediately obtained or there was an error attempting to
@@ -143,7 +148,7 @@ CORE_mutex_Status _CORE_mutex_Initialize(
 RTEMS_INLINE_ROUTINE int _CORE_mutex_Seize_interrupt_trylock_body(
   CORE_mutex_Control  *the_mutex,
   Thread_Control      *executing,
-  ISR_Level            level
+  ISR_lock_Context    *lock_context
 );
 
 #if defined(__RTEMS_DO_NOT_INLINE_CORE_MUTEX_SEIZE__)
@@ -156,12 +161,13 @@ RTEMS_INLINE_ROUTINE int _CORE_mutex_Seize_interrupt_trylock_body(
    *  which makes it harder to get full binary test coverage.
    *
    *  @param[in] the_mutex will attempt to lock
+   *  @param[in] _executing points to the executing thread
    *  @param[in] level_p is the interrupt level
    */
   int _CORE_mutex_Seize_interrupt_trylock(
     CORE_mutex_Control  *the_mutex,
     Thread_Control      *executing,
-    ISR_Level            level
+    ISR_lock_Context    *lock_context
   );
 #else
   /**
@@ -169,10 +175,11 @@ RTEMS_INLINE_ROUTINE int _CORE_mutex_Seize_interrupt_trylock_body(
    *  a few instructions.  This is very important for mutex performance.
    *
    *  @param[in] _mutex will attempt to lock
-   *  @param[in] _level is the interrupt level
+   *  @param[in] _executing points to the executing thread
+   *  @param[in] _lock_context is the interrupt level
    */
-  #define _CORE_mutex_Seize_interrupt_trylock( _mutex, _executing, _level ) \
-     _CORE_mutex_Seize_interrupt_trylock_body( _mutex, _executing, _level )
+  #define _CORE_mutex_Seize_interrupt_trylock( _mutex, _executing, _lock_context ) \
+     _CORE_mutex_Seize_interrupt_trylock_body( _mutex, _executing, _lock_context )
 #endif
 
 /**
@@ -185,12 +192,15 @@ RTEMS_INLINE_ROUTINE int _CORE_mutex_Seize_interrupt_trylock_body(
  *  @param[in,out] the_mutex is the mutex to attempt to lock
  *  @param[in,out] executing The currently executing thread.
  *  @param[in] timeout is the maximum number of ticks to block
+ *  @param[in] lock_context is the interrupt level
  */
 void _CORE_mutex_Seize_interrupt_blocking(
   CORE_mutex_Control  *the_mutex,
   Thread_Control      *executing,
-  Watchdog_Interval    timeout
+  Watchdog_Interval    timeout,
+  ISR_lock_Context    *lock_context
 );
+
 /**
  *  @brief Verifies that a mutex blocking seize is performed safely.
  *
@@ -200,17 +210,10 @@ void _CORE_mutex_Seize_interrupt_blocking(
  *
  *  @retval this method returns true if dispatch is in an unsafe state.
  */
-#ifdef RTEMS_SMP
-  #define _CORE_mutex_Check_dispatch_for_seize(_wait) \
-      (_Thread_Dispatch_get_disable_level() != 1 \
-        && (_wait) \
-        && (_System_state_Get() >= SYSTEM_STATE_UP))
-#else
-  #define _CORE_mutex_Check_dispatch_for_seize(_wait) \
-      (!_Thread_Dispatch_is_enabled() \
-        && (_wait) \
-        && (_System_state_Get() >= SYSTEM_STATE_UP))
-#endif
+#define _CORE_mutex_Check_dispatch_for_seize(_wait) \
+  (!_Thread_Dispatch_is_enabled() \
+    && (_wait) \
+    && (_System_state_Get() >= SYSTEM_STATE_UP))
 
 /**
  *  @brief Attempt to obtain the mutex.
@@ -219,11 +222,11 @@ void _CORE_mutex_Seize_interrupt_blocking(
  *  then it will return immediately.  Otherwise, it will invoke the
  *  support routine @a _Core_mutex_Seize_interrupt_blocking.
  *
- *  @param[in] _the_mutex is the mutex to attempt to lock
- *  @param[in] _id is the Id of the owning API level Semaphore object
- *  @param[in] _wait is true if the thread is willing to wait
- *  @param[in] _timeout is the maximum number of ticks to block
- *  @param[in] _level is a temporary variable used to contain the ISR
+ *  @param[in] the_mutex is the mutex to attempt to lock
+ *  @param[in] id is the Id of the owning API level Semaphore object
+ *  @param[in] wait is true if the thread is willing to wait
+ *  @param[in] timeout is the maximum number of ticks to block
+ *  @param[in] lock_context is a temporary variable used to contain the ISR
  *         disable level cookie
  *
  *  @note If the mutex is called from an interrupt service routine,
@@ -245,7 +248,7 @@ RTEMS_INLINE_ROUTINE void _CORE_mutex_Seize_body(
   Objects_Id           id,
   bool                 wait,
   Watchdog_Interval    timeout,
-  ISR_Level            level
+  ISR_lock_Context    *lock_context
 )
 {
   if ( _CORE_mutex_Check_dispatch_for_seize( wait ) ) {
@@ -255,18 +258,20 @@ RTEMS_INLINE_ROUTINE void _CORE_mutex_Seize_body(
       INTERNAL_ERROR_MUTEX_OBTAIN_FROM_BAD_STATE
     );
   }
-  if ( _CORE_mutex_Seize_interrupt_trylock( the_mutex, executing, level ) ) {
+  _Thread_queue_Acquire_critical( &the_mutex->Wait_queue, lock_context );
+  if ( _CORE_mutex_Seize_interrupt_trylock( the_mutex, executing, lock_context ) ) {
     if ( !wait ) {
-      _ISR_Enable( level );
+      _Thread_queue_Release( &the_mutex->Wait_queue, lock_context );
       executing->Wait.return_code =
         CORE_MUTEX_STATUS_UNSATISFIED_NOWAIT;
     } else {
-      _Thread_queue_Enter_critical_section( &the_mutex->Wait_queue );
-      executing->Wait.queue = &the_mutex->Wait_queue;
       executing->Wait.id = id;
-      _Thread_Disable_dispatch();
-      _ISR_Enable( level );
-      _CORE_mutex_Seize_interrupt_blocking( the_mutex, executing, timeout );
+      _CORE_mutex_Seize_interrupt_blocking(
+        the_mutex,
+        executing,
+        timeout,
+        lock_context
+      );
     }
   }
 }
@@ -275,10 +280,11 @@ RTEMS_INLINE_ROUTINE void _CORE_mutex_Seize_body(
  *  This method is used to obtain a core mutex.
  *
  *  @param[in] _the_mutex is the mutex to attempt to lock
+ *  @param[in] _executing The currently executing thread.
  *  @param[in] _id is the Id of the owning API level Semaphore object
  *  @param[in] _wait is true if the thread is willing to wait
  *  @param[in] _timeout is the maximum number of ticks to block
- *  @param[in] _level is a temporary variable used to contain the ISR
+ *  @param[in] _lock_context is a temporary variable used to contain the ISR
  *         disable level cookie
  */
 #if defined(__RTEMS_DO_NOT_INLINE_CORE_MUTEX_SEIZE__)
@@ -288,11 +294,13 @@ RTEMS_INLINE_ROUTINE void _CORE_mutex_Seize_body(
     Objects_Id           _id,
     bool                 _wait,
     Watchdog_Interval    _timeout,
-    ISR_Level            _level
+    ISR_lock_Context    *_lock_context
   );
 #else
-  #define _CORE_mutex_Seize( _executing, _mtx, _id, _wait, _timeout, _level ) \
-     _CORE_mutex_Seize_body( _executing, _mtx, _id, _wait, _timeout, _level )
+  #define _CORE_mutex_Seize( \
+      _the_mutex, _executing, _id, _wait, _timeout, _lock_context ) \
+       _CORE_mutex_Seize_body( \
+         _the_mutex, _executing, _id, _wait, _timeout, _lock_context )
 #endif
 
 /**
@@ -306,13 +314,15 @@ RTEMS_INLINE_ROUTINE void _CORE_mutex_Seize_body(
  *  @param[in] id is the id of the RTEMS Object associated with this mutex
  *  @param[in] api_mutex_mp_support is the routine that will be called when
  *         unblocking a remote mutex
+ *  @param[in] lock_context is the interrupt level
  *
  *  @retval an indication of whether the routine succeeded or failed
  */
 CORE_mutex_Status _CORE_mutex_Surrender(
   CORE_mutex_Control                *the_mutex,
   Objects_Id                         id,
-  CORE_mutex_API_mp_support_callout  api_mutex_mp_support
+  CORE_mutex_API_mp_support_callout  api_mutex_mp_support,
+  ISR_lock_Context                  *lock_context
 );
 
 /**
@@ -345,7 +355,7 @@ void _CORE_mutex_Flush(
  * @retval false The mutex is not locked.
  */
 RTEMS_INLINE_ROUTINE bool _CORE_mutex_Is_locked(
-  CORE_mutex_Control  *the_mutex
+  const CORE_mutex_Control *the_mutex
 )
 {
   return the_mutex->holder != NULL;
@@ -436,7 +446,7 @@ RTEMS_INLINE_ROUTINE bool _CORE_mutex_Is_priority_ceiling(
 RTEMS_INLINE_ROUTINE int _CORE_mutex_Seize_interrupt_trylock_body(
   CORE_mutex_Control  *the_mutex,
   Thread_Control      *executing,
-  ISR_Level            level
+  ISR_lock_Context    *lock_context
 )
 {
   /* disabled when you get here */
@@ -458,7 +468,7 @@ RTEMS_INLINE_ROUTINE int _CORE_mutex_Seize_interrupt_trylock_body(
     }
 
     if ( !_CORE_mutex_Is_priority_ceiling( &the_mutex->Attributes ) ) {
-      _ISR_Enable( level );
+      _Thread_queue_Release( &the_mutex->Wait_queue, lock_context );
       return 0;
     } /* else must be CORE_MUTEX_DISCIPLINES_PRIORITY_CEILING
        *
@@ -472,19 +482,17 @@ RTEMS_INLINE_ROUTINE int _CORE_mutex_Seize_interrupt_trylock_body(
       ceiling = the_mutex->Attributes.priority_ceiling;
       current = executing->current_priority;
       if ( current == ceiling ) {
-        _ISR_Enable( level );
+        _Thread_queue_Release( &the_mutex->Wait_queue, lock_context );
         return 0;
       }
 
       if ( current > ceiling ) {
-        _Thread_Disable_dispatch();
-        _ISR_Enable( level );
-        _Thread_Change_priority(
-          executing,
-          ceiling,
-          false
-        );
-        _Thread_Enable_dispatch();
+        Per_CPU_Control *cpu_self;
+
+        cpu_self = _Thread_Dispatch_disable_critical( lock_context );
+        _Thread_queue_Release( &the_mutex->Wait_queue, lock_context );
+        _Thread_Raise_priority( executing, ceiling );
+        _Thread_Dispatch_enable( cpu_self );
         return 0;
       }
       /* if ( current < ceiling ) */ {
@@ -492,7 +500,7 @@ RTEMS_INLINE_ROUTINE int _CORE_mutex_Seize_interrupt_trylock_body(
         the_mutex->holder = NULL;
         the_mutex->nest_count = 0;     /* undo locking above */
         executing->resource_count--;   /* undo locking above */
-        _ISR_Enable( level );
+        _Thread_queue_Release( &the_mutex->Wait_queue, lock_context );
         return 0;
       }
     }
@@ -508,12 +516,12 @@ RTEMS_INLINE_ROUTINE int _CORE_mutex_Seize_interrupt_trylock_body(
     switch ( the_mutex->Attributes.lock_nesting_behavior ) {
       case CORE_MUTEX_NESTING_ACQUIRES:
         the_mutex->nest_count++;
-        _ISR_Enable( level );
+        _Thread_queue_Release( &the_mutex->Wait_queue, lock_context );
         return 0;
       #if defined(RTEMS_POSIX_API)
         case CORE_MUTEX_NESTING_IS_ERROR:
           executing->Wait.return_code = CORE_MUTEX_STATUS_NESTING_NOT_ALLOWED;
-          _ISR_Enable( level );
+          _Thread_queue_Release( &the_mutex->Wait_queue, lock_context );
           return 0;
       #endif
       case CORE_MUTEX_NESTING_BLOCKS:

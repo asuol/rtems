@@ -21,16 +21,12 @@
 #include "config.h"
 #endif
 
-#include <rtems/system.h>
-#include <rtems/score/isr.h>
 #include <rtems/score/watchdogimpl.h>
 
 void _Watchdog_Handler_initialization( void )
 {
-  _Watchdog_Sync_count = 0;
-  _Watchdog_Sync_level = 0;
   _Watchdog_Ticks_since_boot = 0;
 
-  _Chain_Initialize_empty( &_Watchdog_Ticks_chain );
-  _Chain_Initialize_empty( &_Watchdog_Seconds_chain );
+  _Watchdog_Header_initialize( &_Watchdog_Ticks_header );
+  _Watchdog_Header_initialize( &_Watchdog_Seconds_header );
 }

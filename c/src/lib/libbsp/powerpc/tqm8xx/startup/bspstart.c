@@ -50,17 +50,13 @@ uint32_t bsp_clicks_per_usec; /* for PIT driver: OSCCLK */
 uint32_t   bsp_timer_average_overhead; /* Average overhead of timer in ticks */
 uint32_t   bsp_timer_least_valid;      /* Least valid number from timer      */
 bool       bsp_timer_internal_clock;   /* TRUE, when timer runs with CPU clk */
-/*
- *  Use the shared implementations of the following routines.
- *  Look in rtems/c/src/lib/libbsp/shared/bsplibc.c.
- */
-extern void cpu_init( void);
 
 void BSP_panic( char *s)
 {
   rtems_interrupt_level level;
 
   rtems_interrupt_disable( level);
+  (void) level; /* avoid set but not used warning */
 
   printk( "%s PANIC %s\n", _RTEMS_version, s);
 
@@ -74,6 +70,7 @@ void _BSP_Fatal_error( unsigned n)
   rtems_interrupt_level level;
 
   rtems_interrupt_disable( level);
+  (void) level;
 
   printk( "%s PANIC ERROR %u\n", _RTEMS_version, n);
 
@@ -82,7 +79,7 @@ void _BSP_Fatal_error( unsigned n)
   }
 }
 
-const char *bsp_tqm_get_cib_string( const char *cib_id)
+static const char *bsp_tqm_get_cib_string( const char *cib_id)
 {
   char srch_pattern[10] = "";
   char *fnd_str;
@@ -112,7 +109,7 @@ const char *bsp_tqm_get_cib_string( const char *cib_id)
   }
 }
 
-rtems_status_code  bsp_tqm_get_cib_uint32( const char *cib_id,
+static rtems_status_code  bsp_tqm_get_cib_uint32( const char *cib_id,
 					   uint32_t   *result)
 {
   const char *item_ptr;
@@ -130,18 +127,17 @@ rtems_status_code  bsp_tqm_get_cib_uint32( const char *cib_id,
 
 void bsp_start( void)
 {
-  ppc_cpu_id_t myCpu;
-  ppc_cpu_revision_t myCpuRevision;
 
   uintptr_t interrupt_stack_start = (uintptr_t) bsp_interrupt_stack_start;
   uintptr_t interrupt_stack_size = (uintptr_t) bsp_interrupt_stack_size;
 
   /*
-   * Get CPU identification dynamically. Note that the get_ppc_cpu_type() function
-   * store the result in global variables so that it can be used latter...
+   * Get CPU identification dynamically. Note that the get_ppc_cpu_type()
+   * function stores the result in global variables so that it can be used
+   * later...
    */
-  myCpu = get_ppc_cpu_type();
-  myCpuRevision = get_ppc_cpu_revision();
+  get_ppc_cpu_type();
+  get_ppc_cpu_revision();
 
   /* Basic CPU initialization */
   cpu_init();

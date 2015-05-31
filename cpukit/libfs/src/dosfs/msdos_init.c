@@ -35,13 +35,28 @@ static int msdos_clone_node_info(rtems_filesystem_location_info_t *loc)
     return fat_file_reopen(fat_fd);
 }
 
+static int msdos_utime(
+  const rtems_filesystem_location_info_t *loc,
+  time_t                                  actime,
+  time_t                                  modtime
+)
+{
+    fat_file_fd_t *fat_fd = loc->node_access;
+
+    if (actime != modtime)
+        rtems_set_errno_and_return_minus_one( ENOTSUP );
+
+    fat_file_set_mtime(fat_fd, modtime);
+
+    return RC_OK;
+}
+
 const rtems_filesystem_operations_table  msdos_ops = {
   .lock_h         =  msdos_lock,
   .unlock_h       =  msdos_unlock,
   .eval_path_h    =  msdos_eval_path,
   .link_h         =  rtems_filesystem_default_link,
   .are_nodes_equal_h = rtems_filesystem_default_are_nodes_equal,
-  .node_type_h    =  msdos_node_type,
   .mknod_h        =  msdos_mknod,
   .rmnod_h        =  msdos_rmnod,
   .fchmod_h       =  rtems_filesystem_default_fchmod,
@@ -49,10 +64,9 @@ const rtems_filesystem_operations_table  msdos_ops = {
   .clonenod_h     =  msdos_clone_node_info,
   .freenod_h      =  msdos_free_node_info,
   .mount_h        =  rtems_filesystem_default_mount,
-  .fsmount_me_h   =  rtems_dosfs_initialize,
   .unmount_h      =  rtems_filesystem_default_unmount,
   .fsunmount_me_h =  msdos_shut_down,
-  .utime_h        =  rtems_filesystem_default_utime,
+  .utime_h        =  msdos_utime,
   .symlink_h      =  rtems_filesystem_default_symlink,
   .readlink_h     =  rtems_filesystem_default_readlink,
   .rename_h       =  msdos_rename,

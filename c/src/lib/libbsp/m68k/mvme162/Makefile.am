@@ -14,11 +14,14 @@ nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
 DISTCLEANFILES = include/bspopts.h
 noinst_PROGRAMS =
 
-include_HEADERS += ../../shared/tod.h
 include_HEADERS += include/coverhd.h
 include_HEADERS += include/page_table.h
 
 nodist_include_HEADERS += $(top_srcdir)/../shared/mvme/mvme16x_hw.h
+
+## Zilog component header files
+include_rtems_zilogdir = $(includedir)/rtems/zilog
+include_rtems_zilog_HEADERS = ../../shared/include/zilog/z8036.h
 
 noinst_LIBRARIES = libbspstart.a
 libbspstart_a_SOURCES = ../../m68k/shared/start/start.S

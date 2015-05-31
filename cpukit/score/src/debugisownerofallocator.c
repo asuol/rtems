@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014 embedded brains GmbH.  All rights reserved.
+ * Copyright (c) 2014-2015 embedded brains GmbH.  All rights reserved.
  *
  *  embedded brains GmbH
  *  Dornierstr. 4
@@ -18,7 +18,7 @@
 
 #include <rtems/score/assert.h>
 #include <rtems/score/apimutex.h>
-#include <rtems/score/thread.h>
+#include <rtems/score/threadimpl.h>
 
 #if defined( RTEMS_DEBUG )
   bool _Debug_Is_owner_of_allocator( void )

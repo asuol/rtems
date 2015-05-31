@@ -1,7 +1,7 @@
 ## Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([rtems-cpukit],[_RTEMS_VERSION],[http://www.rtems.org/bugzilla])
+AC_INIT([rtems-cpukit],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([score])
 RTEMS_TOP([..],[])
 
@@ -17,6 +17,7 @@ RTEMS_ENABLE_RTEMS_DEBUG
 RTEMS_ENABLE_NETWORKING
 RTEMS_ENABLE_PARAVIRT
 RTEMS_ENABLE_PROFILING
+RTEMS_ENABLE_DRVMGR
 
 RTEMS_ENV_RTEMSCPU
 RTEMS_CHECK_RTEMS_DEBUG
@@ -116,6 +117,12 @@ RTEMS_CHECK_FUNC([pthread_getattr_np],[
   #include <pthread.h>])
 AC_CHECK_HEADERS([sys/cpuset.h])
 
+# This was added to newlib in August 2014 to improve conformance.
+# Disable use of internal definition if it is present.
+RTEMS_CHECK_FUNC([sigaltstack],[
+  #define _GNU_SOURCE
+  #include <signal.h>])
+
 # Mandated by POSIX, not declared in some versions of newlib.
 AC_CHECK_DECLS([getrusage],,,[#include sys/resource.h])
 
@@ -129,6 +136,9 @@ AC_CHECK_HEADERS([tar.h errno.h sched.h sys/cdefs.h sys/queue.h],,
   [rtems_missing_header="$ac_header";break])
 AS_IF([test -n "$rtems_missing_header"],
   AC_MSG_ERROR([Missing required header $rtems_missing_header])])
+
+AC_CHECK_HEADERS([semaphore.h])
+AM_CONDITIONAL([HAVE_SEMAPHORE_H],[test x"$ac_cv_header_semaphore_h" = x"yes"])
 
 ## error out if libc doesn't provide stdint.h
 AS_IF([test x"${ac_cv_header_stdint_h}" != xyes],
@@ -220,6 +230,11 @@ RTEMS_CPUOPT([RTEMS_NETWORKING],
   [1],
   [if networking is enabled])
 
+RTEMS_CPUOPT([RTEMS_DRVMGR_STARTUP],
+  [test x"$enable_drvmgr" = xyes],
+  [1],
+  [if driver manager api is supported])
+
 RTEMS_CPUOPT([RTEMS_VERSION],
   [true],
   ["]_RTEMS_VERSION["],
@@ -236,6 +251,12 @@ RTEMS_CPUOPT([__RTEMS_HAVE_SYS_CPUSET_H__],
   [1],
   [indicate if <sys/cpuset.h> is present in toolset])
 
+## Header file differences that need to be known in .h after install
+RTEMS_CPUOPT([__RTEMS_HAVE_DECL_SIGALTSTACK__],
+  [test x"${ac_cv_have_decl_sigaltstack}" = x"yes"],
+  [1],
+  [indicate if <signal.h> in toolset has sigaltstack()])
+
 ## This improves both the size and coverage analysis.
 RTEMS_CPUOPT([__RTEMS_DO_NOT_INLINE_THREAD_ENABLE_DISPATCH__],
   [test x"${RTEMS_DO_NOT_INLINE_THREAD_ENABLE_DISPATCH}" = x"1"],
@@ -247,12 +268,6 @@ RTEMS_CPUOPT([__RTEMS_DO_NOT_INLINE_CORE_MUTEX_SEIZE__],
   [test x"${RTEMS_DO_NOT_INLINE_CORE_MUTEX_SEIZE}" = x"1"],
   [1],
   [disable inlining _Thread_Enable_dispatch])
-
-## This improves both the size and coverage analysis.
-RTEMS_CPUOPT([__RTEMS_DO_NOT_UNROLL_THREADQ_ENQUEUE_PRIORITY__],
-  [test x"${RTEMS_DO_NOT_UNROLL_THREADQ_ENQUEUE_PRIORITY}" = x"1"],
-  [1],
-  [disable inlining _Thread_queue_Enqueue_priority])
 
 ## This gives the same behavior as 4.8 and older
 RTEMS_CPUOPT([__RTEMS_STRICT_ORDER_MUTEX__],
@@ -292,7 +307,7 @@ AC_ENABLE_MULTILIB([Makefile],[..])
 AC_MSG_CHECKING([for assignable stdio])
 AC_COMPILE_IFELSE(
   [AC_LANG_PROGRAM(
-    [#include <stdio.h>], 
+    [#include <stdio.h>],
     [stdin = fopen("/tmp", "r")])],
   [HAVE_ASSIGNABLE_STDIO=yes],
   [HAVE_ASSIGNABLE_STDIO=no])
@@ -316,7 +331,7 @@ AC_CHECK_SIZEOF([time_t])
 
 AC_CHECK_SIZEOF([size_t])
 
-# FIXME: Mandatory in SUSv4, optional in SUSv3. 
+# FIXME: Mandatory in SUSv4, optional in SUSv3.
 #   Not implemented in GCC/newlib, so far.
 AC_CHECK_DECLS([WORD_BIT],,,[#include <limits.h>])
 AC_CHECK_DECLS([LONG_BIT],,,[#include <limits.h>])
@@ -366,12 +381,71 @@ AM_CONDITIONAL([RPCTOOLS],[test "$RPCGEN" = rpcgen \
 && test -n "$AWK" \
 && test "$enable_rpcgen" = yes])
 
+# Filter dynamic loading to only build for architectures that have
+# reloc backends
+AC_MSG_CHECKING([whether CPU supports libdl])
+case $RTEMS_CPU in
+  arm | i386 | m32r | m68k | mips | \
+  moxie | powerpc | sparc)
+   HAVE_LIBDL=yes ;;
+  # bfin has an issue to resolve with libdl. See ticket #2252
+  bfin)
+   HAVE_LIBDL=no ;;
+  # h8300 has an issue to resolve with libdl. See ticket #2284
+  h8300)
+   HAVE_LIBDL=no ;;
+  # lm32 has an issue to resolve with libdl. See ticket #2283
+  lm32)
+   HAVE_LIBDL=no ;;
+  # v850 has an issue to resolve with libdl. See ticket #2260
+  v850)
+   HAVE_LIBDL=no ;;
+  *)
+   HAVE_LIBDL=no ;;
+esac
+AM_CONDITIONAL(LIBDL,[test x"$HAVE_LIBDL" = x"yes"])
+AC_MSG_RESULT([$HAVE_LIBDL])
+
+AC_MSG_CHECKING([whether CPU supports SHA])
+case $RTEMS_CPU in
+  m32c)
+   HAVE_SHA=no ;;
+  *)
+   HAVE_SHA=yes ;;
+esac
+AM_CONDITIONAL(SHA,[test x"$HAVE_SHA" = x"yes"])
+AC_MSG_RESULT([$HAVE_SHA])
+
+# Filter libpci to only build for architectures that have support for it
+AC_MSG_CHECKING([whether CPU supports libpci])
+case $RTEMS_CPU in
+  sparc)
+   HAVE_LIBPCI=yes ;;
+  *)
+   HAVE_LIBPCI=no ;;
+esac
+AM_CONDITIONAL(LIBPCI,[test x"$HAVE_LIBPCI" = x"yes"])
+AC_MSG_RESULT([$HAVE_LIBPCI])
+
+# Filter libdrvmgr to only build for architectures that have support for it
+AC_MSG_CHECKING([whether CPU supports libdrvmgr])
+case $RTEMS_CPU in
+  sparc)
+   HAVE_LIBDRVMGR=yes ;;
+  *)
+   HAVE_LIBDRVMGR=no ;;
+esac
+AM_CONDITIONAL(LIBDRVMGR,[test x"$HAVE_LIBDRVMGR" = x"yes"])
+AC_MSG_RESULT([$HAVE_LIBDRVMGR])
+
+
 RTEMS_AMPOLISH3
 
 # Explicitly list all Makefiles here
 AC_CONFIG_FILES([
 Doxyfile
 Makefile
+dev/Makefile
 rtems/Makefile
 sapi/Makefile
 score/Makefile
@@ -379,6 +453,7 @@ score/cpu/Makefile
 score/cpu/arm/Makefile
 score/cpu/bfin/Makefile
 score/cpu/avr/Makefile
+score/cpu/epiphany/Makefile
 score/cpu/h8300/Makefile
 score/cpu/i386/Makefile
 score/cpu/lm32/Makefile
@@ -388,6 +463,7 @@ score/cpu/m32r/Makefile
 score/cpu/mips/Makefile
 score/cpu/moxie/Makefile
 score/cpu/nios2/Makefile
+score/cpu/or1k/Makefile
 score/cpu/powerpc/Makefile
 score/cpu/sh/Makefile
 score/cpu/sparc/Makefile
@@ -396,15 +472,19 @@ score/cpu/v850/Makefile
 score/cpu/no_cpu/Makefile
 posix/Makefile
 libblock/Makefile
+libdrvmgr/Makefile
 libfs/Makefile
 libfs/src/nfsclient/Makefile
 libgnat/Makefile
+libcrypt/Makefile
 libcsupport/Makefile
 libnetworking/Makefile
+libpci/Makefile
 librpc/Makefile
 libmisc/Makefile
 libi2c/Makefile
 libmd/Makefile
+libdl/Makefile
 zlib/Makefile
 ftpd/Makefile
 telnetd/Makefile

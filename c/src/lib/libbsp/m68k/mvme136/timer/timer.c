@@ -16,7 +16,7 @@
 int Ttimer_val;
 bool benchmark_timer_find_average_overhead;
 
-rtems_isr timerisr(void);
+rtems_isr timerisr(rtems_vector_number);
 
 void benchmark_timer_initialize(void)
 {
@@ -50,7 +50,7 @@ void benchmark_timer_initialize(void)
                              /* (6 countdowns) to start/stop the timer. */
 #define LEAST_VALID       10 /* Don't trust a value lower than this */
 
-uint32_t benchmark_timer_read(void)
+benchmark_timer_t benchmark_timer_read(void)
 {
 /*
   uint8_t          msb, lsb;

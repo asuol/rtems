@@ -25,7 +25,6 @@ const char rtems_test_name[] = "LOOPBACK";
 
 #define CONFIGURE_MICROSECONDS_PER_TICK    10000
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 50
-#define CONFIGURE_USE_IMFS_AS_BASE_FILESYSTEM
 
 #define CONFIGURE_INIT_TASK_STACK_SIZE    (10*1024)
 #define CONFIGURE_INIT_TASK_PRIORITY    50
@@ -168,7 +167,10 @@ static rtems_task serverTask(rtems_task_argument arg)
         addrlen = sizeof farAddr;
         s1 = accept(s, (struct sockaddr *)&farAddr, &addrlen);
         if (s1 < 0)
-            rtems_panic("Can't accept connection: %s", strerror(errno));
+            if (errno == ENXIO)
+                rtems_task_delete(RTEMS_SELF);
+            else
+                rtems_panic("Can't accept connection: %s", strerror(errno));
         else
             printf("ACCEPTED:%lX\n", ntohl(farAddr.sin_addr.s_addr));
         spawnTask(workerTask, myPriority, s1);

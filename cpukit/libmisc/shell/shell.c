@@ -40,7 +40,7 @@
 #include <pthread.h>
 #include <assert.h>
 
-static rtems_shell_env_t rtems_global_shell_env = {
+const rtems_shell_env_t rtems_global_shell_env = {
   .magic         = rtems_build_name('S', 'E', 'N', 'V'),
   .devname       = CONSOLE_DEVICE_NAME,
   .taskname      = "SHGL",
@@ -56,7 +56,8 @@ static rtems_shell_env_t rtems_global_shell_env = {
   .login_check   = NULL
 };
 
-static pthread_once_t rtems_shell_current_env_once = PTHREAD_ONCE_INIT;
+static pthread_once_t rtems_shell_once = PTHREAD_ONCE_INIT;
+
 static pthread_key_t rtems_shell_current_env_key;
 
 /*
@@ -101,12 +102,51 @@ static void rtems_shell_env_free(
   free( ptr );
 }
 
-/*
- *  Create the posix key.
- */
-static void rtems_shell_current_env_make_key(void)
+static void rtems_shell_create_file(const char *name, const char *content)
 {
-  (void) pthread_key_create(&rtems_shell_current_env_key, rtems_shell_env_free);
+  FILE *fp = fopen(name, "wx");
+
+  if (fp != NULL) {
+    fputs(content, fp);
+    fclose(fp);
+  }
+}
+
+static void rtems_shell_init_commands(void)
+{
+  rtems_shell_cmd_t * const *c;
+  rtems_shell_alias_t * const *a;
+
+  for ( c = rtems_shell_Initial_commands ; *c  ; c++ ) {
+    rtems_shell_add_cmd_struct( *c );
+  }
+
+  for ( a = rtems_shell_Initial_aliases ; *a  ; a++ ) {
+    rtems_shell_alias_cmd( (*a)->name, (*a)->alias );
+  }
+}
+
+static void rtems_shell_init_once(void)
+{
+  struct passwd pwd;
+  struct passwd *pwd_res;
+
+  pthread_key_create(&rtems_shell_current_env_key, rtems_shell_env_free);
+
+  /* dummy call to init /etc dir */
+  getpwuid_r(0, &pwd, NULL, 0, &pwd_res);
+
+  rtems_shell_create_file("etc/issue",
+                          "\n"
+                          "Welcome to @V\\n"
+                          "Login into @S\\n");
+
+  rtems_shell_create_file("/etc/issue.net",
+                          "\n"
+                          "Welcome to %v\n"
+                          "running on %m\n");
+
+  rtems_shell_init_commands();
 }
 
 /*
@@ -114,9 +154,25 @@ static void rtems_shell_current_env_make_key(void)
  */
 rtems_shell_env_t *rtems_shell_get_current_env(void)
 {
-  void *ptr = pthread_getspecific(rtems_shell_current_env_key);
-  assert (ptr != NULL);
-  return (rtems_shell_env_t *) ptr;
+  return (rtems_shell_env_t *) pthread_getspecific(rtems_shell_current_env_key);
+}
+
+/*
+ *  Duplication the current shell environment and if none is set
+ *  clear it.
+ */
+void rtems_shell_dup_current_env(rtems_shell_env_t *copy)
+{
+  rtems_shell_env_t *env = rtems_shell_get_current_env();
+  if (env) {
+    *copy = *env;
+  }
+  else {
+    memset(copy, 0, sizeof(rtems_shell_env_t));
+    copy->magic    = rtems_build_name('S', 'E', 'N', 'V');
+    copy->devname  = CONSOLE_DEVICE_NAME;
+    copy->taskname = "RTSH";
+  }
 }
 
 /*
@@ -290,7 +346,12 @@ static int rtems_shell_line_editor(
 
         case 7:                         /* Control-G */
           if (output) {
-            fprintf(out,"\r%s%*c", prompt, strlen (line), ' ');
+            /*
+             * The (int) cast is needed because the width specifier (%*)
+             * must be an int, but strlen() returns a size_t. Without
+             * the case, the result is a printf() format warning.
+             */
+            fprintf(out,"\r%s%*c", prompt, (int) strlen (line), ' ');
             fprintf(out,"\r%s\x7", prompt);
           }
           memset (line, '\0', strlen(line));
@@ -477,61 +538,23 @@ static int rtems_shell_line_editor(
   return -2;
 }
 
-/* ----------------------------------------------- *
- * - The shell TASK
- * Poor but enough..
- * TODO: Redirection. Tty Signals. ENVVARs. Shell language.
- * ----------------------------------------------- */
-
-static void rtems_shell_init_issue(void)
+static bool rtems_shell_login(rtems_shell_env_t *env, FILE * in,FILE * out)
 {
-  static bool issue_inited=false;
-  struct stat buf;
-
-  if (issue_inited)
-    return;
-  issue_inited = true;
-
-  /* dummy call to init /etc dir */
-  getpwnam("root");
-
-  if (stat("/etc/issue",&buf)) {
-    rtems_shell_write_file("/etc/issue",
-                           "\n"
-                           "Welcome to @V\\n"
-                           "Login into @S\\n");
-  }
-
-  if (stat("/etc/issue.net",&buf)) {
-     rtems_shell_write_file("/etc/issue.net",
-                           "\n"
-                            "Welcome to %v\n"
-                            "running on %m\n");
-  }
-}
-
-static bool rtems_shell_login(FILE * in,FILE * out) {
-  FILE          *fd;
-  int            c;
-  time_t         t;
-
-  rtems_shell_init_issue();
-  setuid(0);
-  setgid(0);
-  rtems_current_user_env->euid =
-  rtems_current_user_env->egid =0;
+  FILE              *fd;
+  int               c;
+  time_t            t;
 
   if (out) {
-    if ((rtems_current_shell_env->devname[5]!='p')||
-        (rtems_current_shell_env->devname[6]!='t')||
-        (rtems_current_shell_env->devname[7]!='y')) {
+    if ((env->devname[5]!='p')||
+        (env->devname[6]!='t')||
+        (env->devname[7]!='y')) {
       fd = fopen("/etc/issue","r");
       if (fd) {
         while ((c=fgetc(fd))!=EOF) {
           if (c=='@')  {
             switch(c=fgetc(fd)) {
               case 'L':
-                fprintf(out,"%s",rtems_current_shell_env->devname);
+                fprintf(out,"%s", env->devname);
                 break;
               case 'B':
                 fprintf(out,"0");
@@ -578,7 +601,7 @@ static bool rtems_shell_login(FILE * in,FILE * out) {
           if (c=='%')  {
             switch(c=fgetc(fd)) {
               case 't':
-                fprintf(out,"%s",rtems_current_shell_env->devname);
+                fprintf(out,"%s", env->devname);
                 break;
               case 'h':
                 fprintf(out,"0");
@@ -617,12 +640,7 @@ static bool rtems_shell_login(FILE * in,FILE * out) {
     }
   }
 
-  return rtems_shell_login_prompt(
-    in,
-    out,
-    rtems_current_shell_env->devname,
-    rtems_current_shell_env->login_check
-  );
+  return rtems_shell_login_prompt(in, out, env->devname, env->login_check);
 }
 
 #if defined(SHELL_DEBUG)
@@ -659,6 +677,24 @@ static rtems_task rtems_shell_task(rtems_task_argument task_argument)
   rtems_task_delete( RTEMS_SELF );
 }
 
+static bool rtems_shell_init_user_env(void)
+{
+  rtems_status_code sc;
+
+  /* Make sure we have a private user environment */
+  sc = rtems_libio_set_private_env();
+  if (sc != RTEMS_SUCCESSFUL) {
+    rtems_error(sc, "rtems_libio_set_private_env():");
+    return false;
+  }
+
+  /* Make an effective root user */
+  seteuid(0);
+  setegid(0);
+
+  return chroot("/") == 0;
+}
+
 #define RTEMS_SHELL_MAXIMUM_ARGUMENTS (128)
 #define RTEMS_SHELL_CMD_SIZE          (128)
 #define RTEMS_SHELL_CMD_COUNT         (32)
@@ -669,8 +705,6 @@ bool rtems_shell_main_loop(
 )
 {
   rtems_shell_env_t *shell_env;
-  rtems_shell_cmd_t *shell_cmd;
-  rtems_status_code  sc;
   int                eno;
   struct termios     term;
   struct termios     previous_term;
@@ -687,13 +721,10 @@ bool rtems_shell_main_loop(
   FILE              *stdinToClose = NULL;
   FILE              *stdoutToClose = NULL;
 
-  rtems_shell_initialize_command_set();
-
-  eno = pthread_once(
-    &rtems_shell_current_env_once,
-    rtems_shell_current_env_make_key
-  );
+  eno = pthread_once(&rtems_shell_once, rtems_shell_init_once);
   assert(eno == 0);
+
+  rtems_shell_register_monitor_commands();
 
   shell_env = rtems_shell_init_env(shell_env_arg);
   if (shell_env == NULL) {
@@ -707,10 +738,10 @@ bool rtems_shell_main_loop(
     return false;
   }
 
-  setuid(0);
-  setgid(0);
-
-  rtems_current_user_env->euid = rtems_current_user_env->egid = 0;
+  if (!rtems_shell_init_user_env()) {
+    rtems_error(0, "rtems_shell_init_user_env");
+    return false;
+  }
 
   fileno(stdout);
 
@@ -774,8 +805,6 @@ bool rtems_shell_main_loop(
   setvbuf(stdin,NULL,_IONBF,0); /* Not buffered*/
   setvbuf(stdout,NULL,_IONBF,0); /* Not buffered*/
 
-  rtems_shell_initialize_command_set();
-
   /*
    * Allocate the command line buffers.
    */
@@ -798,23 +827,25 @@ bool rtems_shell_main_loop(
     }
 
     do {
-      /* Set again root user and root filesystem, side effect of set_priv..*/
-      sc = rtems_libio_set_private_env();
-      if (sc != RTEMS_SUCCESSFUL) {
-        rtems_error(sc,"rtems_libio_set_private_env():");
-        result = false;
-        break;
-      }
+      result = rtems_shell_init_user_env();
 
-      /*
-       *  By using result here, we can fall to the bottom of the
-       *  loop when the connection is dropped during login and
-       *  keep on trucking.
-       */
-      if (shell_env->login_check != NULL) {
-        result = rtems_shell_login(stdin,stdout);
-      } else {
-        result = true;
+      if (result) {
+        /*
+         *  By using result here, we can fall to the bottom of the
+         *  loop when the connection is dropped during login and
+         *  keep on trucking.
+         */
+        if (shell_env->login_check != NULL) {
+          result = rtems_shell_login(shell_env, stdin,stdout);
+        } else {
+          setuid(shell_env->uid);
+          setgid(shell_env->gid);
+          seteuid(shell_env->uid);
+          setegid(shell_env->gid);
+          rtems_current_user_env_getgroups();
+
+          result = true;
+        }
       }
 
       if (result)  {
@@ -823,8 +854,7 @@ bool rtems_shell_main_loop(
         if (!input_file) {
           rtems_shell_cat_file(stdout,"/etc/motd");
           fprintf(stdout, "\n"
-                  "RTEMS SHELL (Ver.1.0-FRC):%s. " \
-                  __DATE__". 'help' to list commands.\n",
+                  "RTEMS Shell on %s. Use 'help' to list commands.\n",
                   shell_env->devname);
         }
 
@@ -879,9 +909,6 @@ bool rtems_shell_main_loop(
           if (!strcmp(cmds[cmd],"bye") || !strcmp(cmds[cmd],"exit")) {
             fprintf(stdout, "Shell exiting\n" );
             break;
-          } else if (!strcmp(cmds[cmd],"shutdown")) { /* exit application */
-            fprintf(stdout, "System shutting down at user request\n" );
-            exit(0);
           }
 
           /* exec cmd section */
@@ -894,14 +921,7 @@ bool rtems_shell_main_loop(
           memcpy (cmd_argv, cmds[cmd], RTEMS_SHELL_CMD_SIZE);
           if (!rtems_shell_make_args(cmd_argv, &argc, argv,
                                      RTEMS_SHELL_MAXIMUM_ARGUMENTS)) {
-            shell_cmd = rtems_shell_lookup_cmd(argv[0]);
-            if ( argv[0] == NULL ) {
-              shell_env->errorlevel = -1;
-            } else if ( shell_cmd == NULL ) {
-              shell_env->errorlevel = rtems_shell_script_file(argc, argv);
-            } else {
-              shell_env->errorlevel = shell_cmd->command(argc, argv);
-            }
+            shell_env->errorlevel = rtems_shell_execute_cmd(argv[0], argc, argv);
           }
 
           /* end exec cmd section */
@@ -995,6 +1015,8 @@ static rtems_status_code rtems_shell_run (
   shell_env->output_append = output_append;
   shell_env->wake_on_end   = wake_on_end;
   shell_env->login_check   = login_check;
+  shell_env->uid           = getuid();
+  shell_env->gid           = getgid();
 
   getcwd(shell_env->cwd, sizeof(shell_env->cwd));
 

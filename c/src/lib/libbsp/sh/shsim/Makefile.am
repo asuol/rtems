@@ -12,6 +12,7 @@ include_HEADERS += ../../shared/include/tm27.h
 
 nodist_include_HEADERS = include/bspopts.h
 nodist_include_bsp_HEADERS = ../../shared/include/bootcard.h
+nodist_include_bsp_HEADERS += ../../shared/include/console-polled.h
 DISTCLEANFILES = include/bspopts.h
 
 nodist_include_HEADERS += ../../shared/include/coverhd.h
@@ -37,6 +38,7 @@ libbsp_a_SOURCES += ../../shared/bspclean.c
 libbsp_a_SOURCES += ../../shared/sbrk.c ../../shared/bootcard.c
 libbsp_a_SOURCES += ../../shared/gnatinstallhandler.c
 libbsp_a_SOURCES += ../shared/bsphwinit.c
+libbsp_a_SOURCES += startup/sysexit.c
 
 # clock
 libbsp_a_SOURCES += ../../shared/clock_driver_simidle.c

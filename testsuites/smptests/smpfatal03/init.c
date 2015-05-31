@@ -42,7 +42,7 @@ static void acquire_giant_and_fatal_task(rtems_task_argument arg)
   int i;
 
   for (i = 0; i < 13; ++i) {
-    _Giant_Acquire();
+    _Thread_Disable_dispatch();
   }
 
   _SMP_barrier_Wait(&giant_barrier, &state, CPU_COUNT);
@@ -62,7 +62,7 @@ static void wait_for_giant(void)
 
   _SMP_barrier_Wait(&giant_barrier, &state, CPU_COUNT);
 
-  _Giant_Acquire();
+  _Thread_Disable_dispatch();
 }
 
 static void Init(rtems_task_argument arg)
@@ -115,7 +115,7 @@ static void fatal_extension(
 
     if (self == main_cpu) {
       assert(source == RTEMS_FATAL_SOURCE_SMP);
-      assert(code == SMP_FATAL_SHUTDOWN);
+      assert(code == SMP_FATAL_SHUTDOWN_RESPONSE);
     } else {
       assert(source == RTEMS_FATAL_SOURCE_APPLICATION);
       assert(code == 0xdeadbeef);
@@ -126,6 +126,8 @@ static void fatal_extension(
     if (self == 0) {
       rtems_test_endk();
     }
+
+    _SMP_barrier_Wait(&fatal_barrier, &state, CPU_COUNT);
   }
 }
 

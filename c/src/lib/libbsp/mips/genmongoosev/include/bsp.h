@@ -17,10 +17,6 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
 
@@ -28,7 +24,11 @@ extern "C" {
 #include <rtems/iosupp.h>
 #include <rtems/console.h>
 #include <rtems/clockdrv.h>
-#include <libcpu/mongoose-v.h>
+#include <bsp/mongoose-v.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define BSP_FEATURE_IRQ_EXTENSION
 #define BSP_SHARED_HANDLER_SUPPORT      1
@@ -58,6 +58,12 @@ extern void assertSoftwareInterrupt(uint32_t);
 /* from start.S */
 extern void promCopyIcacheFlush(void);
 extern void promCopyDcacheFlush(void);
+
+/*
+ * Called from user programs wanting to use the GDB stub.
+ */
+void mg5rdbgCloseGDBuart(void);
+int mg5rdbgOpenGDBuart(int);
 
 #ifdef __cplusplus
 }

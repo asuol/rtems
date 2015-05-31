@@ -20,6 +20,7 @@
 #include <rtems/rtems/sem.h>
 #include <rtems/score/coremuteximpl.h>
 #include <rtems/score/coresemimpl.h>
+#include <rtems/score/mrspimpl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -65,7 +66,7 @@ void _Semaphore_Manager_initialization(void);
  * This function returns a RTEMS status code based on the mutex
  * status code specified.
  *
- * @param[in] the_mutex_status is the mutex status code to translate
+ * @param[in] status is the mutex status code to translate
  *
  * @retval translated RTEMS status code
  */
@@ -92,13 +93,21 @@ _Semaphore_Translate_core_mutex_return_code(
   return _Semaphore_Translate_core_mutex_return_code_[status];
 }
 
+#if defined(RTEMS_SMP)
+RTEMS_INLINE_ROUTINE rtems_status_code
+_Semaphore_Translate_MRSP_status_code( MRSP_Status mrsp_status )
+{
+  return (rtems_status_code) mrsp_status;
+}
+#endif
+
 /**
  * @brief Semaphore Translate Core Semaphore Return Code
  *
  * This function returns a RTEMS status code based on the semaphore
  * status code specified.
  *
- * @param[in] the_mutex_status is the semaphore status code to translate
+ * @param[in] status is the semaphore status code to translate
  *
  * @retval translated RTEMS status code
  */
@@ -181,11 +190,15 @@ RTEMS_INLINE_ROUTINE Semaphore_Control *_Semaphore_Get (
 RTEMS_INLINE_ROUTINE Semaphore_Control *_Semaphore_Get_interrupt_disable (
   Objects_Id         id,
   Objects_Locations *location,
-  ISR_Level         *level
+  ISR_lock_Context  *lock_context
 )
 {
-  return (Semaphore_Control *)
-    _Objects_Get_isr_disable( &_Semaphore_Information, id, location, level );
+  return (Semaphore_Control *) _Objects_Get_isr_disable(
+    &_Semaphore_Information,
+    id,
+    location,
+    lock_context
+  );
 }
 
 #ifdef __cplusplus

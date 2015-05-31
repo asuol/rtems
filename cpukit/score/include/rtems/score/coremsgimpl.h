@@ -21,6 +21,7 @@
 
 #include <rtems/score/coremsg.h>
 #include <rtems/score/chainimpl.h>
+#include <rtems/score/threaddispatch.h>
 #include <rtems/score/threadqimpl.h>
 
 #include <limits.h>
@@ -113,8 +114,6 @@ typedef void ( *CORE_message_queue_API_mp_support_callout )(
 /**
  *  @brief Initialize a message queue.
  *
- *  DESCRIPTION:
- *
  *  This package is the implementation of the CORE Message Queue Handler.
  *  This core object provides task synchronization and communication functions
  *  via messages passed to queue objects.
@@ -144,7 +143,6 @@ bool _CORE_message_queue_Initialize(
 /**
  *  @brief Close a message queue.
  *
- *  DESCRIPTION:
  *  This package is the implementation of the CORE Message Queue Handler.
  *  This core object provides task synchronization and communication functions
  *  via messages passed to queue objects
@@ -167,7 +165,6 @@ void _CORE_message_queue_Close(
 /**
  *  @brief Flush pending messages.
  *
- *  DESCRIPTION:
  *  This package is the implementation of the CORE Message Queue Handler.
  *  This core object provides task synchronization and communication functions
  *  via messages passed to queue objects.
@@ -176,28 +173,13 @@ void _CORE_message_queue_Close(
  *  number of messages flushed from the queue is returned.
  *
  *  @param[in] the_message_queue points to the message queue to flush
+ *  @param[in] lock_context The lock context of the interrupt disable.
  *
  *  @retval This method returns the number of message pending messages flushed.
  */
 uint32_t   _CORE_message_queue_Flush(
-  CORE_message_queue_Control *the_message_queue
-);
-
-/**
- *  @brief Flush all outstanding messages.
- *
- *  This routine flushes all outstanding messages and returns
- *  them to the inactive message chain.
- *
- *  @param[in] the_message_queue points to the message queue to flush
- *
- *  @retval This method returns the number of pending messages flushed.
- *
- *  - INTERRUPT LATENCY:
- *    + single case
- */
-uint32_t   _CORE_message_queue_Flush_support(
-  CORE_message_queue_Control *the_message_queue
+  CORE_message_queue_Control *the_message_queue,
+  ISR_lock_Context           *lock_context
 );
 
 #if defined(FUNCTIONALITY_NOT_CURRENTLY_USED_BY_ANY_API)
@@ -220,7 +202,6 @@ uint32_t   _CORE_message_queue_Flush_support(
 /**
  *  @brief Broadcast a message to the message queue.
  *
- *  DESCRIPTION:
  *  This package is the implementation of the CORE Message Queue Handler.
  *  This core object provides task synchronization and communication functions
  *  via messages passed to queue objects.
@@ -237,6 +218,7 @@ uint32_t   _CORE_message_queue_Flush_support(
  *         a thread that is unblocked is actually a remote thread.
  *  @param[out] count points to the variable that will contain the
  *         number of tasks that are sent this message
+ *  @param[in] lock_context The lock context of the interrupt disable.
  *  @retval @a *count will contain the number of messages sent
  *  @retval indication of the successful completion or reason for failure
  */
@@ -246,7 +228,8 @@ CORE_message_queue_Status _CORE_message_queue_Broadcast(
   size_t                                     size,
   Objects_Id                                 id,
   CORE_message_queue_API_mp_support_callout  api_message_queue_mp_support,
-  uint32_t                                  *count
+  uint32_t                                  *count,
+  ISR_lock_Context                          *lock_context
 );
 
 /**
@@ -272,6 +255,7 @@ CORE_message_queue_Status _CORE_message_queue_Broadcast(
  *         if the message queue is full.
  *  @param[in] timeout is the maximum number of clock ticks that the calling
  *         thread is willing to block if the message queue is full.
+ *  @param[in] lock_context The lock context of the interrupt disable.
  *  @retval indication of the successful completion or reason for failure
  */
 CORE_message_queue_Status _CORE_message_queue_Submit(
@@ -283,13 +267,13 @@ CORE_message_queue_Status _CORE_message_queue_Submit(
   CORE_message_queue_API_mp_support_callout  api_message_queue_mp_support,
   CORE_message_queue_Submit_types            submit_type,
   bool                                       wait,
-  Watchdog_Interval                          timeout
+  Watchdog_Interval                          timeout,
+  ISR_lock_Context                          *lock_context
 );
 
 /**
  *  @brief Size a message from the message queue.
  *
- *  DESCRIPTION:
  *  This package is the implementation of the CORE Message Queue Handler.
  *  This core object provides task synchronization and communication functions
  *  via messages passed to queue objects.
@@ -310,6 +294,7 @@ CORE_message_queue_Status _CORE_message_queue_Submit(
  *         if the message queue is empty.
  *  @param[in] timeout is the maximum number of clock ticks that the calling
  *         thread is willing to block if the message queue is empty.
+ *  @param[in] lock_context The lock context of the interrupt disable.
  *
  *  @retval indication of the successful completion or reason for failure.
  *          On success, the location pointed to @a size_p will contain the
@@ -328,7 +313,8 @@ void _CORE_message_queue_Seize(
   void                            *buffer,
   size_t                          *size_p,
   bool                             wait,
-  Watchdog_Interval                timeout
+  Watchdog_Interval                timeout,
+  ISR_lock_Context                *lock_context
 );
 
 /**
@@ -361,8 +347,9 @@ RTEMS_INLINE_ROUTINE CORE_message_queue_Status _CORE_message_queue_Send(
   size_t                                     size,
   Objects_Id                                 id,
   CORE_message_queue_API_mp_support_callout  api_message_queue_mp_support,
-  bool                                    wait,
-  Watchdog_Interval                          timeout
+  bool                                       wait,
+  Watchdog_Interval                          timeout,
+  ISR_lock_Context                          *lock_context
 )
 {
   return _CORE_message_queue_Submit(
@@ -374,7 +361,8 @@ RTEMS_INLINE_ROUTINE CORE_message_queue_Status _CORE_message_queue_Send(
     api_message_queue_mp_support,
     CORE_MESSAGE_QUEUE_SEND_REQUEST,
     wait,     /* sender may block */
-    timeout   /* timeout interval */
+    timeout,  /* timeout interval */
+    lock_context
   );
 }
 
@@ -387,8 +375,9 @@ RTEMS_INLINE_ROUTINE CORE_message_queue_Status _CORE_message_queue_Urgent(
   size_t                                     size,
   Objects_Id                                 id,
   CORE_message_queue_API_mp_support_callout  api_message_queue_mp_support,
-  bool                                    wait,
-  Watchdog_Interval                          timeout
+  bool                                       wait,
+  Watchdog_Interval                          timeout,
+  ISR_lock_Context                          *lock_context
 )
 {
   return _CORE_message_queue_Submit(
@@ -400,8 +389,44 @@ RTEMS_INLINE_ROUTINE CORE_message_queue_Status _CORE_message_queue_Urgent(
     api_message_queue_mp_support,
     CORE_MESSAGE_QUEUE_URGENT_REQUEST,
     wait,     /* sender may block */
-    timeout   /* timeout interval */
+    timeout,  /* timeout interval */
+    lock_context
  );
+}
+
+RTEMS_INLINE_ROUTINE void _CORE_message_queue_Acquire(
+  CORE_message_queue_Control *the_message_queue,
+  ISR_lock_Context           *lock_context
+)
+{
+  _Thread_queue_Acquire( &the_message_queue->Wait_queue, lock_context );
+}
+
+RTEMS_INLINE_ROUTINE void _CORE_message_queue_Acquire_critical(
+  CORE_message_queue_Control *the_message_queue,
+  ISR_lock_Context           *lock_context
+)
+{
+  _Thread_queue_Acquire_critical( &the_message_queue->Wait_queue, lock_context );
+
+  #if defined(RTEMS_MULTIPROCESSING)
+    /*
+     * In case RTEMS_MULTIPROCESSING is enabled, then we have to prevent
+     * deletion of the executing thread after the thread queue operations.
+     */
+    _Thread_Dispatch_disable();
+  #endif
+}
+
+RTEMS_INLINE_ROUTINE void _CORE_message_queue_Release(
+  CORE_message_queue_Control *the_message_queue,
+  ISR_lock_Context           *lock_context
+)
+{
+  _Thread_queue_Release( &the_message_queue->Wait_queue, lock_context );
+  #if defined(RTEMS_MULTIPROCESSING)
+    _Thread_Dispatch_enable( _Per_CPU_Get() );
+  #endif
 }
 
 /**
@@ -427,7 +452,7 @@ _CORE_message_queue_Allocate_message_buffer (
 )
 {
    return (CORE_message_queue_Buffer_control *)
-     _Chain_Get( &the_message_queue->Inactive_messages );
+     _Chain_Get_unprotected( &the_message_queue->Inactive_messages );
 }
 
 /**
@@ -439,7 +464,7 @@ RTEMS_INLINE_ROUTINE void _CORE_message_queue_Free_message_buffer (
   CORE_message_queue_Buffer_control *the_message
 )
 {
-  _Chain_Append( &the_message_queue->Inactive_messages, &the_message->Node );
+  _Chain_Append_unprotected( &the_message_queue->Inactive_messages, &the_message->Node );
 }
 
 /**
@@ -449,7 +474,7 @@ RTEMS_INLINE_ROUTINE void _CORE_message_queue_Free_message_buffer (
  *       disabled if no API requires it.
  */
 RTEMS_INLINE_ROUTINE int _CORE_message_queue_Get_message_priority (
-  CORE_message_queue_Buffer_control *the_message
+  const CORE_message_queue_Buffer_control *the_message
 )
 {
   #if defined(RTEMS_SCORE_COREMSG_ENABLE_MESSAGE_PRIORITY)
@@ -500,46 +525,6 @@ RTEMS_INLINE_ROUTINE bool _CORE_message_queue_Is_priority(
     (the_attribute->discipline == CORE_MESSAGE_QUEUE_DISCIPLINES_PRIORITY);
 }
 
-/**
- * This routine places the_message at the rear of the outstanding
- * messages on the_message_queue.
- */
-RTEMS_INLINE_ROUTINE void _CORE_message_queue_Append_unprotected (
-  CORE_message_queue_Control        *the_message_queue,
-  CORE_message_queue_Buffer_control *the_message
-)
-{
-  _Chain_Append_unprotected(
-    &the_message_queue->Pending_messages,
-    &the_message->Node
-  );
-}
-
-/**
- * This routine places the_message at the front of the outstanding
- * messages on the_message_queue.
- */
-RTEMS_INLINE_ROUTINE void _CORE_message_queue_Prepend_unprotected (
-  CORE_message_queue_Control        *the_message_queue,
-  CORE_message_queue_Buffer_control *the_message
-)
-{
-  _Chain_Prepend_unprotected(
-    &the_message_queue->Pending_messages,
-    &the_message->Node
-  );
-}
-
-/**
- * This function returns true if the_message_queue is true and false otherwise.
- */
-RTEMS_INLINE_ROUTINE bool _CORE_message_queue_Is_null (
-  CORE_message_queue_Control *the_message_queue
-)
-{
-  return ( the_message_queue == NULL  );
-}
-
 #if defined(RTEMS_SCORE_COREMSG_ENABLE_NOTIFICATION)
   /**
    * This function returns true if notification is enabled on this message
@@ -572,6 +557,55 @@ RTEMS_INLINE_ROUTINE bool _CORE_message_queue_Is_null (
   #define _CORE_message_queue_Set_notify( \
            the_message_queue, the_handler, the_argument )
 #endif
+
+RTEMS_INLINE_ROUTINE Thread_Control *_CORE_message_queue_Dequeue_receiver(
+  CORE_message_queue_Control      *the_message_queue,
+  const void                      *buffer,
+  size_t                           size,
+  CORE_message_queue_Submit_types  submit_type,
+  ISR_lock_Context                *lock_context
+)
+{
+  Thread_Control *the_thread;
+
+  /*
+   *  If there are pending messages, then there can't be threads
+   *  waiting for us to send them a message.
+   *
+   *  NOTE: This check is critical because threads can block on
+   *        send and receive and this ensures that we are broadcasting
+   *        the message to threads waiting to receive -- not to send.
+   */
+  if ( the_message_queue->number_of_pending_messages != 0 ) {
+    return NULL;
+  }
+
+  /*
+   *  There must be no pending messages if there is a thread waiting to
+   *  receive a message.
+   */
+  the_thread = _Thread_queue_First_locked( &the_message_queue->Wait_queue );
+  if ( the_thread == NULL ) {
+    return NULL;
+  }
+
+   *(size_t *) the_thread->Wait.return_argument = size;
+   the_thread->Wait.count = (uint32_t) submit_type;
+
+  _CORE_message_queue_Copy_buffer(
+    buffer,
+    the_thread->Wait.return_argument_second.mutable_object,
+    size
+  );
+
+  _Thread_queue_Extract_critical(
+    &the_message_queue->Wait_queue,
+    the_thread,
+    lock_context
+  );
+
+  return the_thread;
+}
 
 /** @} */
 

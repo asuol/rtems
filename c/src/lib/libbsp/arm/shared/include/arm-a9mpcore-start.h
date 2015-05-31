@@ -36,21 +36,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-BSP_START_TEXT_SECTION static inline uint32_t
-arm_cp15_get_control(void);
-
-BSP_START_TEXT_SECTION static inline void
-arm_cp15_set_control(uint32_t val);
-
-BSP_START_TEXT_SECTION static inline uint32_t
-arm_cp15_get_auxiliary_control(void);
-
-BSP_START_TEXT_SECTION static inline void
-arm_cp15_set_auxiliary_control(uint32_t val);
-
-BSP_START_TEXT_SECTION static inline void
-arm_cp15_set_vector_base_address(void *base);
-
 BSP_START_TEXT_SECTION static inline void
 arm_a9mpcore_start_set_vector_base(void)
 {
@@ -96,60 +81,70 @@ arm_a9mpcore_start_scu_enable(volatile a9mpcore_scu *scu)
   arm_a9mpcore_start_errata_764369_handler(scu);
 }
 
+#ifdef RTEMS_SMP
+BSP_START_TEXT_SECTION static inline void
+arm_a9mpcore_start_on_secondary_processor(void)
+{
+  uint32_t ctrl;
+
+  arm_a9mpcore_start_set_vector_base();
+
+  arm_gic_irq_initialize_secondary_cpu();
+
+  ctrl = arm_cp15_start_setup_mmu_and_cache(
+    0,
+    ARM_CP15_CTRL_AFE | ARM_CP15_CTRL_Z
+  );
+
+  arm_cp15_set_domain_access_control(
+    ARM_CP15_DAC_DOMAIN(ARM_MMU_DEFAULT_CLIENT_DOMAIN, ARM_CP15_DAC_CLIENT)
+  );
+
+  /* FIXME: Sharing the translation table between processors is brittle */
+  arm_cp15_set_translation_table_base(
+    (uint32_t *) bsp_translation_table_base
+  );
+
+  ctrl |= ARM_CP15_CTRL_I | ARM_CP15_CTRL_C | ARM_CP15_CTRL_M;
+  arm_cp15_set_control(ctrl);
+
+  _SMP_Start_multitasking_on_secondary_processor();
+}
+
+BSP_START_TEXT_SECTION static inline void
+arm_a9mpcore_start_enable_smp_in_auxiliary_control(void)
+{
+  /*
+   * Enable cache coherency support and cache/MMU maintenance broadcasts for
+   * this processor.
+   */
+  uint32_t actlr = arm_cp15_get_auxiliary_control();
+  actlr |= ARM_CORTEX_A9_ACTL_SMP | ARM_CORTEX_A9_ACTL_FW;
+  arm_cp15_set_auxiliary_control(actlr);
+}
+#endif
+
 BSP_START_TEXT_SECTION static inline void arm_a9mpcore_start_hook_0(void)
 {
   volatile a9mpcore_scu *scu =
     (volatile a9mpcore_scu *) BSP_ARM_A9MPCORE_SCU_BASE;
-  uint32_t cpu_id;
+  uint32_t cpu_id = arm_cortex_a9_get_multiprocessor_cpu_id();
 
-  arm_a9mpcore_start_scu_enable(scu);
+  arm_cp15_branch_predictor_invalidate_all();
+
+  if (cpu_id == 0) {
+    arm_a9mpcore_start_scu_enable(scu);
+  }
 
 #ifdef RTEMS_SMP
-  /* Enable cache coherency support for this processor */
-  {
-    uint32_t actlr = arm_cp15_get_auxiliary_control();
-    actlr |= ARM_CORTEX_A9_ACTL_SMP;
-    arm_cp15_set_auxiliary_control(actlr);
-  }
+  arm_a9mpcore_start_enable_smp_in_auxiliary_control();
 #endif
-
-  cpu_id = arm_cortex_a9_get_multiprocessor_cpu_id();
 
   arm_a9mpcore_start_scu_invalidate(scu, cpu_id, 0xf);
 
 #ifdef RTEMS_SMP
   if (cpu_id != 0) {
-    arm_a9mpcore_start_set_vector_base();
-
-    if (cpu_id < rtems_configuration_get_maximum_processors()) {
-      uint32_t ctrl;
-
-      arm_gic_irq_initialize_secondary_cpu();
-
-      ctrl = arm_cp15_start_setup_mmu_and_cache(
-        0,
-        ARM_CP15_CTRL_AFE | ARM_CP15_CTRL_Z
-      );
-
-      arm_cp15_set_domain_access_control(
-        ARM_CP15_DAC_DOMAIN(ARM_MMU_DEFAULT_CLIENT_DOMAIN, ARM_CP15_DAC_CLIENT)
-      );
-
-      /* FIXME: Sharing the translation table between processors is brittle */
-      arm_cp15_set_translation_table_base(
-        (uint32_t *) bsp_translation_table_base
-      );
-
-      ctrl |= ARM_CP15_CTRL_I | ARM_CP15_CTRL_C | ARM_CP15_CTRL_M;
-      arm_cp15_set_control(ctrl);
-
-      _SMP_Start_multitasking_on_secondary_processor();
-    } else {
-      /* FIXME: Shutdown processor */
-      while (1) {
-        __asm__ volatile ("wfi");
-      }
-    }
+    arm_a9mpcore_start_on_secondary_processor();
   }
 #endif
 }

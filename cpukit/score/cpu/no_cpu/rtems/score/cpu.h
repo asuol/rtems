@@ -69,29 +69,6 @@ extern "C" {
 #define CPU_INLINE_ENABLE_DISPATCH       FALSE
 
 /**
- * Should the body of the search loops in _Thread_queue_Enqueue_priority
- * be unrolled one time?  In unrolled each iteration of the loop examines
- * two "nodes" on the chain being searched.  Otherwise, only one node
- * is examined per iteration.
- *
- * If TRUE, then the loops are unrolled.
- * If FALSE, then the loops are not unrolled.
- *
- * The primary factor in making this decision is the cost of disabling
- * and enabling interrupts (_ISR_Flash) versus the cost of rest of the
- * body of the loop.  On some CPUs, the flash is more expensive than
- * one iteration of the loop body.  In this case, it might be desirable
- * to unroll the loop.  It is important to note that on some CPUs, this
- * code is the longest interrupt disable period in RTEMS.  So it is
- * necessary to strike a balance when setting this parameter.
- *
- * Port Specific Information:
- *
- * XXX document implementation including references if appropriate
- */
-#define CPU_UNROLL_ENQUEUE_PRIORITY      TRUE
-
-/**
  * Does RTEMS manage a dedicated interrupt stack in software?
  *
  * If TRUE, then a stack is allocated in @ref _ISR_Handler_initialization.
@@ -578,11 +555,40 @@ typedef struct {
 #ifdef RTEMS_SMP
     /**
      * @brief On SMP configurations the thread context must contain a boolean
-     * indicator if this context is executing on a processor.
+     * indicator to signal if this context is executing on a processor.
      *
      * This field must be updated during a context switch.  The context switch
      * to the heir must wait until the heir context indicates that it is no
-     * longer executing on a processor.
+     * longer executing on a processor.  The context switch must also check if
+     * a thread dispatch is necessary to honor updates of the heir thread for
+     * this processor.  This indicator must be updated using an atomic test and
+     * set operation to ensure that at most one processor uses the heir
+     * context at the same time.
+     *
+     * @code
+     * void _CPU_Context_switch(
+     *   Context_Control *executing,
+     *   Context_Control *heir
+     * )
+     * {
+     *   save( executing );
+     *
+     *   executing->is_executing = false;
+     *   memory_barrier();
+     *
+     *   if ( test_and_set( &heir->is_executing ) ) {
+     *     do {
+     *       Per_CPU_Control *cpu_self = _Per_CPU_Get_snapshot();
+     *
+     *       if ( cpu_self->dispatch_necessary ) {
+     *         heir = _Thread_Get_heir_and_make_it_executing( cpu_self );
+     *       }
+     *     } while ( test_and_set( &heir->is_executing ) );
+     *   }
+     *
+     *   restore( heir );
+     * }
+     * @endcode
      */
     volatile bool is_executing;
 #endif
@@ -1042,7 +1048,7 @@ uint32_t   _CPU_ISR_Get_level( void );
  *
  * XXX document implementation including references if appropriate
  */
-#define _CPU_Fatal_halt( _error ) \
+#define _CPU_Fatal_halt( _source, _error ) \
   { \
   }
 
@@ -1543,6 +1549,18 @@ register struct Per_CPU_Control *_CPU_Per_CPU_current asm( "rX" );
    * virtually available processors.
    */
   void _CPU_SMP_Finalize_initialization( uint32_t cpu_count );
+
+  /**
+   * @brief Prepares a CPU to start multitasking in terms of SMP.
+   *
+   * This function is invoked on all processors requested by the application
+   * during system initialization.
+   *
+   * This function will be called after all processors requested by the
+   * application have been started right before the context switch to the first
+   * thread takes place.
+   */
+  void _CPU_SMP_Prepare_start_multitasking( void );
 
   /**
    * @brief Returns the index of the current processor.

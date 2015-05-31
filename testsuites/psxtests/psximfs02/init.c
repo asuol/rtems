@@ -31,7 +31,6 @@ extern int seteuid(uid_t euid);
 
 /* forward declarations to avoid warnings */
 rtems_task Init(rtems_task_argument argument);
-void IMFS_dump(void);
 
 rtems_task Init(
   rtems_task_argument argument
@@ -183,8 +182,6 @@ rtems_task Init(
   puts( "Creating a fifo -- OK" );
   status = mkfifo( "/fifo", S_IRWXU );
   rtems_test_assert( status == 0 );
-
-  IMFS_dump();
   
   puts( "chown /fifo to 10 -- OK" );
   status = chown( "/fifo", 10, 10 );
@@ -211,6 +208,8 @@ rtems_task Init(
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
+#define CONFIGURE_FILESYSTEM_IMFS
+
 #define CONFIGURE_MAXIMUM_TASKS                  1
 #define CONFIGURE_IMFS_MEMFILE_BYTES_PER_BLOCK   15
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
@@ -220,7 +219,6 @@ rtems_task Init(
 
 #define CONFIGURE_INIT
 
-#define CONFIGURE_FIFOS_ENABLED
 #define CONFIGURE_MAXIMUM_FIFOS 1
 
 #include <rtems/confdefs.h>

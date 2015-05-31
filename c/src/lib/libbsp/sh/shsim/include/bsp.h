@@ -1,8 +1,10 @@
 /*
- *  This include file contains all board IO definitions.
- *
  *  SH-gdb simulator BSP
  *
+ *  This include file contains all board IO definitions.
+ */
+
+/*
  *  Author: Ralf Corsepius (corsepiu@faw.uni-ulm.de)
  *
  *  COPYRIGHT (c) 2001, Ralf Corsepius, Ulm, Germany
@@ -22,9 +24,7 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef ASM
 
 #include <rtems.h>
 #include <rtems/clockdrv.h>
@@ -38,6 +38,10 @@ extern "C" {
  */
 #include <rtems/devnull.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /* Constants */
 
 Thread clock_driver_sim_idle_body(uintptr_t);
@@ -46,12 +50,18 @@ Thread clock_driver_sim_idle_body(uintptr_t);
 /*
  * Defined in the linker script 'linkcmds'
  */
-
 extern void *CPU_Interrupt_stack_low;
 extern void *CPU_Interrupt_stack_high;
+
+/*
+ * BSP methods that cross file boundaries.
+ */
+int _sys_exit (int n);
+void bsp_hw_init(void);
 
 #ifdef __cplusplus
 }
 #endif
 
+#endif /* !ASM */
 #endif

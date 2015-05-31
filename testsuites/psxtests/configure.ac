@@ -1,7 +1,7 @@
 ## Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([rtems-c-src-tests-psxtests],[_RTEMS_VERSION],[http://www.rtems.org/bugzilla])
+AC_INIT([rtems-c-src-tests-psxtests],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([psx01])
 AC_CONFIG_HEADER([config.h])
 RTEMS_TOP([../..],[..])
@@ -11,17 +11,25 @@ RTEMS_CANONICAL_TARGET_CPU
 AM_INIT_AUTOMAKE([no-define foreign 1.12.2])
 AM_MAINTAINER_MODE
 
+RTEMS_ENABLE_CXX
+
 RTEMS_ENV_RTEMSBSP
 
 RTEMS_PROJECT_ROOT
 
 RTEMS_PROG_CC_FOR_TARGET
+RTEMS_PROG_CXX_FOR_TARGET
 
 RTEMS_CANONICALIZE_TOOLS
 
 RTEMS_CHECK_CUSTOM_BSP(RTEMS_BSP)
+RTEMS_CHECK_CXX(RTEMS_BSP)
+RTEMS_CHECK_CPUOPTS([RTEMS_POSIX_API])
+RTEMS_CHECK_CPUOPTS([RTEMS_NETWORKING])
 
-AM_CONDITIONAL([HAS_NETWORKING],[test "$HAS_NETWORKING" = "yes"])
+AM_CONDITIONAL(HAS_CXX,test "$rtems_cv_HAS_CPLUSPLUS" = "yes")
+AM_CONDITIONAL([HAS_NETWORKING],test "$rtems_cv_RTEMS_NETWORKING" = "yes")
+AM_CONDITIONAL([HAS_CPLUSPLUS],[test x"$HAS_CPLUSPLUS" = x"yes"])
 
 RTEMS_CHECK_CPUOPTS([RTEMS_POSIX_API])
 AM_CONDITIONAL(HAS_POSIX,test x"${rtems_cv_RTEMS_POSIX_API}" = x"yes")
@@ -133,6 +141,7 @@ psxclassic01/Makefile
 psxcleanup/Makefile
 psxcleanup01/Makefile
 psxclock/Makefile
+psxclock01/Makefile
 psxcond01/Makefile
 psxconfig01/Makefile
 psxeintr_join/Makefile
@@ -145,6 +154,8 @@ psxfile02/Makefile
 psxfilelock01/Makefile
 psxgetattrnp01/Makefile
 psxgetrusage01/Makefile
+psxglobalcon01/Makefile
+psxglobalcon02/Makefile
 psxhdrs/Makefile
 psxid01/Makefile
 psximfs01/Makefile

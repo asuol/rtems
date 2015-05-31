@@ -26,15 +26,11 @@
 void _API_Mutex_Lock( API_Mutex_Control *the_mutex )
 {
   bool previous_thread_life_protection;
-  ISR_Level level;
+  ISR_lock_Context lock_context;
 
   previous_thread_life_protection = _Thread_Set_life_protection( true );
 
-  #if defined(RTEMS_SMP)
-    _Thread_Disable_dispatch();
-  #endif
-
-  _ISR_Disable( level );
+  _ISR_lock_ISR_disable( &lock_context );
 
   _CORE_mutex_Seize(
     &the_mutex->Mutex,
@@ -42,15 +38,11 @@ void _API_Mutex_Lock( API_Mutex_Control *the_mutex )
     the_mutex->Object.id,
     true,
     0,
-    level
+    &lock_context
   );
 
   if ( the_mutex->Mutex.nest_count == 1 ) {
     the_mutex->previous_thread_life_protection =
       previous_thread_life_protection;
   }
-
-  #if defined(RTEMS_SMP)
-    _Thread_Enable_dispatch();
-  #endif
 }

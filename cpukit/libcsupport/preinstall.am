@@ -42,30 +42,17 @@ $(PROJECT_INCLUDE)/rtems/rtc.h: include/rtc.h $(PROJECT_INCLUDE)/rtems/$(dirstam
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/rtc.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/rtc.h
 
+$(PROJECT_INCLUDE)/rtems/tod.h: include/rtems/tod.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/tod.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/tod.h
+
 $(PROJECT_INCLUDE)/rtems/spurious.h: include/spurious.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/spurious.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/spurious.h
 
-$(PROJECT_INCLUDE)/rtems/timerdrv.h: include/timerdrv.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/timerdrv.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/timerdrv.h
-
 $(PROJECT_INCLUDE)/rtems/vmeintr.h: include/vmeintr.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/vmeintr.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/vmeintr.h
-
-$(PROJECT_INCLUDE)/rtems/motorola/$(dirstamp):
-	@$(MKDIR_P) $(PROJECT_INCLUDE)/rtems/motorola
-	@: > $(PROJECT_INCLUDE)/rtems/motorola/$(dirstamp)
-PREINSTALL_DIRS += $(PROJECT_INCLUDE)/rtems/motorola/$(dirstamp)
-
-$(PROJECT_INCLUDE)/rtems/motorola/mc68230.h: include/motorola/mc68230.h $(PROJECT_INCLUDE)/rtems/motorola/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/motorola/mc68230.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/motorola/mc68230.h
-
-$(PROJECT_INCLUDE)/rtems/motorola/mc68681.h: include/motorola/mc68681.h $(PROJECT_INCLUDE)/rtems/motorola/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/motorola/mc68681.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/motorola/mc68681.h
 
 $(PROJECT_INCLUDE)/rtems/assoc.h: include/rtems/assoc.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/assoc.h
@@ -102,21 +89,4 @@ PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/termiostypes.h
 $(PROJECT_INCLUDE)/rtems/gxx_wrappers.h: include/rtems/gxx_wrappers.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/gxx_wrappers.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/gxx_wrappers.h
-
-$(PROJECT_INCLUDE)/rtems/zilog/$(dirstamp):
-	@$(MKDIR_P) $(PROJECT_INCLUDE)/rtems/zilog
-	@: > $(PROJECT_INCLUDE)/rtems/zilog/$(dirstamp)
-PREINSTALL_DIRS += $(PROJECT_INCLUDE)/rtems/zilog/$(dirstamp)
-
-$(PROJECT_INCLUDE)/rtems/zilog/z8036.h: include/zilog/z8036.h $(PROJECT_INCLUDE)/rtems/zilog/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/zilog/z8036.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/zilog/z8036.h
-
-$(PROJECT_INCLUDE)/rtems/zilog/z8530.h: include/zilog/z8530.h $(PROJECT_INCLUDE)/rtems/zilog/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/zilog/z8530.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/zilog/z8530.h
-
-$(PROJECT_INCLUDE)/rtems/zilog/z8536.h: include/zilog/z8536.h $(PROJECT_INCLUDE)/rtems/zilog/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/zilog/z8536.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/zilog/z8536.h
 

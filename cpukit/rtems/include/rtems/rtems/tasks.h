@@ -271,6 +271,8 @@ rtems_status_code rtems_task_delete(
 /**
  * @brief RTEMS Get Task Node
  *
+ * @deprecated Notepads are deprecated and will be removed.
+ *
  * This routine implements the rtems_task_get_note directive. The
  * value of the indicated notepad for the task associated with ID
  * is returned in note.
@@ -285,10 +287,12 @@ rtems_status_code rtems_task_get_note(
   rtems_id    id,
   uint32_t    notepad,
   uint32_t   *note
-);
+) RTEMS_COMPILER_DEPRECATED_ATTRIBUTE;
 
 /**
  * @brief RTEMS Set Task Note
+ *
+ * @deprecated Notepads are deprecated and will be removed.
  *
  * This routine implements the rtems_task_set_note directive. The
  * value of the indicated notepad for the task associated with ID
@@ -306,7 +310,7 @@ rtems_status_code rtems_task_set_note(
   rtems_id   id,
   uint32_t   notepad,
   uint32_t   note
-);
+) RTEMS_COMPILER_DEPRECATED_ATTRIBUTE;
 
 /**
  * @brief RTEMS Task Mode
@@ -458,6 +462,8 @@ rtems_status_code rtems_task_is_suspended(
 /**
  *  @brief RTEMS Add Task Variable
  *
+ *  @deprecated Task variables are deprecated.
+ *
  *  This directive adds a per task variable.
  *
  *  @note This service is not available in SMP configurations.
@@ -466,10 +472,12 @@ rtems_status_code rtems_task_variable_add(
   rtems_id  tid,
   void    **ptr,
   void    (*dtor)(void *)
-);
+) RTEMS_COMPILER_DEPRECATED_ATTRIBUTE;
 
 /**
  *  @brief Get a per-task variable
+ *
+ *  @deprecated Task variables are deprecated.
  *
  *  This directive gets the value of a task variable.
  *
@@ -479,10 +487,12 @@ rtems_status_code rtems_task_variable_get(
   rtems_id tid,
   void **ptr,
   void **result
-);
+) RTEMS_COMPILER_DEPRECATED_ATTRIBUTE;
 
 /**
  *  @brief RTEMS Delete Task Variable
+ *
+ *  @deprecated Task variables are deprecated.
  *
  *  This directive removes a per task variable.
  *
@@ -491,7 +501,7 @@ rtems_status_code rtems_task_variable_get(
 rtems_status_code rtems_task_variable_delete(
   rtems_id  tid,
   void    **ptr
-);
+) RTEMS_COMPILER_DEPRECATED_ATTRIBUTE;
 #endif
 
 #if defined(__RTEMS_HAVE_SYS_CPUSET_H__)
@@ -520,6 +530,17 @@ rtems_status_code rtems_task_get_affinity(
 
 /**
  * @brief Sets the processor affinity set of a task.
+ *
+ * This function will not change the scheduler of the task.  The intersection
+ * of the processor affinity set and the set of processors owned by the
+ * scheduler of the task must be non-empty.  It is not an error if the
+ * processor affinity set contains processors that are not part of the set of
+ * processors owned by the scheduler instance of the task.  A task will simply
+ * not run under normal circumstances on these processors since the scheduler
+ * ignores them.  Some locking protocols may temporarily use processors that
+ * are not included in the processor affinity set of the task.  It is also not
+ * an error if the processor affinity set contains processors that are not part
+ * of the system.
  *
  * @param[in] id Identifier of the task.  Use @ref RTEMS_SELF to select the
  * executing task.
@@ -652,10 +673,12 @@ typedef struct {
 
   /**
    *  This field contains the notepads for this task.
+   * 
+   *  @deprecated Notepads are deprecated and will be removed.
    *
    *  @note MUST BE LAST ENTRY.
    */
-  uint32_t                 Notepads[ RTEMS_ZERO_LENGTH_ARRAY ];
+  uint32_t Notepads[ RTEMS_ZERO_LENGTH_ARRAY ] RTEMS_COMPILER_DEPRECATED_ATTRIBUTE;
 }  RTEMS_API_Control;
 
 /**

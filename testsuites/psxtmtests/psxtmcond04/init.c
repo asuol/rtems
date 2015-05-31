@@ -17,7 +17,7 @@
 #include "test_support.h"
 #include <pthread.h>
 #include <sched.h>
-#include <rtems/timerdrv.h>
+#include <rtems/btimer.h>
 
 const char rtems_test_name[] = "PSXTMCOND 04";
 
@@ -33,10 +33,10 @@ void *Blocker(
 )
 {
 
-  long end_time;
-  struct sched_param param;
-  int policy;
-  int status;
+  uint32_t end_time;
+  struct   sched_param param;
+  int      policy;
+  int      status;
 
   status = pthread_mutex_lock(&MutexID);
   rtems_test_assert( status == 0 );

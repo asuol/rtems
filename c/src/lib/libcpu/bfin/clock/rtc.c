@@ -1,5 +1,8 @@
-/*  Real Time Clock Driver for Blackfin
- *
+/*
+ * Real Time Clock Driver for Blackfin
+ */
+
+/*
  *  Copyright (c) 2006 by Atos Automacao Industrial Ltda.
  *             written by Alain Schaefer <alain.schaefer@easc.ch>
  *                    and Antonio Giovanini <antonio@atos.com.br>
@@ -11,7 +14,7 @@
 
 
 #include <rtems.h>
-#include "tod.h"
+#include <rtems/tod.h>
 #include <rtems/rtc.h>
 #include <rtems/libio.h>
 #include <bsp.h>
@@ -30,19 +33,18 @@ int Leap_years_until_now (int year);
 
 void Init_RTC(void)
 {
-  *((uint16_t*)RTC_PREN)    = RTC_PREN_PREN; /* Enable Prescaler */
+  *((uint16_t*)RTC_PREN) = RTC_PREN_PREN; /* Enable Prescaler */
 }
 
 /*
  *  Read time from RTEMS' clock manager and set it to RTC
  */
-
 void setRealTimeFromRTEMS (void)
 {
   rtems_time_of_day time_buffer;
   rtems_status_code status;
 
-  status = rtems_clock_get( RTEMS_CLOCK_GET_TOD, &time_buffer );
+  status = rtems_clock_get_tod( &time_buffer );
   if (status == RTEMS_SUCCESSFUL){
     setRealTime(&time_buffer);
   }
@@ -51,7 +53,6 @@ void setRealTimeFromRTEMS (void)
 /*
  *  Read real time from RTC and set it to RTEMS' clock manager
  */
-
 void setRealTimeToRTEMS (void)
 {
   rtems_time_of_day time_buffer;
@@ -60,9 +61,9 @@ void setRealTimeToRTEMS (void)
   rtems_clock_set( &time_buffer );
 }
 
- /*
-  * Set the RTC time
-  */
+/*
+ * Set the RTC time
+ */
 int setRealTime(
   const rtems_time_of_day *tod
 )
@@ -87,10 +88,9 @@ int setRealTime(
   return 0;
 }
 
- /*
-  *  Get the time from the RTC.
-  */
-
+/*
+ *  Get the time from the RTC.
+ */
 void getRealTime(
   rtems_time_of_day *tod
 )
@@ -134,7 +134,6 @@ void getRealTime(
  *  Return the difference between RTC and RTEMS' clock manager time in minutes.
  *  If the difference is greater than 1 day, this returns 9999.
  */
-
 int checkRealTime (void)
 {
   rtems_time_of_day rtems_tod;
@@ -142,7 +141,7 @@ int checkRealTime (void)
   uint32_t   rtems_time;
   uint32_t   rtc_time;
 
-  rtems_clock_get( RTEMS_CLOCK_GET_TOD, &rtems_tod );
+  (void) rtems_clock_get_tod( &rtems_tod );
   getRealTime ( &rtc_tod );
 
   rtems_time = _TOD_To_seconds( &rtems_tod );

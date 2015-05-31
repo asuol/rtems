@@ -30,12 +30,65 @@ extern "C" {
  * NDEBUG.
  */
 #if defined( RTEMS_DEBUG )
-  #define _Assert( _e ) \
-    ( ( _e ) ? \
-      ( void ) 0 : \
-        __assert_func( __FILE__, __LINE__, __ASSERT_FUNC, #_e ) )
+
+  /**
+   * @brief Macro with method name used in assert output
+   *
+   * Given the variations in compilers and standards, we have to poke a bit.
+   *
+   * @note This is based on the code in newlib's assert.h.
+   */
+  #ifndef __RTEMS_ASSERT_FUNCTION
+    /* Use g++'s demangled names in C++.  */
+    #if defined __cplusplus && defined __GNUC__
+      #define __RTEMS_ASSERT_FUNCTION __PRETTY_FUNCTION__
+
+    /* C99 requires the use of __func__.  */
+    #elif __STDC_VERSION__ >= 199901L
+      #define __RTEMS_ASSERT_FUNCTION __func__
+
+    /* Older versions of gcc don't have __func__ but can use __FUNCTION__.  */
+    #elif __GNUC__ >= 2
+      #define __RTEMS_ASSERT_FUNCTION __FUNCTION__
+
+    /* failed to detect __func__ support.  */
+    #else
+      #define __RTEMS_ASSERT_FUNCTION ((char *) 0)
+    #endif
+  #endif /* !__RTEMS_ASSERT_FUNCTION */
+
+  #if !defined( RTEMS_SCHEDSIM )
+    /* normal build is newlib. */
+
+    void __assert_func(const char *, int, const char *, const char *)
+      RTEMS_COMPILER_NO_RETURN_ATTRIBUTE;
+
+    #define _Assert( _e ) \
+       ( ( _e ) ? \
+         ( void ) 0 : \
+           __assert_func( __FILE__, __LINE__, __RTEMS_ASSERT_FUNCTION, #_e ) )
+
+  #elif defined(__linux__)
+    /* Scheduler simulator has only beed tested on glibc. */
+    #define _Assert( _e ) \
+     ( ( _e ) ? \
+       ( void ) 0 : \
+         __assert_fail( #_e, __FILE__, __LINE__, __RTEMS_ASSERT_FUNCTION ) )
+  #else
+    #error "Implement RTEMS assert support for this C Library"
+  #endif
+
 #else
   #define _Assert( _e ) ( ( void ) 0 )
+#endif
+
+/**
+ * @brief Like _Assert(), but only armed if RTEMS_SMP is defined.
+ */
+#if defined( RTEMS_SMP )
+  #define _SMP_Assert( _e ) _Assert( _e )
+#else
+  #define _SMP_Assert( _e ) ( ( void ) 0 )
 #endif
 
 /**
@@ -70,7 +123,11 @@ extern "C" {
 /**
  * @brief Asserts that this point is not reached during run-time.
  */
+#if RTEMS_SCHEDSIM
+#define _Assert_Not_reached()
+#else
 #define _Assert_Not_reached() _Assert( 0 )
+#endif
 
 #ifdef __cplusplus
 }

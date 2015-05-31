@@ -21,7 +21,7 @@
 #include "imfs.h"
 
 #define jnode_get_control( jnode ) \
-  (&jnode->info.directory.Entries)
+  (&((IMFS_directory_t *) jnode)->Entries)
 
 #define jnode_has_no_children( jnode )  \
   rtems_chain_is_empty( jnode_get_control( jnode ) )
@@ -48,12 +48,6 @@ void IMFS_fsunmount(
 
    loc = temp_mt_entry->mt_fs_root->location;
    jnode = (IMFS_jnode_t *)loc.node_access;
-
-   /*
-    *  Set this to null to indicate that it is being unmounted.
-    */
-
-   temp_mt_entry->mt_fs_root->location.node_access = NULL;
 
    do {
      next = jnode->Parent;

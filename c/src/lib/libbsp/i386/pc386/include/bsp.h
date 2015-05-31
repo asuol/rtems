@@ -47,12 +47,11 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef ASM
 
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
+#include <bsp/tblsizes.h>
 
 #include <rtems.h>
 #include <rtems/iosupp.h>
@@ -60,6 +59,10 @@ extern "C" {
 #include <rtems/clockdrv.h>
 #include <libcpu/cpu.h>
 #include <rtems/bspIo.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * @degroup pc386_i386 PC386 Support
@@ -113,12 +116,6 @@ extern int rtems_3c509_driver_attach(struct rtems_bsdnet_ifconfig *config);
 +--------------------------------------------------------------------------*/
 
 /*-------------------------------------------------------------------------+
-| Video (console) related constants.
-+--------------------------------------------------------------------------*/
-
-#include <crt.h>
-
-/*-------------------------------------------------------------------------+
 | Constants relating to the 8254 (or 8253) programmable interval timers.
 +--------------------------------------------------------------------------*/
 #define IO_TIMER1      0x40
@@ -170,11 +167,8 @@ extern int rtems_3c509_driver_attach(struct rtems_bsdnet_ifconfig *config);
 /*-------------------------------------------------------------------------+
 | External Variables.
 +--------------------------------------------------------------------------*/
-#define IDT_SIZE 256
-#define GDT_SIZE 3
-
 extern interrupt_gate_descriptor Interrupt_descriptor_table[IDT_SIZE];
-extern segment_descriptors Global_descriptor_table   [GDT_SIZE];
+extern segment_descriptors _Global_descriptor_table   [GDT_SIZE];
 
 /*-------------------------------------------------------------------------+
 | Function Prototypes.
@@ -183,12 +177,58 @@ void          _IBMPC_initVideo(void);    /* from 'outch.c'  */
 void          _IBMPC_outch    (char);    /* from 'outch.c'  */
 char          _IBMPC_inch     (void);    /* from 'inch.c'   */
 char          _IBMPC_inch_sleep (void);  /* from 'inch.c'   */
+int           BSP_wait_polled_input(void); /* from 'inch.c' */
+int           rtems_kbpoll( void );      /* from 'inch.c' */
+int           getch( void );             /* from 'inch.c' */
+void           add_to_queue( unsigned short b ); /* from 'inch.c' */
 
 void Wait_X_ms(unsigned int timeToWait); /* from 'timer.c'  */
+void Calibrate_loop_1ms(void);           /* from 'timer.c'  */
 
-void Clock_driver_install_handler(void); /* from 'ckinit.c'  */
-void Clock_driver_support_initialize_hardware(void); /* from 'ckinit.c'  */
+void rtems_irq_mngt_init(void);          /* from 'irq_init.c' */
+
+void bsp_size_memory(void);              /* from 'bspstart.c' */
+
+#if (BSP_IS_EDISON == 0)
+  void Clock_driver_install_handler(void);             /* from 'ckinit.c'  */
+  void Clock_driver_support_initialize_hardware(void); /* from 'ckinit.c'  */
+#else
+  /**
+   *  @defgroup edison_bsp Clock Tick Support
+   *
+   *  @ingroup i386_pc386
+   *
+   *  @brief Clock Tick Support Package
+   */
+   Thread clock_driver_sim_idle_body(uintptr_t);
+   #define BSP_IDLE_TASK_BODY clock_driver_sim_idle_body
+  /*  
+   * hack to kill some time. Hopefully hitting a hardware register is slower
+   * than an empty loop.
+   */
+  #define BSP_CLOCK_DRIVER_DELAY() \
+    do { \
+      uint64_t _i = 2500000; \
+      while (_i) { \
+        _i--; \
+      } \
+    } while ( 0 )
+#endif /* edison */
+
+void kbd_reset_setup(char *str, int *ints);   /* from 'pc_keyb.c' */
 size_t read_aux(char * buffer, size_t count); /* from 'ps2_mouse.c'  */
+
+bool bsp_get_serial_mouse_device(             /* from 'serial_mouse.c' */
+  const char **name,
+  const char **type
+);
+
+void register_leds(                           /* from 'keyboard.c' */
+  int console,
+  unsigned int led,
+  unsigned int *addr,
+  unsigned int mask
+);
 
 /* Definitions for BSPConsolePort */
 #define BSP_CONSOLE_PORT_CONSOLE (-1)
@@ -201,6 +241,7 @@ size_t read_aux(char * buffer, size_t count); /* from 'ps2_mouse.c'  */
 const char* bsp_cmdline(void);
 const char* bsp_cmdline_arg(const char* arg);
 
+#if BSP_ENABLE_IDE
 /*
  * IDE command line parsing.
  */
@@ -210,17 +251,33 @@ void bsp_ide_cmdline_init(void);
  * indicate, that BSP has IDE driver
  */
 #define RTEMS_BSP_HAS_IDE_DRIVER
+#endif
 
 /* GDB stub stuff */
+void init_remote_gdb( void );
 void i386_stub_glue_init(int uart);
 void i386_stub_glue_init_breakin(void);
-void set_debug_traps(void);
 void breakpoint(void);
 
 #define BSP_MAXIMUM_DEVICES 6
 
+/*
+ * Debug helper methods
+ */
+typedef __FILE FILE;
+uint32_t BSP_irq_count_dump(FILE *f);
+
+/*
+ * Prototypes just called from .S files. This lets the .S file include
+ * bsp.h just to establish the dependency.
+ */
+void raw_idt_notify(void);
+void C_dispatch_isr(int vector);
+
 #ifdef __cplusplus
 }
 #endif
+
+#endif /* !ASM */
 
 #endif /* _BSP_H */

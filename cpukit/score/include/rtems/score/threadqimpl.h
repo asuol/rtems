@@ -8,7 +8,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 1989-2009.
+ *  COPYRIGHT (c) 1989-2014.
  *  On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
@@ -20,6 +20,8 @@
 #define _RTEMS_SCORE_THREADQIMPL_H
 
 #include <rtems/score/threadq.h>
+#include <rtems/score/chainimpl.h>
+#include <rtems/score/rbtreeimpl.h>
 #include <rtems/score/thread.h>
 
 #ifdef __cplusplus
@@ -31,22 +33,30 @@ extern "C" {
  */
 /**@{*/
 
-/**
- *  Constant for indefinite wait.
- */
-#define THREAD_QUEUE_WAIT_FOREVER  WATCHDOG_NO_TIMEOUT
+RTEMS_INLINE_ROUTINE void _Thread_queue_Acquire_critical(
+  Thread_queue_Control *the_thread_queue,
+  ISR_lock_Context     *lock_context
+)
+{
+  _ISR_lock_Acquire( &the_thread_queue->Lock, lock_context );
+}
 
-/**
- *  This is one of the constants used to manage the priority queues.
- *  @ref TASK_QUEUE_DATA_NUMBER_OF_PRIORITY_HEADERS for more details.
- */
-#define TASK_QUEUE_DATA_PRIORITIES_PER_HEADER      64
+RTEMS_INLINE_ROUTINE void _Thread_queue_Acquire(
+  Thread_queue_Control *the_thread_queue,
+  ISR_lock_Context     *lock_context
+)
+{
+  _ISR_lock_ISR_disable( lock_context );
+  _Thread_queue_Acquire_critical( the_thread_queue, lock_context );
+}
 
-/**
- *  This is one of the constants used to manage the priority queues.
- *  @ref TASK_QUEUE_DATA_NUMBER_OF_PRIORITY_HEADERS for more details.
- */
-#define TASK_QUEUE_DATA_REVERSE_SEARCH_MASK        0x20
+RTEMS_INLINE_ROUTINE void _Thread_queue_Release(
+  Thread_queue_Control *the_thread_queue,
+  ISR_lock_Context     *lock_context
+)
+{
+  _ISR_lock_Release_and_ISR_enable( &the_thread_queue->Lock, lock_context );
+}
 
 /**
  *  The following type defines the callout used when a remote task
@@ -57,78 +67,204 @@ typedef void ( *Thread_queue_Flush_callout )(
              );
 
 /**
- *  The following type defines the callout used for timeout processing
- *  methods.
- */
-typedef void ( *Thread_queue_Timeout_callout )(
-                 Objects_Id,
-                 void *
-             );
-
-/**
  *  @brief Gets a pointer to a thread waiting on the_thread_queue.
  *
  *  This function returns a pointer to a thread waiting on
  *  the_thread_queue.  The selection of this thread is based on
  *  the discipline of the_thread_queue.  If no threads are waiting
  *  on the_thread_queue, then NULL is returned.
+ *
+ *  - INTERRUPT LATENCY:
+ *    + single case
  */
 Thread_Control *_Thread_queue_Dequeue(
   Thread_queue_Control *the_thread_queue
 );
 
 /**
- *  @brief Enqueues the currently executing thread on the_thread_queue.
+ * @brief Blocks the thread and places it on the thread queue.
  *
- *  This routine enqueues the currently executing thread on
- *  the_thread_queue with an optional timeout.
+ * This enqueues the thread on the thread queue, blocks the thread, and
+ * optionally starts the thread timer in case the timeout interval is not
+ * WATCHDOG_NO_TIMEOUT.
+ *
+ * The caller must be the owner of the thread queue lock.  This function will
+ * release the thread queue lock and register it as the new thread lock.
+ * Thread dispatching is disabled before the thread queue lock is released.
+ * Thread dispatching is enabled once the sequence to block the thread is
+ * complete.  The operation to enqueue the thread on the queue is protected by
+ * the thread queue lock.  This makes it possible to use the thread queue lock
+ * to protect the state of objects embedding the thread queue and directly
+ * enter _Thread_queue_Enqueue_critical() in case the thread must block.
+ *
+ * @code
+ * #include <rtems/score/threadqimpl.h>
+ * #include <rtems/score/statesimpl.h>
+ *
+ * typedef struct {
+ *   Thread_queue_Control  Queue;
+ *   Thread_Control       *owner;
+ * } Mutex;
+ *
+ * void _Mutex_Obtain( Mutex *mutex )
+ * {
+ *   ISR_lock_Context  lock_context;
+ *   Thread_Control   *executing;
+ *
+ *   _Thread_queue_Acquire( &mutex->Queue, &lock_context );
+ *
+ *   executing = _Thread_Executing;
+ *
+ *   if ( mutex->owner == NULL ) {
+ *     mutex->owner = executing;
+ *     _Thread_queue_Release( &mutex->Queue, &lock_context );
+ *   } else {
+ *     _Thread_queue_Enqueue_critical(
+ *       &mutex->Queue,
+ *       executing,
+ *       STATES_WAITING_FOR_MUTEX,
+ *       WATCHDOG_NO_TIMEOUT,
+ *       0,
+ *       &lock_context
+ *     );
+ *   }
+ * }
+ * @endcode
+ *
+ * @param[in] the_thread_queue The thread queue.
+ * @param[in] the_thread The thread to enqueue.
+ * @param[in] state The new state of the thread.
+ * @param[in] timeout Interval to wait.  Use WATCHDOG_NO_TIMEOUT to block
+ * potentially forever.
+ * @param[in] timeout_code The return code in case a timeout occurs.
+ * @param[in] lock_context The lock context of the lock acquire.
  */
-#define _Thread_queue_Enqueue( _the_thread_queue, _the_thread, _timeout ) \
-  _Thread_queue_Enqueue_with_handler( \
-    _the_thread_queue, \
-    _the_thread, \
-    _timeout, \
-    _Thread_queue_Timeout )
+void _Thread_queue_Enqueue_critical(
+  Thread_queue_Control *the_thread_queue,
+  Thread_Control       *the_thread,
+  States_Control        state,
+  Watchdog_Interval     timeout,
+  uint32_t              timeout_code,
+  ISR_lock_Context     *lock_context
+);
 
 /**
- *  @brief Blocks a thread and places it on a thread.
- *
- *  This routine blocks a thread, places it on a thread, and optionally
- *  starts a timeout timer.
- *
- *  @param[in] the_thread_queue pointer to threadq
- *  @param[in] the_thread the thread to enqueue
- *  @param[in] timeout interval to wait
- *
- *  - INTERRUPT LATENCY:
- *    + single case
+ * @brief Acquires the thread queue lock and calls
+ * _Thread_queue_Enqueue_critical().
  */
-void _Thread_queue_Enqueue_with_handler(
-  Thread_queue_Control         *the_thread_queue,
-  Thread_Control               *the_thread,
-  Watchdog_Interval             timeout,
-  Thread_queue_Timeout_callout  handler
+RTEMS_INLINE_ROUTINE void _Thread_queue_Enqueue(
+  Thread_queue_Control *the_thread_queue,
+  Thread_Control       *the_thread,
+  States_Control        state,
+  Watchdog_Interval     timeout,
+  uint32_t              timeout_code
+)
+{
+  ISR_lock_Context lock_context;
+
+  _Thread_queue_Acquire( the_thread_queue, &lock_context );
+  _Thread_queue_Enqueue_critical(
+    the_thread_queue,
+    the_thread,
+    state,
+    timeout,
+    timeout_code,
+    &lock_context
+  );
+}
+
+/**
+ * @brief Extracts the thread from the thread queue, restores the default wait
+ * operations and restores the default thread lock.
+ *
+ * The caller must be the owner of the thread queue lock.  The thread queue
+ * lock is not released.
+ *
+ * @param[in] the_thread_queue The thread queue.
+ * @param[in] the_thread The thread to extract.
+ */
+void _Thread_queue_Extract_locked(
+  Thread_queue_Control *the_thread_queue,
+  Thread_Control       *the_thread
+);
+
+/**
+ * @brief Unblocks the thread which was on the thread queue before.
+ *
+ * The caller must be the owner of the thread queue lock.  This function will
+ * release the thread queue lock.  Thread dispatching is disabled before the
+ * thread queue lock is released and an unblock is necessary.  Thread
+ * dispatching is enabled once the sequence to unblock the thread is complete.
+ *
+ * @param[in] the_thread_queue The thread queue.
+ * @param[in] the_thread The thread to extract.
+ * @param[in] lock_context The lock context of the lock acquire.
+ */
+void _Thread_queue_Unblock_critical(
+  Thread_queue_Control *the_thread_queue,
+  Thread_Control       *the_thread,
+  ISR_lock_Context     *lock_context
+);
+
+/**
+ * @brief Extracts the thread from the thread queue and unblocks it.
+ *
+ * The caller must be the owner of the thread queue lock.  This function will
+ * release the thread queue lock and restore the default thread lock.  Thread
+ * dispatching is disabled before the thread queue lock is released and an
+ * unblock is necessary.  Thread dispatching is enabled once the sequence to
+ * unblock the thread is complete.  This makes it possible to use the thread
+ * queue lock to protect the state of objects embedding the thread queue and
+ * directly enter _Thread_queue_Extract_critical() to finalize an operation in
+ * case a waiting thread exists.
+ *
+ * @code
+ * #include <rtems/score/threadqimpl.h>
+ *
+ * typedef struct {
+ *   Thread_queue_Control  Queue;
+ *   Thread_Control       *owner;
+ * } Mutex;
+ *
+ * void _Mutex_Release( Mutex *mutex )
+ * {
+ *   ISR_lock_Context  lock_context;
+ *   Thread_Control   *first;
+ *
+ *   _Thread_queue_Acquire( &mutex->Queue, &lock_context );
+ *
+ *   first = _Thread_queue_First_locked( &mutex->Queue );
+ *   mutex->owner = first;
+ *
+ *   if ( first != NULL ) {
+ *     _Thread_queue_Extract_critical(
+ *       &mutex->Queue,
+ *       first,
+ *       &lock_context
+ *   );
+ * }
+ * @endcode
+ *
+ * @param[in] the_thread_queue The thread queue.
+ * @param[in] the_thread The thread to extract.
+ * @param[in] lock_context The lock context of the lock acquire.
+ */
+void _Thread_queue_Extract_critical(
+  Thread_queue_Control *the_thread_queue,
+  Thread_Control       *the_thread,
+  ISR_lock_Context     *lock_context
 );
 
 /**
  *  @brief Extracts thread from thread queue.
  *
- *  This routine removes @a the_thread from @a the_thread_queue
+ *  This routine removes @a the_thread its thread queue
  *  and cancels any timeouts associated with this blocking.
  *
- *  @param[in] the_thread_queue is the pointer to the ThreadQ header
- *  @param[in] the_thread is the pointer to a thread control block that is to be removed
+ *  @param[in] the_thread is the pointer to a thread control block that
+ *      is to be removed
  */
-void _Thread_queue_Extract(
-  Thread_queue_Control *the_thread_queue,
-  Thread_Control       *the_thread
-);
-
-void _Thread_queue_Extract_with_return_code(
-  Thread_queue_Control *the_thread_queue,
-  Thread_Control       *the_thread,
-  uint32_t              return_code
-);
+void _Thread_queue_Extract( Thread_Control *the_thread );
 
 /**
  *  @brief Extracts the_thread from the_thread_queue.
@@ -142,15 +278,34 @@ void _Thread_queue_Extract_with_proxy(
 );
 
 /**
- *  @brief Gets a pointer to the "first" thread on the_thread_queue.
+ * @brief Returns the first thread on the thread queue if it exists, otherwise
+ * @c NULL.
  *
- *  This function returns a pointer to the "first" thread
- *  on the_thread_queue.  The "first" thread is selected
- *  based on the discipline of the_thread_queue.
+ * The caller must be the owner of the thread queue lock.  The thread queue
+ * lock is not released.
  *
- *  @param[in] the_thread_queue pointer to thread queue
+ * @param[in] the_thread_queue The thread queue.
  *
- *  @retval first thread or NULL
+ * @retval NULL No thread is present on the thread queue.
+ * @retval first The first thread on the thread queue according to the enqueue
+ * order.
+ */
+RTEMS_INLINE_ROUTINE Thread_Control *_Thread_queue_First_locked(
+  Thread_queue_Control *the_thread_queue
+)
+{
+  return ( *the_thread_queue->operations->first )( the_thread_queue );
+}
+
+/**
+ * @brief Returns the first thread on the thread queue if it exists, otherwise
+ * @c NULL.
+ *
+ * @param[in] the_thread_queue The thread queue.
+ *
+ * @retval NULL No thread is present on the thread queue.
+ * @retval first The first thread on the thread queue according to the enqueue
+ * order.
  */
 Thread_Control *_Thread_queue_First(
   Thread_queue_Control *the_thread_queue
@@ -183,235 +338,71 @@ void _Thread_queue_Flush(
  *
  *  @param[in] the_thread_queue is the pointer to a threadq header
  *  @param[in] the_discipline is the queueing discipline
- *  @param[in] state is the state of waiting threads
- *  @param[in] timeout_status is the return on a timeout
  */
 void _Thread_queue_Initialize(
-  Thread_queue_Control         *the_thread_queue,
-  Thread_queue_Disciplines      the_discipline,
-  States_Control                state,
-  uint32_t                      timeout_status
+  Thread_queue_Control     *the_thread_queue,
+  Thread_queue_Disciplines  the_discipline
 );
 
-/**
- *  @brief Removes a thread from the specified PRIORITY based
- *  threadq, unblocks it, and cancels its timeout timer.
- *
- *  This routine removes a thread from the specified PRIORITY based
- *  threadq, unblocks it, and cancels its timeout timer.
- *
- *  - INTERRUPT LATENCY:
- *    + single case
- *
- * @param[in] the_thread_queue is a pointer to a thread queue
- *
- * @retval thread dequeued
- * @retval NULL if no thread are waiting on the_thread_queue
- */
-Thread_Control *_Thread_queue_Dequeue_priority(
-  Thread_queue_Control *the_thread_queue
-);
+#if defined(RTEMS_SMP)
+  #define THREAD_QUEUE_FIFO_INITIALIZER( designator, name ) { \
+      .Queues = { \
+        .Fifo = CHAIN_INITIALIZER_EMPTY( designator.Queues.Fifo ) \
+      }, \
+      .operations = &_Thread_queue_Operations_FIFO, \
+      .Lock = ISR_LOCK_INITIALIZER( name ) \
+    }
 
-/**
- *  @brief Enqueues the currently executing thread on the_thread_queue.
- *
- *  This routine enqueues the currently executing thread on
- *  the_thread_queue with an optional timeout using the
- *  priority discipline.
- *
- *  @param[in] the_thread_queue is the pointer to threadq
- *  @param[in] the_thread is the thread to insert
- *  @param[in] level_p is a pointer to an interrupt level to be returned
- *
- *  @retval This methods returns an indication of the blocking state as
- *          well as filling in *@ level_p with the previous interrupt level.
- *
- *  - INTERRUPT LATENCY:
- *    + forward less than
- *    + forward equal
- */
-Thread_blocking_operation_States _Thread_queue_Enqueue_priority (
-  Thread_queue_Control *the_thread_queue,
-  Thread_Control       *the_thread,
-  ISR_Level            *level_p
-);
+  #define THREAD_QUEUE_PRIORIY_INITIALIZER( designator, name ) { \
+      .Queues = { \
+        .Priority = RBTREE_INITIALIZER_EMPTY( designator.Queues.Priority ) \
+      }, \
+      .operations = &_Thread_queue_Operations_priority, \
+      .Lock = ISR_LOCK_INITIALIZER( name ) \
+    }
+#else
+  #define THREAD_QUEUE_FIFO_INITIALIZER( designator, name ) { \
+      .Queues = { \
+        .Fifo = CHAIN_INITIALIZER_EMPTY( designator.Queues.Fifo ) \
+      }, \
+      .operations = &_Thread_queue_Operations_FIFO \
+    }
 
-/**
- *  @brief Removes the_thread and cancels related timeouts.
- *
- *  This routine removes the_thread from the_thread_queue
- *  and cancels any timeouts associated with this blocking.
- *  @param[in] the_thread_queue pointer to a threadq header
- *  @param[in] the_thread pointer to a thread control block
- *  @param[in] requeuing true if requeuing and should not alter
- *         timeout or state
- *  - INTERRUPT LATENCY:
- *    + EXTRACT_PRIORITY
- *
- *  @retval true The extract operation was performed by the executing context.
- *  @retval false Otherwise.
- */
-void _Thread_queue_Extract_priority_helper(
-  Thread_Control       *the_thread,
-  uint32_t              return_code,
-  bool                  requeuing
-);
+  #define THREAD_QUEUE_PRIORIY_INITIALIZER( designator, name ) { \
+      .Queues = { \
+        .Priority = RBTREE_INITIALIZER_EMPTY( designator.Queues.Priority ) \
+      }, \
+      .operations = &_Thread_queue_Operations_priority \
+    }
+#endif
 
-/**
- *  @brief Wraps the underlying call and hides the requeuing argument.
- *
- * This macro wraps the underlying call and hides the requeuing argument.
- */
-
-#define _Thread_queue_Extract_priority( _the_thread, _return_code ) \
-  _Thread_queue_Extract_priority_helper( _the_thread, _return_code, false )
-/**
- *  @brief Get highest priority thread on the_thread_queue.
- *
- *  This function returns a pointer to the "first" thread
- *  on @a the_thread_queue.  The "first" thread is the highest
- *  priority thread waiting on @a the_thread_queue.
- *
- *  @param[in] the_thread_queue is the pointer to the thread queue
- *  @retval first thread or NULL
- */
-Thread_Control *_Thread_queue_First_priority(
-  Thread_queue_Control *the_thread_queue
-);
-
-/**
- *  @brief Gets a pointer to the thread which has been waiting the longest.
- *
- *  This function returns a pointer to the thread which has
- *  been waiting the longest on  the_thread_queue.  If no
- *  threads are waiting on the_thread_queue, then NULL is returned.
- *
- *  @param[in] the_thread_queue is the pointer to threadq
- *
- *  @retval thread dequeued or NULL
- *
- *  - INTERRUPT LATENCY:
- *    + check sync
- *    + FIFO
- */
-Thread_Control *_Thread_queue_Dequeue_fifo(
-  Thread_queue_Control *the_thread_queue
-);
-
-/**
- *  @brief Enqueues the currently executing thread on the_thread_queue.
- *
- *  This routine enqueues the currently executing thread on
- *  the_thread_queue with an optional timeout using the
- *  FIFO discipline.
- *
- *    @param[in] the_thread_queue pointer to threadq
- *    @param[in] the_thread pointer to the thread to block
- *    @param[in] level_p interrupt level in case the operation blocks actually
- *
- *  - INTERRUPT LATENCY:
- *    + single case
- */
-Thread_blocking_operation_States _Thread_queue_Enqueue_fifo (
-  Thread_queue_Control *the_thread_queue,
-  Thread_Control       *the_thread,
-  ISR_Level            *level_p
-);
-
-/**
- *  @brief Removes the_thread from the_thread_queue and cancels any timeouts.
- *
- *  This routine removes the_thread from the_thread_queue
- *  and cancels any timeouts associated with this blocking.
- */
-void _Thread_queue_Extract_fifo(
-  Thread_Control       *the_thread,
-  uint32_t              return_code
-);
-
-/**
- *  @brief Gets a pointer to the "first" thread on the_thread_queue.
- *
- *  This function returns a pointer to the "first" thread
- *  on the_thread_queue.  The first thread is the thread
- *  which has been waiting longest on the_thread_queue.
- *
- *  @param[in] the_thread_queue is the pointer to threadq
- *
- *  @retval first thread or NULL
- */
-Thread_Control *_Thread_queue_First_fifo(
-  Thread_queue_Control *the_thread_queue
-);
-
-/**
- *  @brief Thread queue timeout.
- *
- *  This routine is invoked when a task's request has not
- *  been satisfied after the timeout interval specified to
- *  enqueue.  The task represented by ID will be unblocked and
- *  its status code will be set in it's control block to indicate
- *  that a timeout has occurred.
- *
- *  @param[in] id thread id
- */
-void _Thread_queue_Timeout (
-  Objects_Id  id,
-  void       *ignored
-);
-
-/**
- *  @brief Process thread queue timeout.
- *
- * This is a shared helper routine which makes it easier to have multiple
- * object class specific timeout routines.
- *
- * @param[in] the_thread is the thread to extract
- *
- * @note This method assumes thread dispatching is disabled
- *       and is expected to be called via the processing of
- *       a clock tick.
- */
-void _Thread_queue_Process_timeout(
-  Thread_Control *the_thread
-);
-
-/**
- * This function returns the index of the priority chain on which
- * a thread of the_priority should be placed.
- */
-
-RTEMS_INLINE_ROUTINE uint32_t   _Thread_queue_Header_number (
-  Priority_Control the_priority
-)
-{
-  return (the_priority / TASK_QUEUE_DATA_PRIORITIES_PER_HEADER);
-}
-
-/**
- * This function returns true if the_priority indicates that the
- * enqueue search should start at the front of this priority
- * group chain, and false if the search should start at the rear.
- */
-
-RTEMS_INLINE_ROUTINE bool _Thread_queue_Is_reverse_search (
-  Priority_Control the_priority
-)
-{
-  return ( the_priority & TASK_QUEUE_DATA_REVERSE_SEARCH_MASK );
-}
-
-/**
- * This routine is invoked to indicate that the specified thread queue is
- * entering a critical section.
- */
-
-RTEMS_INLINE_ROUTINE void _Thread_queue_Enter_critical_section (
+RTEMS_INLINE_ROUTINE void _Thread_queue_Destroy(
   Thread_queue_Control *the_thread_queue
 )
 {
-  the_thread_queue->sync_state = THREAD_BLOCKING_OPERATION_NOTHING_HAPPENED;
+  _ISR_lock_Destroy( &the_thread_queue->Lock );
 }
+
+/**
+ * @brief Compare two thread's priority for RBTree Insertion.
+ *
+ * @param[in] left points to the left thread's RBnode
+ * @param[in] right points to the right thread's RBnode
+ *
+ * @retval 1 The @a left node is more important than @a right node.
+ * @retval 0 The @a left node is of equal importance with @a right node.
+ * @retval 1 The @a left node is less important than @a right node.
+ */
+RBTree_Compare_result _Thread_queue_Compare_priority(
+  const RBTree_Node *left,
+  const RBTree_Node *right
+);
+
+extern const Thread_queue_Operations _Thread_queue_Operations_default;
+
+extern const Thread_queue_Operations _Thread_queue_Operations_FIFO;
+
+extern const Thread_queue_Operations _Thread_queue_Operations_priority;
 
 /**@}*/
 

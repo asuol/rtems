@@ -31,7 +31,6 @@
 #endif
 
 #include <rtems/asm.h>
-#include <rtems/score/percpu.h>
 
 #ifdef ARM_MULTILIB_ARCH_V4
 
@@ -48,17 +47,6 @@
 
 #define CONTEXT_LIST {r0, r1, r2, r3, EXCHANGE_LR, EXCHANGE_SPSR, SELF_CPU_CONTROL, r12}
 #define CONTEXT_SIZE 32
-
-.macro GET_SELF_CPU_CONTROL REG, TMP
-	ldr	\REG, =_Per_CPU_Information
-#ifdef RTEMS_SMP
-	/* Use ARMv7 Multiprocessor Affinity Register (MPIDR) */
-	mrc	p15, 0, \TMP, c0, c0, 5
-
-	and	\TMP, \TMP, #0xff
-	add	\REG, \REG, \TMP, asl #PER_CPU_CONTROL_SIZE_LOG2
-#endif
-.endm
 
 .arm
 .globl _ARMV4_Exception_interrupt
@@ -87,13 +75,15 @@ _ARMV4_Exception_interrupt:
 	stmdb	sp!, CONTEXT_LIST
 	stmdb	sp!, {SP_OF_INTERRUPTED_CONTEXT, lr}
 
-#ifdef ARM_MULTILIB_VFP_D32
+#ifdef ARM_MULTILIB_VFP
 	/* Save VFP context */
 	vmrs	r0, FPSCR
 	vstmdb	sp!, {d0-d7}
+#ifdef ARM_MULTILIB_VFP_D32
 	vstmdb	sp!, {d16-d31}
-	stmdb	sp!, {r0, r1}
 #endif
+	stmdb	sp!, {r0, r1}
+#endif /* ARM_MULTILIB_VFP */
 
 	/* Get per-CPU control of current processor */
 	GET_SELF_CPU_CONTROL	SELF_CPU_CONTROL, r1
@@ -178,13 +168,15 @@ thread_dispatch_done:
 	/* Switch to ARM instructions if necessary */
 	SWITCH_FROM_THUMB_TO_ARM
 
-#ifdef ARM_MULTILIB_VFP_D32
+#ifdef ARM_MULTILIB_VFP
 	/* Restore VFP context */
 	ldmia	sp!, {r0, r1}
+#ifdef ARM_MULTILIB_VFP_D32
 	vldmia	sp!, {d16-d31}
+#endif
 	vldmia	sp!, {d0-d7}
 	vmsr	FPSCR, r0
-#endif
+#endif /* ARM_MULTILIB_VFP */
 
 	/* Restore SP_OF_INTERRUPTED_CONTEXT register and link register */
 	ldmia	sp!, {SP_OF_INTERRUPTED_CONTEXT, lr}

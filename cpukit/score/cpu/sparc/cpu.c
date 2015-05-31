@@ -29,6 +29,14 @@ RTEMS_STATIC_ASSERT(
   SPARC_PER_CPU_ISR_DISPATCH_DISABLE
 );
 
+#if SPARC_HAS_FPU == 1
+  RTEMS_STATIC_ASSERT(
+    offsetof( Per_CPU_Control, cpu_per_cpu.fsr)
+      == SPARC_PER_CPU_FSR_OFFSET,
+    SPARC_PER_CPU_FSR_OFFSET
+  );
+#endif
+
 #define SPARC_ASSERT_OFFSET(field, off) \
   RTEMS_STATIC_ASSERT( \
     offsetof(Context_Control, field) == off ## _OFFSET, \
@@ -71,22 +79,42 @@ SPARC_ASSERT_OFFSET(isr_dispatch_disable, ISR_DISPATCH_DISABLE_STACK);
 SPARC_ASSERT_OFFSET(is_executing, SPARC_CONTEXT_CONTROL_IS_EXECUTING);
 #endif
 
-/*
- *  This initializes the set of opcodes placed in each trap
- *  table entry.  The routine which installs a handler is responsible
- *  for filling in the fields for the _handler address and the _vector
- *  trap type.
- *
- *  The constants following this structure are masks for the fields which
- *  must be filled in when the handler is installed.
- */
+#define SPARC_ASSERT_ISF_OFFSET(field, off) \
+  RTEMS_STATIC_ASSERT( \
+    offsetof(CPU_Interrupt_frame, field) == ISF_ ## off ## _OFFSET, \
+    CPU_Interrupt_frame_offset_ ## field \
+  )
 
-const CPU_Trap_table_entry _CPU_Trap_slot_template = {
-  0xa1480000,      /* mov   %psr, %l0           */
-  0x29000000,      /* sethi %hi(_handler), %l4  */
-  0x81c52000,      /* jmp   %l4 + %lo(_handler) */
-  0xa6102000       /* mov   _vector, %l3        */
-};
+SPARC_ASSERT_ISF_OFFSET(psr, PSR);
+SPARC_ASSERT_ISF_OFFSET(pc, PC);
+SPARC_ASSERT_ISF_OFFSET(npc, NPC);
+SPARC_ASSERT_ISF_OFFSET(g1, G1);
+SPARC_ASSERT_ISF_OFFSET(g2, G2);
+SPARC_ASSERT_ISF_OFFSET(g3, G3);
+SPARC_ASSERT_ISF_OFFSET(g4, G4);
+SPARC_ASSERT_ISF_OFFSET(g5, G5);
+SPARC_ASSERT_ISF_OFFSET(g7, G7);
+SPARC_ASSERT_ISF_OFFSET(i0, I0);
+SPARC_ASSERT_ISF_OFFSET(i1, I1);
+SPARC_ASSERT_ISF_OFFSET(i2, I2);
+SPARC_ASSERT_ISF_OFFSET(i3, I3);
+SPARC_ASSERT_ISF_OFFSET(i4, I4);
+SPARC_ASSERT_ISF_OFFSET(i5, I5);
+SPARC_ASSERT_ISF_OFFSET(i6_fp, I6_FP);
+SPARC_ASSERT_ISF_OFFSET(i7, I7);
+SPARC_ASSERT_ISF_OFFSET(y, Y);
+SPARC_ASSERT_ISF_OFFSET(tpc, TPC);
+
+RTEMS_STATIC_ASSERT(
+  sizeof(CPU_Interrupt_frame) == CONTEXT_CONTROL_INTERRUPT_FRAME_SIZE,
+  CPU_Interrupt_frame_size
+);
+
+/* https://devel.rtems.org/ticket/2352 */
+RTEMS_STATIC_ASSERT(
+  sizeof(CPU_Interrupt_frame) % CPU_ALIGNMENT == 0,
+  CPU_Interrupt_frame_alignment
+);
 
 /*
  *  _CPU_Initialize
@@ -105,6 +133,11 @@ void _CPU_Initialize(void)
 {
 #if (SPARC_HAS_FPU == 1)
   Context_Control_fp *pointer;
+  uint32_t            psr;
+
+  sparc_get_psr( psr );
+  psr |= SPARC_PSR_EF_MASK;
+  sparc_set_psr( psr );
 
   /*
    *  This seems to be the most appropriate way to obtain an initial
@@ -227,10 +260,21 @@ void _CPU_ISR_install_raw_handler(
     (u32_handler & HIGH_BITS_MASK) >> HIGH_BITS_SHIFT;
   slot->jmp_to_low_of_handler_plus_l4 |= (u32_handler & LOW_BITS_MASK);
 
-  /* need to flush icache after this !!! */
-
+  /*
+   * There is no instruction cache snooping, so we need to invalidate
+   * the instruction cache to make sure that the processor sees the
+   * changes to the trap table. This step is required on both single-
+   * and multiprocessor systems.
+   *
+   * In a SMP configuration a change to the trap table might be
+   * missed by other cores. If the system state is up, the other
+   * cores can be notified using SMP messages that they need to
+   * flush their icache. If the up state has not been reached
+   * there is no need to notify other cores. They will do an
+   * automatic flush of the icache just after entering the up
+   * state, but before enabling interrupts.
+   */
   rtems_cache_invalidate_entire_instruction();
-
 }
 
 void _CPU_ISR_install_vector(

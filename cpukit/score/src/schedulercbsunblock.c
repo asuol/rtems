@@ -25,12 +25,12 @@
 #include <rtems/score/threadimpl.h>
 #include <rtems/score/watchdogimpl.h>
 
-void _Scheduler_CBS_Unblock(
+Scheduler_Void_or_thread _Scheduler_CBS_Unblock(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread
 )
 {
-  Scheduler_CBS_Node   *node = _Scheduler_CBS_Node_get( the_thread );
+  Scheduler_CBS_Node   *node = _Scheduler_CBS_Thread_get_node( the_thread );
   Scheduler_CBS_Server *serv_info = node->cbs_server;
   Priority_Control      new_priority;
 
@@ -53,10 +53,11 @@ void _Scheduler_CBS_Unblock(
     if ( deadline*budget_left > budget*deadline_left ) {
       /* Put late unblocked task to background until the end of period. */
       new_priority = the_thread->Start.initial_priority;
-      if ( the_thread->real_priority != new_priority )
-        the_thread->real_priority = new_priority;
-      if ( the_thread->current_priority != new_priority )
-        _Thread_Change_priority(the_thread, new_priority, true);
+      the_thread->real_priority = new_priority;
+      if ( the_thread->current_priority != new_priority ) {
+        the_thread->current_priority = new_priority;
+        _Scheduler_Change_priority(the_thread, new_priority, true);
+      }
     }
   }
 
@@ -79,9 +80,11 @@ void _Scheduler_CBS_Unblock(
        _Thread_Heir->current_priority
     )
   ) {
-    _Thread_Heir = the_thread;
-    if ( _Thread_Executing->is_preemptible ||
-         the_thread->current_priority == 0 )
-      _Thread_Dispatch_necessary = true;
+    _Scheduler_Update_heir(
+      the_thread,
+      the_thread->current_priority == PRIORITY_PSEUDO_ISR
+    );
   }
+
+  SCHEDULER_RETURN_VOID_OR_NULL;
 }

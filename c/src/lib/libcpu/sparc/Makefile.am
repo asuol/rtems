@@ -10,8 +10,8 @@ include_libcpu_HEADERS += include/libcpu/byteorder.h
 include_libcpu_HEADERS += include/libcpu/access.h
 
 noinst_PROGRAMS += cache.rel
-cache_rel_SOURCES = cache/cache.c cache/cache_.h \
-    ../shared/src/cache_aligned_malloc.c ../shared/src/cache_manager.c
+cache_rel_SOURCES = cache/cache_.h \
+    ../shared/src/cache_manager.c
 cache_rel_CPPFLAGS = $(AM_CPPFLAGS) -I$(srcdir)/cache
 cache_rel_LDFLAGS = $(RTEMS_RELLDFLAGS)
 

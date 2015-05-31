@@ -29,22 +29,14 @@
 
 IMFS_jnode_t *IMFS_node_initialize_generic(
   IMFS_jnode_t *node,
-  const IMFS_types_union *info
+  void *arg
 )
 {
-  node->info.generic.context = info->generic.context;
+  IMFS_generic_t *generic = (IMFS_generic_t *) node;
+
+  generic->context = arg;
 
   return node;
-}
-
-bool IMFS_is_imfs_instance(
-  const rtems_filesystem_location_info_t *loc
-)
-{
-  const char *type = loc->mt_entry->type;
-
-  return strcmp(type, RTEMS_FILESYSTEM_TYPE_IMFS) == 0
-    || strcmp(type, RTEMS_FILESYSTEM_TYPE_MINIIMFS) == 0;
 }
 
 int IMFS_make_generic_node(
@@ -72,45 +64,37 @@ int IMFS_make_generic_node(
   }
 
   if ( rv == 0 ) {
-    if ( node_control->imfs_type == IMFS_GENERIC ) {
-      rtems_filesystem_eval_path_context_t ctx;
-      int eval_flags = RTEMS_FS_FOLLOW_LINK
-        | RTEMS_FS_MAKE
-        | RTEMS_FS_EXCLUSIVE;
-      const rtems_filesystem_location_info_t *currentloc =
-        rtems_filesystem_eval_path_start( &ctx, path, eval_flags );
+    rtems_filesystem_eval_path_context_t ctx;
+    int eval_flags = RTEMS_FS_FOLLOW_LINK
+      | RTEMS_FS_MAKE
+      | RTEMS_FS_EXCLUSIVE;
+    const rtems_filesystem_location_info_t *currentloc =
+      rtems_filesystem_eval_path_start( &ctx, path, eval_flags );
 
-      if ( IMFS_is_imfs_instance( currentloc ) ) {
-        IMFS_types_union info;
-        IMFS_jnode_t *new_node;
+    if ( IMFS_is_imfs_instance( currentloc ) ) {
+      IMFS_jnode_t *new_node = IMFS_create_node(
+        currentloc,
+        node_control,
+        sizeof( IMFS_generic_t ),
+        rtems_filesystem_eval_path_get_token( &ctx ),
+        rtems_filesystem_eval_path_get_tokenlen( &ctx ),
+        mode,
+        context
+      );
 
-        info.generic.context = context;
-        new_node = IMFS_create_node_with_control(
-          currentloc,
-          node_control,
-          rtems_filesystem_eval_path_get_token( &ctx ),
-          rtems_filesystem_eval_path_get_tokenlen( &ctx ),
-          mode,
-          &info
-        );
+      if ( new_node != NULL ) {
+        IMFS_jnode_t *parent = currentloc->node_access;
 
-        if ( new_node != NULL ) {
-          IMFS_jnode_t *parent = currentloc->node_access;
-
-          IMFS_mtime_ctime_update( parent );
-        } else {
-          rv = -1;
-        }
+        IMFS_mtime_ctime_update( parent );
       } else {
-        rtems_filesystem_eval_path_error( &ctx, ENOTSUP );
         rv = -1;
       }
-
-      rtems_filesystem_eval_path_cleanup( &ctx );
     } else {
-      errno = EINVAL;
+      rtems_filesystem_eval_path_error( &ctx, ENOTSUP );
       rv = -1;
     }
+
+    rtems_filesystem_eval_path_cleanup( &ctx );
   }
 
   return rv;

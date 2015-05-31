@@ -52,12 +52,13 @@ extern "C" {
     _Scheduler_priority_SMP_Initialize, \
     _Scheduler_default_Schedule, \
     _Scheduler_priority_SMP_Yield, \
-    _Scheduler_priority_SMP_Block, \
-    _Scheduler_priority_SMP_Unblock, \
-    _Scheduler_priority_SMP_Change_priority, \
-    _Scheduler_priority_affinity_SMP_Allocate, \
-    _Scheduler_default_Free, \
-    _Scheduler_priority_SMP_Update, \
+    _Scheduler_priority_affinity_SMP_Block, \
+    _Scheduler_priority_affinity_SMP_Unblock, \
+    _Scheduler_priority_affinity_SMP_Change_priority, \
+    _Scheduler_priority_affinity_SMP_Ask_for_help, \
+    _Scheduler_priority_affinity_SMP_Node_initialize, \
+    _Scheduler_default_Node_destroy, \
+    _Scheduler_priority_SMP_Update_priority, \
     _Scheduler_priority_Priority_compare, \
     _Scheduler_default_Release_job, \
     _Scheduler_default_Tick, \
@@ -67,21 +68,47 @@ extern "C" {
   }
 
 /**
- *  @brief Allocates @a the_thread->scheduler.
+ *  @brief Initializes per thread scheduler information
  *
- *  This routine allocates @a the_thread->scheduler.
+ *  This routine allocates @a thread->scheduler.
  *
  *  @param[in] scheduler points to the scheduler specific information.
- *  @param[in] the_thread is the thread the scheduler is allocating
+ *  @param[in] thread is the thread the scheduler is allocating
  *             management memory for.
  */
-bool _Scheduler_priority_affinity_SMP_Allocate(
+void _Scheduler_priority_affinity_SMP_Node_initialize(
   const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread
+  Thread_Control          *thread
 );
 
 /**
- * @brief Get affinity for the priority affinity smp scheduler.
+ * @brief SMP Priority Affinity Scheduler Block Operation
+ *
+ * This method is the block operation for this scheduler.
+ *
+ * @param[in] scheduler is the scheduler instance information
+ * @param[in] thread is the thread to block
+ */
+void _Scheduler_priority_affinity_SMP_Block(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *thread
+);
+
+/**
+ * @brief SMP Priority Affinity Scheduler Unblock Operation
+ *
+ * This method is the unblock operation for this scheduler.
+ *
+ * @param[in] scheduler is the scheduler instance information
+ * @param[in] thread is the thread to unblock
+ */
+Thread_Control *_Scheduler_priority_affinity_SMP_Unblock(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *thread
+);
+
+/**
+ * @brief Get affinity for the priority affinity SMP scheduler.
  *
  * @param[in] scheduler The scheduler of the thread.
  * @param[in] thread The associated thread.
@@ -98,26 +125,50 @@ bool _Scheduler_priority_affinity_SMP_Get_affinity(
   cpu_set_t               *cpuset
 );
 
+/**
+ * @brief Change priority for the priority affinity SMP scheduler.
+ *
+ * @param[in] scheduler The scheduler of the thread.
+ * @param[in] the_thread The associated thread.
+ * @param[in] new_priority The new priority for the thread.
+ * @param[in] prepend_it Append or prepend the thread to its priority FIFO.
+ */
+Thread_Control *_Scheduler_priority_affinity_SMP_Change_priority(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *the_thread,
+  Priority_Control         new_priority,
+  bool                     prepend_it
+);
+
+Thread_Control *_Scheduler_priority_affinity_SMP_Ask_for_help(
+  const Scheduler_Control *scheduler,
+  Thread_Control          *offers_help,
+  Thread_Control          *needs_help
+);
+
 /** 
- * @brief Set affinity for the priority affinity smp scheduler.
+ * @brief Set affinity for the priority affinity SMP scheduler.
  *
  * @param[in] scheduler The scheduler of the thread.
  * @param[in] thread The associated thread.
  * @param[in] cpusetsize The size of the cpuset.
  * @param[in] cpuset Affinity new affinity set.
  *
- * @retval 0 Successful
+ * @retval true if successful
+ * @retval false if unsuccessful
  */
 bool _Scheduler_priority_affinity_SMP_Set_affinity(
   const Scheduler_Control *scheduler,
   Thread_Control          *thread,
   size_t                   cpusetsize,
-  cpu_set_t               *cpuset
+  const cpu_set_t         *cpuset
 );
 
 /**
  * @brief Scheduler node specialization for Deterministic Priority Affinity SMP
  * schedulers.
+ *
+ * This is a per thread structure.
  */
 typedef struct {
   /**
@@ -137,4 +188,4 @@ typedef struct {
 }
 #endif /* __cplusplus */
 
-#endif /* _RTEMS_SCORE_SCHEDULERPRIORITYSMP_H */
+#endif /* _RTEMS_SCORE_SCHEDULERPRIORITYAFFINITYSMP_H */

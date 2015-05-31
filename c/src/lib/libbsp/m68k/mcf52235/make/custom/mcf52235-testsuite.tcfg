@@ -16,6 +16,7 @@ jffs2_fslink
 jffs2_fspatheval
 jffs2_fspermission
 jffs2_fsrdwr
+jffs2_fsscandir01
 jffs2_fssymlink
 jffs2_fstime
 loopback
@@ -24,4 +25,6 @@ monitor02
 paranoia
 pppd
 spstkalloc02
+syscall01
+tmfine01
 utf8proc01

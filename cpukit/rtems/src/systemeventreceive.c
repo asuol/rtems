@@ -27,7 +27,7 @@
 #include <rtems/rtems/eventimpl.h>
 #include <rtems/rtems/tasks.h>
 #include <rtems/score/statesimpl.h>
-#include <rtems/score/threaddispatch.h>
+#include <rtems/score/threadimpl.h>
 
 rtems_status_code rtems_event_system_receive(
   rtems_event_set  event_in,
@@ -39,12 +39,16 @@ rtems_status_code rtems_event_system_receive(
   rtems_status_code sc;
 
   if ( event_out != NULL ) {
-    Thread_Control    *executing = _Thread_Get_executing();
-    RTEMS_API_Control *api = executing->API_Extensions[ THREAD_API_RTEMS ];
-    Event_Control     *event = &api->System_event;
+    ISR_lock_Context   lock_context;
+    Thread_Control    *executing;
+    RTEMS_API_Control *api;
+    Event_Control     *event;
+
+    executing = _Thread_Lock_acquire_default_for_executing( &lock_context );
+    api = executing->API_Extensions[ THREAD_API_RTEMS ];
+    event = &api->System_event;
 
     if ( !_Event_sets_Is_empty( event_in ) ) {
-      _Thread_Disable_dispatch();
       _Event_Seize(
         event_in,
         option_set,
@@ -52,14 +56,15 @@ rtems_status_code rtems_event_system_receive(
         event_out,
         executing,
         event,
-        &_System_event_Sync_state,
-        STATES_WAITING_FOR_SYSTEM_EVENT
+        THREAD_WAIT_CLASS_SYSTEM_EVENT,
+        STATES_WAITING_FOR_SYSTEM_EVENT,
+        &lock_context
       );
-      _Thread_Enable_dispatch();
 
       sc = executing->Wait.return_code;
     } else {
       *event_out = event->pending_events;
+      _Thread_Lock_release_default( executing, &lock_context );
       sc = RTEMS_SUCCESSFUL;
     }
   } else {

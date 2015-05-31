@@ -35,7 +35,7 @@
 #include <rtems/score/tls.h>
 #include <rtems/score/cpu.h>
 
-#ifdef ARM_MULTILIB_VFP_D32
+#ifdef ARM_MULTILIB_VFP
   RTEMS_STATIC_ASSERT(
     offsetof( Context_Control, register_d8 ) == ARM_CONTEXT_CONTROL_D8_OFFSET,
     ARM_CONTEXT_CONTROL_D8_OFFSET
@@ -61,6 +61,11 @@
 RTEMS_STATIC_ASSERT(
   sizeof( CPU_Exception_frame ) == ARM_EXCEPTION_FRAME_SIZE,
   ARM_EXCEPTION_FRAME_SIZE
+);
+
+RTEMS_STATIC_ASSERT(
+  sizeof( CPU_Exception_frame ) % CPU_STACK_ALIGNMENT == 0,
+  CPU_Exception_frame_alignment
 );
 
 RTEMS_STATIC_ASSERT(

@@ -53,9 +53,6 @@ include_rtems_rtems_HEADERS += include/rtems/rtems/tasksimpl.h
 include_rtems_rtems_HEADERS += include/rtems/rtems/timer.h
 include_rtems_rtems_HEADERS += include/rtems/rtems/timerimpl.h
 include_rtems_rtems_HEADERS += include/rtems/rtems/types.h
-if HAS_SMP
-include_rtems_rtems_HEADERS += include/rtems/rtems/atomic.h
-endif
 include_rtems_rtems_HEADERS += mainpage.h
 
 if HAS_MP
@@ -154,15 +151,12 @@ librtems_a_SOURCES += src/barrierdata.c
 librtems_a_SOURCES += src/clockget.c
 librtems_a_SOURCES += src/clockgetsecondssinceepoch.c
 librtems_a_SOURCES += src/clockgettickspersecond.c
-librtems_a_SOURCES += src/clockgettickssinceboot.c
 librtems_a_SOURCES += src/clockgettod.c
 librtems_a_SOURCES += src/clockgettodtimeval.c
 librtems_a_SOURCES += src/clockgetuptime.c
 librtems_a_SOURCES += src/clockgetuptimetimeval.c
-librtems_a_SOURCES += src/clockgetuptimeseconds.c
 librtems_a_SOURCES += src/clockgetuptimenanoseconds.c
 librtems_a_SOURCES += src/clockset.c
-librtems_a_SOURCES += src/clocksetnsecshandler.c
 librtems_a_SOURCES += src/clocktick.c
 librtems_a_SOURCES += src/clocktodtoseconds.c
 librtems_a_SOURCES += src/clocktodvalidate.c
@@ -206,6 +200,7 @@ librtems_a_SOURCES += src/semrelease.c
 librtems_a_SOURCES += src/semflush.c
 librtems_a_SOURCES += src/semtranslatereturncode.c
 librtems_a_SOURCES += src/semdata.c
+librtems_a_SOURCES += src/semsetpriority.c
 
 ## EVENT_C_FILES
 librtems_a_SOURCES += src/event.c
@@ -213,8 +208,6 @@ librtems_a_SOURCES += src/eventreceive.c
 librtems_a_SOURCES += src/eventseize.c
 librtems_a_SOURCES += src/eventsend.c
 librtems_a_SOURCES += src/eventsurrender.c
-librtems_a_SOURCES += src/eventtimeout.c
-librtems_a_SOURCES += src/eventdata.c
 librtems_a_SOURCES += src/systemeventsend.c
 librtems_a_SOURCES += src/systemeventreceive.c
 

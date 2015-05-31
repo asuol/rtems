@@ -40,12 +40,12 @@ extern "C" {
 /*
  *  11.1 Semaphore Characteristics, P1003.1b-1993, p.219
  */
-typedef int sem_t;
+typedef uint32_t sem_t;
 
 /*
  *  Bad semaphore Id
  */
-#define SEM_FAILED (sem_t *) -1
+#define SEM_FAILED ((sem_t *)0)
 
 /*
  *  11.2.1 Initialize an Unnamed Semaphore, P1003.1b-1993, p.219

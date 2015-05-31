@@ -8,15 +8,15 @@ endif
 PREINSTALL_DIRS =
 DISTCLEANFILES += $(PREINSTALL_DIRS)
 
-all-local: $(TMPINSTALL_FILES)
-
-TMPINSTALL_FILES =
-CLEANFILES = $(TMPINSTALL_FILES)
-
 all-am: $(PREINSTALL_FILES)
 
 PREINSTALL_FILES =
-CLEANFILES += $(PREINSTALL_FILES)
+CLEANFILES = $(PREINSTALL_FILES)
+
+all-local: $(TMPINSTALL_FILES)
+
+TMPINSTALL_FILES =
+CLEANFILES += $(TMPINSTALL_FILES)
 
 $(PROJECT_LIB)/$(dirstamp):
 	@$(MKDIR_P) $(PROJECT_LIB)
@@ -78,10 +78,6 @@ $(PROJECT_INCLUDE)/bsp/stackalloc.h: ../../shared/include/stackalloc.h $(PROJECT
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/stackalloc.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/stackalloc.h
 
-$(PROJECT_INCLUDE)/bsp/tod.h: ../../shared/tod.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/tod.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/tod.h
-
 $(PROJECT_INCLUDE)/bsp/start.h: ../shared/include/start.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/start.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/start.h
@@ -129,6 +125,18 @@ PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/arm-gic-tm27.h
 $(PROJECT_INCLUDE)/bsp/arm-release-id.h: ../shared/include/arm-release-id.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/arm-release-id.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/arm-release-id.h
+
+$(PROJECT_INCLUDE)/bsp/cadence-i2c.h: include/cadence-i2c.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/cadence-i2c.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/cadence-i2c.h
+
+$(PROJECT_INCLUDE)/bsp/cadence-i2c-regs.h: include/cadence-i2c-regs.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/cadence-i2c-regs.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/cadence-i2c-regs.h
+
+$(PROJECT_INCLUDE)/bsp/i2c.h: include/i2c.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/i2c.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/i2c.h
 
 $(PROJECT_INCLUDE)/bsp/irq.h: include/irq.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/irq.h

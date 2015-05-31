@@ -5,13 +5,19 @@
 #
 
 fileio
+ftp01
 fsdosfsname01
+iostream
 jffs2_fserror
 jffs2_fslink
 jffs2_fspatheval
 jffs2_fspermission
 jffs2_fsrdwr
+jffs2_fsscandir01
 jffs2_fssymlink
 jffs2_fstime
+mghttpd01
 monitor02
+pppd
+rtems++
 utf8proc01

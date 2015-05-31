@@ -1,12 +1,12 @@
 /*
- *  Clock Tick Device Driver
- *
  *  This routine initializes the Real Time Clock Counter Timer which is
  *  part of the MEC on the ERC32 CPU.
  *
  *  The tick frequency is directly programmed to the configured number of
  *  microseconds per tick.
- *
+ */
+
+/*
  *  COPYRIGHT (c) 1989-2008.
  *  On-Line Applications Research Corporation (OAR).
  *
@@ -25,6 +25,7 @@
 #include <bsp.h>
 #include <bspopts.h>
 #include <rtems/counter.h>
+#include <rtems/timecounter.h>
 
 #if SIMSPARC_FAST_IDLE==1
 #define CLOCK_DRIVER_USE_FAST_IDLE 1
@@ -33,7 +34,6 @@
 /*
  *  The Real Time Clock Counter Timer uses this trap type.
  */
-
 #define CLOCK_VECTOR ERC32_TRAP_TYPE( ERC32_INTERRUPT_REAL_TIME_CLOCK )
 
 #define Clock_driver_support_at_tick()
@@ -45,24 +45,34 @@
 
 extern int CLOCK_SPEED;
 
-uint32_t bsp_clock_nanoseconds_since_last_tick(void)
+static rtems_timecounter_simple erc32_tc;
+
+static uint32_t erc32_tc_get( rtems_timecounter_simple *tc )
 {
-  uint32_t clicks;
-  uint32_t usecs;
-
-  clicks = ERC32_MEC.Real_Time_Clock_Counter;
-
-  if ( ERC32_Is_interrupt_pending( ERC32_INTERRUPT_REAL_TIME_CLOCK ) ) {
-    clicks = ERC32_MEC.Real_Time_Clock_Counter;
-    usecs = (2*rtems_configuration_get_microseconds_per_tick() - clicks);
-  } else {
-    usecs = (rtems_configuration_get_microseconds_per_tick() - clicks);
-  }
-  return usecs * 1000;
+  return ERC32_MEC.Real_Time_Clock_Counter;
 }
 
-#define Clock_driver_nanoseconds_since_last_tick \
-  bsp_clock_nanoseconds_since_last_tick
+static bool erc32_tc_is_pending( rtems_timecounter_simple *tc )
+{
+  return ERC32_Is_interrupt_pending( ERC32_INTERRUPT_REAL_TIME_CLOCK );
+}
+
+static uint32_t erc32_tc_get_timecount( struct timecounter *tc )
+{
+  return rtems_timecounter_simple_downcounter_get(
+    tc,
+    erc32_tc_get,
+    erc32_tc_is_pending
+  );
+}
+
+static void erc32_tc_tick( void )
+{
+  rtems_timecounter_simple_downcounter_tick(
+    &erc32_tc,
+    erc32_tc_get
+  );
+}
 
 static CPU_Counter_ticks erc32_counter_difference(
   CPU_Counter_ticks second,
@@ -76,27 +86,36 @@ static CPU_Counter_ticks erc32_counter_difference(
 
 #define Clock_driver_support_initialize_hardware() \
   do { \
+    uint32_t frequency = 1000000; \
     /* approximately 1 us per countdown */ \
     ERC32_MEC.Real_Time_Clock_Scalar  = CLOCK_SPEED - 1; \
     ERC32_MEC.Real_Time_Clock_Counter = \
       rtems_configuration_get_microseconds_per_tick(); \
     \
     ERC32_MEC_Set_Real_Time_Clock_Timer_Control( \
-      ERC32_MEC_TIMER_COUNTER_ENABLE_COUNTING | \
-    	ERC32_MEC_TIMER_COUNTER_LOAD_SCALER | \
-	    ERC32_MEC_TIMER_COUNTER_LOAD_COUNTER \
+        ERC32_MEC_TIMER_COUNTER_ENABLE_COUNTING | \
+        ERC32_MEC_TIMER_COUNTER_LOAD_SCALER | \
+        ERC32_MEC_TIMER_COUNTER_LOAD_COUNTER \
     ); \
     \
     ERC32_MEC_Set_Real_Time_Clock_Timer_Control( \
-      ERC32_MEC_TIMER_COUNTER_ENABLE_COUNTING | \
-	    ERC32_MEC_TIMER_COUNTER_RELOAD_AT_ZERO \
+        ERC32_MEC_TIMER_COUNTER_ENABLE_COUNTING | \
+        ERC32_MEC_TIMER_COUNTER_RELOAD_AT_ZERO \
+    );  \
+    rtems_timecounter_simple_install( \
+        &erc32_tc, \
+        frequency, \
+        rtems_configuration_get_microseconds_per_tick(), \
+        erc32_tc_get_timecount \
     ); \
     _SPARC_Counter_initialize( \
       &ERC32_MEC.Real_Time_Clock_Counter, \
       erc32_counter_difference \
     ); \
-    rtems_counter_initialize_converter(1000000); \
+    rtems_counter_initialize_converter( frequency ); \
   } while (0)
+
+#define Clock_driver_timecounter_tick() erc32_tc_tick()
 
 #define Clock_driver_support_shutdown_hardware() \
   do { \

@@ -6,7 +6,7 @@
 #
 
 AC_PREREQ([2.69])
-AC_INIT([rtems-c-src-lib-libbsp-arm-xilinx-zynq-a9],[_RTEMS_VERSION],[http://www.rtems.org/bugzilla])
+AC_INIT([rtems-c-src-lib-libbsp-arm-xilinx-zynq-a9],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([bsp_specs])
 RTEMS_TOP(../../../../../..)
 
@@ -23,6 +23,12 @@ AM_CONDITIONAL(HAS_NETWORKING,test "$HAS_NETWORKING" = "yes")
 
 RTEMS_BSPOPTS_SET([BSP_START_RESET_VECTOR],[*],[])
 RTEMS_BSPOPTS_HELP([BSP_START_RESET_VECTOR],[reset vector address for BSP start])
+
+RTEMS_BSPOPTS_SET([BSP_DATA_CACHE_ENABLED],[*],[1])
+RTEMS_BSPOPTS_HELP([BSP_DATA_CACHE_ENABLED],[enable data cache])
+
+RTEMS_BSPOPTS_SET([BSP_INSTRUCTION_CACHE_ENABLED],[*],[1])
+RTEMS_BSPOPTS_HELP([BSP_INSTRUCTION_CACHE_ENABLED],[enable instruction cache])
 
 RTEMS_BSPOPTS_SET([BSP_ARM_A9MPCORE_PERIPHCLK],[altcycv_devkit*],[200000000U])
 RTEMS_BSPOPTS_SET([BSP_ARM_A9MPCORE_PERIPHCLK],[*],[100000000U])
@@ -43,8 +49,19 @@ RTEMS_BSPOPTS_HELP([CYCLONE_V_CONFIG_CONSOLE],[configuration for console (UART 0
 RTEMS_BSPOPTS_SET([CYCLONE_V_CONFIG_UART_1],[*],[0])
 RTEMS_BSPOPTS_HELP([CYCLONE_V_CONFIG_UART_1],[configuration for UART 1])
 
-RTEMS_BSPOPTS_SET([CYCLONE_V_UART_BAUD],[*],[57600U])
+RTEMS_BSPOPTS_SET([CYCLONE_V_UART_BAUD],[*],[115200U])
 RTEMS_BSPOPTS_HELP([CYCLONE_V_UART_BAUD],[baud for UARTs])
+
+RTEMS_BSPOPTS_SET([BSP_USE_UART_INTERRUPTS],[*],[1])
+RTEMS_BSPOPTS_HELP([BSP_USE_UART_INTERRUPTS],[enable usage of interrupts for the UART modules])
+
+RTEMS_BSPOPTS_SET([CYCLONE_V_NO_I2C],[*],[1])
+RTEMS_BSPOPTS_HELP([CYCLONE_V_NO_I2C],
+[Number of configured I2C buses. Note that each bus has to be configured in an
+apropriate i2cdrv_config array.])
+
+RTEMS_BSPOPTS_SET([CYCLONE_V_I2C0_SPEED],[*],[100000])
+RTEMS_BSPOPTS_HELP([CYCLONE_V_I2C0_SPEED],[speed for I2C0 in HZ])
 
 RTEMS_CHECK_SMP
 AM_CONDITIONAL(HAS_SMP,[test "$rtems_cv_HAS_SMP" = "yes"])

@@ -8,8 +8,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 1989-1999.
- *  On-Line Applications Research Corporation (OAR).
+ *  COPYRIGHT (c) 1989-1999. On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -30,6 +29,9 @@ extern "C" {
 /*
  *  This section defines the basic types for this processor.
  */
+
+/** Type that can store a 32-bit integer or a pointer. */
+typedef uintptr_t CPU_Uint32ptr;
 
 typedef uint16_t         Priority_bit_map_Word;
 typedef void sparc_isr;

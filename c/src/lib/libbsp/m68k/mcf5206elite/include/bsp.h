@@ -117,10 +117,6 @@
 
 #ifndef ASM
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <bspopts.h>
 #include <rtems.h>
 #include <rtems/console.h>
@@ -129,7 +125,9 @@ extern "C" {
 #include <rtems/rtc.h>
 #include <bsp/default-initial-extension.h>
 
-#include "i2c.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* System frequency */
 #define BSP_SYSTEM_FREQUENCY ((unsigned int)&_SYS_CLOCK_FREQUENCY)
@@ -172,6 +170,11 @@ rtems_isr_entry set_vector(
   rtems_vector_number vector,
   int                 type
 );
+
+/*
+ * Prototypes for BSP methods that cross file boundaries
+ */
+void Init5206e(void);
 
 #ifdef __cplusplus
 }

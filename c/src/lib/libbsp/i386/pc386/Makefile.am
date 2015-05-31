@@ -28,10 +28,12 @@ SUBDIRS = . tools
 include_bsp_HEADERS  = ../../i386/shared/irq/irq.h
 include_bsp_HEADERS += ../../i386/shared/irq/irq_asm.h
 include_bsp_HEADERS += ../../i386/shared/comm/tty_drv.h
+include_bsp_HEADERS += ../../i386/shared/realmode_int/realmode_int.h
 include_bsp_HEADERS += ../../shared/include/irq-generic.h
 include_bsp_HEADERS += ../../shared/include/irq-info.h
 include_bsp_HEADERS += console/rtd316.h
 include_bsp_HEADERS += console/exar17d15x.h
+include_bsp_HEADERS += include/tblsizes.h
 
 if HAS_SMP
 include_bsp_HEADERS += ../../i386/shared/irq/apic.h
@@ -66,20 +68,23 @@ noinst_LIBRARIES += libbsp.a
 libbsp_a_SOURCES =
 
 # clock
+if RTEMS_EDISON
+libbsp_a_SOURCES += ../../shared/clock_driver_simidle.c
+else
 libbsp_a_SOURCES += clock/ckinit.c
+endif
+libbsp_a_SOURCES += ../../shared/clockdrv_shell.h
 libbsp_a_SOURCES += clock/todcfg.c
 libbsp_a_SOURCES += ../../shared/tod.c
-libbsp_a_SOURCES += ../../shared/clockdrv_shell.h
 
 include_rtemsdir = $(includedir)/rtems
-include_rtems_HEADERS = console/keyboard.h
+include_rtems_HEADERS  =
+
+if RTEMS_VGA
+include_rtems_HEADERS += console/keyboard.h
 include_rtems_HEADERS += console/kd.h
 include_rtems_HEADERS += console/ps2_drv.h
-include_rtems_HEADERS += ../../shared/console_private.h
 include_rtems_HEADERS += console/vgacons.h
-
-include_HEADERS += ../../i386/shared/comm/i386_io.h
-# console
 libbsp_a_SOURCES += console/inch.c
 libbsp_a_SOURCES += console/outch.c
 libbsp_a_SOURCES += console/defkeymap.c
@@ -90,9 +95,32 @@ libbsp_a_SOURCES += console/vgainit.c
 libbsp_a_SOURCES += console/vt.c
 libbsp_a_SOURCES += console/videoAsm.S
 libbsp_a_SOURCES += console/kbd_parser.c
+libbsp_a_SOURCES += console/vgacons.c
+include_bsp_HEADERS += console/fb_default_mode.h
+if USE_VGA
+libbsp_a_SOURCES += console/fb_vga.c
+endif
+if USE_CIRRUS_GD5446
+libbsp_a_SOURCES += console/fb_cirrus.c
+endif
+if USE_VBE_RM
+include_bsp_HEADERS += include/vbe3.h
+include_HEADERS += include/edid.h
+include_bsp_HEADERS += include/fb_vesa.h
+libbsp_a_SOURCES += console/fb_vesa_rm.c
+endif
+endif
+
+# console (non-graphics support)
+if RTEMS_EDISON
+libbsp_a_SOURCES += console/console_edison.c
+endif
+include_HEADERS += ../../i386/shared/comm/i386_io.h
+include_rtems_HEADERS += ../../shared/console_private.h
 libbsp_a_SOURCES += console/serial_mouse_config.c
 libbsp_a_SOURCES += ../../i386/shared/comm/uart.c
 libbsp_a_SOURCES += ../../i386/shared/comm/tty_drv.c
+libbsp_a_SOURCES += ../../i386/shared/realmode_int/realmode_int.c
 libbsp_a_SOURCES += ../../shared/console.c
 libbsp_a_SOURCES += console/console_select.c
 libbsp_a_SOURCES += ../../shared/console_read.c
@@ -100,14 +128,8 @@ libbsp_a_SOURCES += ../../shared/console_write.c
 libbsp_a_SOURCES += console/console_control.c
 libbsp_a_SOURCES += console/conscfg.c
 libbsp_a_SOURCES += console/printk_support.c
-libbsp_a_SOURCES += console/vgacons.c
 libbsp_a_SOURCES += console/exar17d15x.c
 libbsp_a_SOURCES += console/rtd316.c
-if USE_CIRRUS_GD5446
-libbsp_a_SOURCES += console/fb_cirrus.c
-else
-libbsp_a_SOURCES += console/fb_vga.c
-endif
 
 # gdb
 libbsp_a_SOURCES += ../../i386/shared/comm/i386-stub.c
@@ -137,7 +159,6 @@ libbsp_a_SOURCES += ../../i386/shared/irq/idt.c
 libbsp_a_SOURCES += ../../i386/shared/irq/irq.c
 libbsp_a_SOURCES += ../../i386/shared/irq/irq_init.c
 libbsp_a_SOURCES += ../../shared/bootcard.c
-libbsp_a_SOURCES += ../../shared/bspinit.c
 libbsp_a_SOURCES += ../../shared/sbrk.c
 libbsp_a_SOURCES += startup/ldsegs.S
 libbsp_a_SOURCES += ../../i386/shared/irq/irq_asm.S
@@ -151,8 +172,11 @@ libbsp_a_SOURCES += ../../shared/src/irq-server.c
 # timer
 libbsp_a_SOURCES += timer/timer.c timer/timerisr.S
 
+if HAS_IDE
 # ide
-libbsp_a_SOURCES += ide/idecfg.c ide/ide.c
+libbsp_a_SOURCES += ide/ide.c
+libbsp_a_SOURCES += ide/idecfg.c
+endif
 
 if HAS_SMP
 libbsp_a_SOURCES += ../../i386/shared/smp/getcpuid.c 

@@ -19,6 +19,7 @@
 #endif
 
 #include <rtems/score/threadimpl.h>
+#include <rtems/score/resourceimpl.h>
 #include <rtems/score/schedulerimpl.h>
 #include <rtems/score/stackimpl.h>
 #include <rtems/score/tls.h>
@@ -51,7 +52,7 @@ bool _Thread_Initialize(
   #endif
   bool                     extension_status;
   size_t                   i;
-  bool                     scheduler_allocated = false;
+  bool                     scheduler_node_initialized = false;
   Per_CPU_Control         *cpu = _Per_CPU_Get_by_index( 0 );
 
 #if defined( RTEMS_SMP )
@@ -158,6 +159,7 @@ bool _Thread_Initialize(
    *  General initialization
    */
 
+  the_thread->Start.isr_level        = isr_level;
   the_thread->Start.is_preemptible   = is_preemptible;
   the_thread->Start.budget_algorithm = budget_algorithm;
   the_thread->Start.budget_callout   = budget_callout;
@@ -178,11 +180,16 @@ bool _Thread_Initialize(
     #endif
   }
 
-  the_thread->Start.isr_level         = isr_level;
-
 #if defined(RTEMS_SMP)
-  the_thread->scheduler               = scheduler;
+  the_thread->Scheduler.state = THREAD_SCHEDULER_BLOCKED;
+  the_thread->Scheduler.own_control = scheduler;
+  the_thread->Scheduler.control = scheduler;
+  the_thread->Scheduler.own_node = the_thread->Scheduler.node;
+  _Resource_Node_initialize( &the_thread->Resource_node );
   _CPU_Context_Set_is_executing( &the_thread->Registers, false );
+  the_thread->Lock.current = &the_thread->Lock.Default;
+  _ISR_lock_Initialize( &the_thread->Lock.Default, "Thread Lock Default");
+  _Atomic_Init_uint(&the_thread->Lock.generation, 0);
 #endif
 
   _Thread_Debug_set_real_processor( the_thread, cpu );
@@ -192,16 +199,19 @@ bool _Thread_Initialize(
 
   the_thread->current_state           = STATES_DORMANT;
   the_thread->Wait.queue              = NULL;
+  the_thread->Wait.operations         = &_Thread_queue_Operations_default;
   the_thread->resource_count          = 0;
+  the_thread->current_priority        = priority;
   the_thread->real_priority           = priority;
+  the_thread->priority_generation     = 0;
   the_thread->Start.initial_priority  = priority;
 
-  scheduler_allocated = _Scheduler_Allocate( scheduler, the_thread );
-  if ( !scheduler_allocated ) {
-    goto failed;
-  }
+  _Thread_Wait_flags_set( the_thread, THREAD_WAIT_FLAGS_INITIAL );
 
-  _Thread_Set_priority( the_thread, priority );
+  _Scheduler_Node_initialize( scheduler, the_thread );
+  scheduler_node_initialized = true;
+
+  _Scheduler_Update_priority( the_thread, priority );
 
   /*
    *  Initialize the CPU usage statistics
@@ -226,6 +236,9 @@ bool _Thread_Initialize(
   the_thread->Life.state = THREAD_LIFE_NORMAL;
   the_thread->Life.terminator = NULL;
 
+  the_thread->Capture.flags = 0;
+  the_thread->Capture.control = NULL;
+
   /*
    *  Open the object
    */
@@ -244,8 +257,8 @@ bool _Thread_Initialize(
 
 failed:
 
-  if ( scheduler_allocated ) {
-    _Scheduler_Free( scheduler, the_thread );
+  if ( scheduler_node_initialized ) {
+    _Scheduler_Node_destroy( scheduler, the_thread );
   }
 
   _Workspace_Free( the_thread->Start.tls_area );

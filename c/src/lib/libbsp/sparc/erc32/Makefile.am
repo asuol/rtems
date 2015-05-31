@@ -36,7 +36,6 @@ libbsp_a_SOURCES += ../../sparc/shared/bsppretaskinghook.c
 libbsp_a_SOURCES += ../../shared/bsppost.c
 libbsp_a_SOURCES += ../../shared/bspstart.c
 libbsp_a_SOURCES += ../../shared/bootcard.c
-libbsp_a_SOURCES += ../../shared/bspinit.c
 libbsp_a_SOURCES += ../../shared/sbrk.c
 libbsp_a_SOURCES += startup/setvec.c
 libbsp_a_SOURCES += startup/spurious.c
@@ -45,7 +44,10 @@ libbsp_a_SOURCES += startup/boardinit.S
 libbsp_a_SOURCES += startup/bspidle.c
 libbsp_a_SOURCES += startup/bspdelay.c
 libbsp_a_SOURCES += ../../sparc/shared/startup/early_malloc.c
+libbsp_a_SOURCES += ../../sparc/shared/startup/bsp_fatal_exit.c
+libbsp_a_SOURCES += ../../sparc/shared/startup/bsp_fatal_halt.c
 # ISR Handler
+libbsp_a_SOURCES += ../../sparc/shared/cpu.c
 libbsp_a_SOURCES += ../../sparc/shared/irq_asm.S
 # gnatsupp
 libbsp_a_SOURCES += gnatsupp/gnatsupp.c ../../sparc/shared/gnatcommon.c
@@ -69,6 +71,7 @@ include_bsp_HEADERS += \
     include/bsp/irq.h
 libbsp_a_SOURCES += \
     ../../sparc/shared/irq/irq-shared.c \
+    ../../sparc/shared/irq/bsp_isr_handler.c \
     ../../shared/src/irq-default-handler.c \
     ../../shared/src/irq-generic.c \
     ../../shared/src/irq-info.c \

@@ -14,7 +14,6 @@
  *
  * - set the current date and time
  * - obtain the current date and time
- * - set the nanoseconds since last clock tick handler
  * - announce a clock tick
  * - obtain the system uptime
  */
@@ -34,6 +33,8 @@
 #include <rtems/score/tod.h>
 #include <rtems/rtems/status.h>
 #include <rtems/rtems/types.h>
+#include <rtems/config.h>
+#include <rtems/score/timecounterimpl.h>
 
 #include <sys/time.h> /* struct timeval */
 
@@ -68,13 +69,10 @@ typedef enum {
 } rtems_clock_get_options;
 
 /**
- *  Type for the nanoseconds since last tick BSP extension.
- */
-typedef TOD_Nanoseconds_since_last_tick_routine
-  rtems_nanoseconds_extension_routine;
-
-/**
  * @brief Obtain Current Time of Day
+ *
+ * @deprecated rtems_clock_get() is deprecated. Use the more explicit
+ * function calls rtems_clock_get_xxx().
  *
  * This routine implements the rtems_clock_get directive. It returns
  * one of the following:
@@ -93,7 +91,7 @@ typedef TOD_Nanoseconds_since_last_tick_routine
 rtems_status_code rtems_clock_get(
   rtems_clock_get_options  option,
   void                    *time_buffer
-);
+) RTEMS_COMPILER_DEPRECATED_ATTRIBUTE;
 
 /**
  * @brief Obtain Current Time of Day (Classic TOD)
@@ -149,15 +147,85 @@ rtems_status_code rtems_clock_get_seconds_since_epoch(
 );
 
 /**
- * @brief Obtain Ticks Since Boot
+ * @brief Gets the current ticks counter value.
  *
- * This routine implements the rtems_clock_get_ticks_since_boot
- * directive.
- *
- * @retval This method returns the number of ticks since boot. It cannot
- *         fail since RTEMS always keeps a running count of ticks since boot.
+ * @return The current tick counter value.  With a 1ms clock tick, this counter
+ * overflows after 50 days since boot.
  */
-rtems_interval rtems_clock_get_ticks_since_boot(void);
+RTEMS_INLINE_ROUTINE rtems_interval rtems_clock_get_ticks_since_boot(void)
+{
+  return _Watchdog_Ticks_since_boot;
+}
+
+/**
+ * @brief Returns the ticks counter value delta ticks in the future.
+ *
+ * @param[in] delta The ticks delta value.
+ *
+ * @return The tick counter value delta ticks in the future.
+ */
+RTEMS_INLINE_ROUTINE rtems_interval rtems_clock_tick_later(
+  rtems_interval delta
+)
+{
+  return _Watchdog_Ticks_since_boot + delta;
+}
+
+/**
+ * @brief Returns the ticks counter value at least delta microseconds in the
+ * future.
+ *
+ * @param[in] delta_in_usec The delta value in microseconds.
+ *
+ * @return The tick counter value at least delta microseconds in the future.
+ */
+RTEMS_INLINE_ROUTINE rtems_interval rtems_clock_tick_later_usec(
+  rtems_interval delta_in_usec
+)
+{
+  rtems_interval us_per_tick = rtems_configuration_get_microseconds_per_tick();
+
+  /*
+   * Add one additional tick, since we don't know the time to the clock next
+   * tick.
+   */
+  return _Watchdog_Ticks_since_boot
+    + (delta_in_usec + us_per_tick - 1) / us_per_tick + 1;
+}
+
+/**
+ * @brief Returns true if the current ticks counter value indicates a time
+ * before the time specified by the tick value and false otherwise.
+ *
+ * @param[in] tick The tick value.
+ *
+ * This can be used to write busy loops with a timeout.
+ *
+ * @code
+ * status busy( void )
+ * {
+ *   rtems_interval timeout = rtems_clock_tick_later_usec( 10000 );
+ *
+ *   do {
+ *     if ( ok() ) {
+ *       return success;
+ *     }
+ *   } while ( rtems_clock_tick_before( timeout ) );
+ *
+ *   return timeout;
+ * }
+ * @endcode
+ *
+ * @retval true The current ticks counter value indicates a time before the
+ * time specified by the tick value.
+ * @retval false Otherwise.
+ */
+RTEMS_INLINE_ROUTINE bool rtems_clock_tick_before(
+  rtems_interval tick
+)
+{
+  return (int32_t) ( tick - _Watchdog_Ticks_since_boot ) > 0;
+}
 
 /**
  * @brief Obtain Ticks Per Seconds
@@ -205,24 +273,6 @@ rtems_status_code rtems_clock_set(
 rtems_status_code rtems_clock_tick( void );
 
 /**
- * @brief Set the BSP specific Nanoseconds Extension
- *
- * Clock Manager
- *
- * This directive sets the BSP provided nanoseconds since last tick
- * extension.
- *
- * @param[in] routine is a pointer to the extension routine
- *
- * @return This method returns RTEMS_SUCCESSFUL if there was not an
- *         error. Otherwise, a status code is returned indicating the
- *         source of the error.
- */
-rtems_status_code rtems_clock_set_nanoseconds_extension(
-  rtems_nanoseconds_extension_routine routine
-);
-
-/**
  * @brief Obtain the System Uptime
  *
  * This directive returns the system uptime.
@@ -254,7 +304,10 @@ void rtems_clock_get_uptime_timeval( struct timeval *uptime );
  *
  * @retval The system uptime in seconds.
  */
-time_t rtems_clock_get_uptime_seconds( void );
+RTEMS_INLINE_ROUTINE time_t rtems_clock_get_uptime_seconds( void )
+{
+  return _Timecounter_Time_uptime - 1;
+}
 
 /**
  * @brief Returns the system uptime in nanoseconds.

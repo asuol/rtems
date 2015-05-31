@@ -14,8 +14,8 @@ GENERATED_FILES = overview.texi concepts.texi datatypes.texi init.texi \
     task.texi intr.texi clock.texi timer.texi sem.texi msg.texi event.texi \
     signal.texi part.texi region.texi dpmem.texi io.texi fatal.texi \
     schedule.texi rtmon.texi barrier.texi bsp.texi userext.texi conf.texi \
-    mp.texi stackchk.texi cpuuse.texi object.texi chains.texi timespec.texi \
-    cbs.texi dirstat.texi smp.texi
+    mp.texi stackchk.texi cpuuse.texi object.texi chains.texi rbtree.texi \
+    timespec.texi cbs.texi dirstat.texi smp.texi libpci.texi
 
 COMMON_FILES += $(top_srcdir)/common/cpright.texi
 
@@ -96,7 +96,7 @@ sem.texi: sem.t
 	    -n "Barrier Manager" < $< > $@
 
 barrier.texi: barrier.t
-	$(BMENU2) -p "Semaphore Manager SEMAPHORE_FLUSH - Unblock all tasks waiting on a semaphore" \
+	$(BMENU2) -p "Semaphore Manager SEMAPHORE_SET_PRIORITY - Set priority by scheduler for a semaphore" \
 	    -u "Top" \
 	    -n "Message Manager" < $< > $@
 
@@ -166,10 +166,15 @@ mp.texi: mp.t
 smp.texi: smp.t
 	$(BMENU2) -p  "Multiprocessing Manager MULTIPROCESSING_ANNOUNCE - Announce the arrival of a packet"\
 	    -u "Top" \
+	    -n "PCI Library" < $< > $@
+
+libpci.texi: libpci.t
+	$(BMENU2) -p "Symmetric Multiprocessing Services TASK_SET_AFFINITY - Set task processor affinity" \
+	    -u "Top" \
 	    -n "Stack Bounds Checker" < $< > $@
 
 stackchk.texi: stackchk.t
-	$(BMENU2) -p "Symmetric Multiprocessing Services TASK_SET_AFFINITY - Set task processor affinity" \
+	$(BMENU2) -p "PCI Library PCI Shell command" \
 	    -u "Top" \
 	    -n "CPU Usage Statistics" < $< > $@
 
@@ -186,10 +191,15 @@ object.texi: object.t
 chains.texi: chains.t
 	$(BMENU2) -p "Object Services OBJECT_GET_CLASS_INFORMATION - Obtain Class Information" \
 	    -u "Top" \
+	    -n "Red-Black Trees" < $< > $@
+
+rbtree.texi: rbtree.t
+	$(BMENU2) -p "Chains Prepend a Node" \
+	    -u "Top" \
 	    -n "Timespec Helpers" < $< > $@
 
 timespec.texi: timespec.t
-	$(BMENU2) -p "Chains Prepend a Node" \
+	$(BMENU2) -p "Red-Black Trees Documentation for the Red-Black Tree Directives" \
 	    -u "Top" \
 	    -n "Constant Bandwidth Server Scheduler API" < $< > $@
 
@@ -205,7 +215,7 @@ dirstat.texi: dirstat.t
 
 EXTRA_DIST = bsp.t cbs.t clock.t chains.t concepts.t cpuuse.t datatypes.t conf.t \
     dpmem.t event.t fatal.t init.t intr.t io.t mp.t msg.t overview.t \
-    part.t region.t rtmon.t sem.t schedule.t signal.t stackchk.t \
+    part.t rbtree.t region.t rtmon.t sem.t schedule.t signal.t stackchk.t \
     task.t timer.t userext.t dirstat.t $(TXT_FILES) $(PNG_FILES) $(EPS_IMAGES) \
     $(noinst_DATA)
 

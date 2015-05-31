@@ -124,6 +124,13 @@ typedef struct {
   void                           *user_data;
 }   Watchdog_Control;
 
+/**
+ * @brief The watchdog ticks counter.
+ *
+ * With a 1ms watchdog tick, this counter overflows after 50 days since boot.
+ */
+extern volatile Watchdog_Interval _Watchdog_Ticks_since_boot;
+
 /**@}*/
 
 #ifdef __cplusplus

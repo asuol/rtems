@@ -53,13 +53,15 @@ extern "C" {
     _Scheduler_EDF_Block,            /* block entry point */ \
     _Scheduler_CBS_Unblock,          /* unblock entry point */ \
     _Scheduler_EDF_Change_priority,  /* change priority entry point */ \
-    _Scheduler_CBS_Allocate,         /* allocate entry point */ \
-    _Scheduler_default_Free,         /* free entry point */ \
-    _Scheduler_EDF_Update,           /* update entry point */ \
+    SCHEDULER_OPERATION_DEFAULT_ASK_FOR_HELP \
+    _Scheduler_CBS_Node_initialize,  /* node initialize entry point */ \
+    _Scheduler_default_Node_destroy, /* node destroy entry point */ \
+    _Scheduler_EDF_Update_priority,  /* update priority entry point */ \
     _Scheduler_EDF_Priority_compare, /* compares two priorities */ \
     _Scheduler_CBS_Release_job,      /* new period of task */ \
     _Scheduler_default_Tick,         /* tick entry point */ \
     _Scheduler_default_Start_idle    /* start idle entry point */ \
+    SCHEDULER_OPERATION_DEFAULT_GET_SET_AFFINITY \
   }
 
 /* Return values for CBS server. */
@@ -148,11 +150,12 @@ extern Scheduler_CBS_Server _Scheduler_CBS_Server_list[];
  *  remaining budget is sufficient. If not, the thread continues as a
  *  new job in order to protect concurrent threads.
  *
+ *  @param[in] scheduler The scheduler instance.
  *  @param[in] the_thread will be unblocked.
  *
  *  @note This has to be asessed as missed deadline of the current job.
  */
-void _Scheduler_CBS_Unblock(
+Scheduler_Void_or_thread _Scheduler_CBS_Unblock(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread
 );
@@ -164,6 +167,7 @@ void _Scheduler_CBS_Unblock(
  *  It is called only from Rate Monotonic manager in the beginning
  *  of new period. Deadline has to be shifted and budget replenished.
  *
+ *  @param[in] scheduler The scheduler instance.
  *  @param[in] the_thread is the owner of the job.
  *  @param[in] length of the new job from now. If equal to 0,
  *             the job was cancelled or deleted.
@@ -335,14 +339,9 @@ void _Scheduler_CBS_Budget_callout(
 );
 
 /**
- *  @brief Allocates CBS specific information of @a the_thread.
- *
- *  This routine allocates CBS specific information of @a the_thread.
- *
- *  @param[in] the_thread is the thread the scheduler is allocating
- *             management memory for.
+ *  @brief Initializes a CBS specific scheduler node of @a the_thread.
  */
-bool _Scheduler_CBS_Allocate(
+void _Scheduler_CBS_Node_initialize(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread
 );

@@ -15,21 +15,22 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
 
 #include <rtems.h>
 #include <rtems/console.h>
 #include <rtems/clockdrv.h>
+#include <rtems/irq.h>
 #include <mpc8xx.h>
 #include <mpc8xx/cpm.h>
 #include <mpc8xx/mmu.h>
 #include <mpc8xx/console.h>
 #include <bsp/vectors.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /*
  *  Representation of initialization data in NVRAM
@@ -72,6 +73,22 @@ extern int rtems_enet_driver_attach (struct rtems_bsdnet_ifconfig *config, int a
  * indicate, that BSP has IDE driver
  */
 #define RTEMS_BSP_HAS_IDE_DRIVER
+
+extern uint32_t bsp_clock_speed;
+
+char serial_getc(void);
+
+int serial_tstc(void);
+
+void serial_init(void);
+
+int mbx8xx_console_get_configuration(void);
+
+void _InitMBX8xx(void);
+
+int BSP_disconnect_clock_handler(void);
+
+int BSP_connect_clock_handler (rtems_irq_hdl);
 
 #ifdef __cplusplus
 }

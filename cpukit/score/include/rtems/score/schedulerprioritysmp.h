@@ -84,20 +84,20 @@ typedef struct {
     _Scheduler_priority_SMP_Block, \
     _Scheduler_priority_SMP_Unblock, \
     _Scheduler_priority_SMP_Change_priority, \
-    _Scheduler_priority_SMP_Allocate, \
-    _Scheduler_default_Free, \
-    _Scheduler_priority_SMP_Update, \
+    _Scheduler_priority_SMP_Ask_for_help, \
+    _Scheduler_priority_SMP_Node_initialize, \
+    _Scheduler_default_Node_destroy, \
+    _Scheduler_priority_SMP_Update_priority, \
     _Scheduler_priority_Priority_compare, \
     _Scheduler_default_Release_job, \
     _Scheduler_default_Tick, \
-    _Scheduler_SMP_Start_idle, \
-    _Scheduler_default_Get_affinity, \
-    _Scheduler_default_Set_affinity \
+    _Scheduler_SMP_Start_idle \
+    SCHEDULER_OPERATION_DEFAULT_GET_SET_AFFINITY \
   }
 
 void _Scheduler_priority_SMP_Initialize( const Scheduler_Control *scheduler );
 
-bool _Scheduler_priority_SMP_Allocate(
+void _Scheduler_priority_SMP_Node_initialize(
   const Scheduler_Control *scheduler,
   Thread_Control *thread
 );
@@ -107,24 +107,31 @@ void _Scheduler_priority_SMP_Block(
   Thread_Control *thread
 );
 
-void _Scheduler_priority_SMP_Unblock(
+Thread_Control *_Scheduler_priority_SMP_Unblock(
   const Scheduler_Control *scheduler,
   Thread_Control *thread
 );
 
-void _Scheduler_priority_SMP_Change_priority(
+Thread_Control *_Scheduler_priority_SMP_Change_priority(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
   Priority_Control         new_priority,
   bool                     prepend_it
 );
 
-void _Scheduler_priority_SMP_Update(
+Thread_Control *_Scheduler_priority_SMP_Ask_for_help(
   const Scheduler_Control *scheduler,
-  Thread_Control *thread
+  Thread_Control          *needs_help,
+  Thread_Control          *offers_help
 );
 
-void _Scheduler_priority_SMP_Yield(
+void _Scheduler_priority_SMP_Update_priority(
+  const Scheduler_Control *scheduler,
+  Thread_Control *thread,
+  Priority_Control new_priority
+);
+
+Thread_Control *_Scheduler_priority_SMP_Yield(
   const Scheduler_Control *scheduler,
   Thread_Control *thread
 );

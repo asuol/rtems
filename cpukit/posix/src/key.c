@@ -26,6 +26,8 @@
 #include <rtems/score/objectimpl.h>
 #include <rtems/score/wkspace.h>
 
+RBTREE_DEFINE_EMPTY( _POSIX_Keys_Key_value_lookup_tree );
+
 /**
  * @brief This routine compares the rbtree node by comparing POSIX key first
  * and comparing thread id second.
@@ -42,32 +44,36 @@
  * impossible
  */
 
-int _POSIX_Keys_Key_value_lookup_tree_compare_function(
+RBTree_Compare_result _POSIX_Keys_Key_value_compare(
   const RBTree_Node *node1,
   const RBTree_Node *node2
 )
 {
   POSIX_Keys_Key_value_pair *n1;
   POSIX_Keys_Key_value_pair *n2;
-  Objects_Id thread_id1, thread_id2;
-  int diff;
+  Thread_Control *thread1;
+  Thread_Control *thread2;
+  RBTree_Compare_result diff;
 
-  n1 = _RBTree_Container_of( node1, POSIX_Keys_Key_value_pair, Key_value_lookup_node );
-  n2 = _RBTree_Container_of( node2, POSIX_Keys_Key_value_pair, Key_value_lookup_node );
+  n1 = POSIX_KEYS_RBTREE_NODE_TO_KEY_VALUE_PAIR( node1 );
+  n2 = POSIX_KEYS_RBTREE_NODE_TO_KEY_VALUE_PAIR( node2 );
 
   diff = n1->key - n2->key;
   if ( diff )
     return diff;
 
-  thread_id1 = n1->thread_id;
-  thread_id2 = n2->thread_id;
+  thread1 = n1->thread;
+  thread2 = n2->thread;
 
-  /**
-   * if thread_id1 or thread_id2 equals to 0, only key1 and key2 is valued.
-   * it enables us search node only by pthread_key_t type key.
+  /*
+   * If thread1 or thread2 equals to NULL, only key1 and key2 is valued.  It
+   * enables us search node only by pthread_key_t type key.  Exploit that the
+   * thread control alignment is at least two to avoid integer overflows.
    */
-  if ( thread_id1 && thread_id2 )
-    return thread_id1 - thread_id2;
+  if ( thread1 != NULL && thread2 != NULL )
+    return (RBTree_Compare_result) ( (uintptr_t) thread1 >> 1 )
+      - (RBTree_Compare_result) ( (uintptr_t) thread2 >> 1 );
+
   return 0;
 }
 
@@ -151,12 +157,6 @@ void _POSIX_Key_Manager_initialization(void)
     false,                      /* true if this is a global object class */
     NULL                        /* Proxy extraction support callout */
 #endif
-  );
-
-  _RBTree_Initialize_empty(
-      &_POSIX_Keys_Key_value_lookup_tree,
-      _POSIX_Keys_Key_value_lookup_tree_compare_function,
-      true
   );
 
   _POSIX_Keys_Initialize_keypool();

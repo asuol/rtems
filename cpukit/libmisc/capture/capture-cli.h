@@ -12,7 +12,7 @@
   All rights reserved Objective Design Systems Pty Ltd, 2002
   Chris Johns (ccj@acm.org)
 
-  COPYRIGHT (c) 1989-1998.
+  COPYRIGHT (c) 1989-2014.
   On-Line Applications Research Corporation (OAR).
 
   The license and distribution terms for this file may be
@@ -41,11 +41,8 @@ extern "C" {
 /**
  * rtems_capture_cli_init
  *
- *  DESCRIPTION:
- *
  * This function initialises the command line interface to the capture
  * engine.
- *
  */
 rtems_status_code
 rtems_capture_cli_init (rtems_capture_timestamp timestamp);

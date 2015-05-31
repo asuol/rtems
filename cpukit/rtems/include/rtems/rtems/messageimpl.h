@@ -18,6 +18,7 @@
 
 #include <rtems/rtems/message.h>
 #include <rtems/score/objectimpl.h>
+#include <rtems/score/coremsgimpl.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -104,20 +105,6 @@ rtems_status_code _Message_queue_Translate_core_message_queue_return_code (
 );
 
 /**
- *  @brief Check whether message queue is null.
- *
- *  This function places the_message at the rear of the outstanding
- *  messages on the_message_queue.
- */
-RTEMS_INLINE_ROUTINE bool _Message_queue_Is_null (
-  Message_queue_Control *the_message_queue
-)
-{
-  return ( the_message_queue == NULL  );
-}
-
-
-/**
  *  @brief Deallocates a message queue control block into
  *  the inactive chain of free message queue control blocks.
  *
@@ -150,6 +137,21 @@ RTEMS_INLINE_ROUTINE Message_queue_Control *_Message_queue_Get (
 {
   return (Message_queue_Control *)
      _Objects_Get( &_Message_queue_Information, id, location );
+}
+
+RTEMS_INLINE_ROUTINE Message_queue_Control *
+_Message_queue_Get_interrupt_disable(
+  Objects_Id         id,
+  Objects_Locations *location,
+  ISR_lock_Context  *lock_context
+)
+{
+  return (Message_queue_Control *) _Objects_Get_isr_disable(
+    &_Message_queue_Information,
+    id,
+    location,
+    lock_context
+  );
 }
 
 RTEMS_INLINE_ROUTINE Message_queue_Control *_Message_queue_Allocate( void )

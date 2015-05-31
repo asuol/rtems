@@ -12,6 +12,7 @@
 
 #include <rtems.h>
 #include <rtems/fs.h>
+#include <rtems/bsd.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,10 +62,7 @@ void *memset(void *s, int c, size_t n);
 #define panic	rtems_panic
 #define suser(a,b)	0
 
-static inline void microtime(struct timeval *tv)
-{
-  rtems_clock_get_uptime_timeval(tv);
-}
+#define microtime(tv) rtems_bsd_microtime(tv)
 
 #define hz rtems_bsdnet_ticks_per_second
 #define tick rtems_bsdnet_microseconds_per_tick
@@ -83,11 +81,13 @@ typedef	quad_t *	qaddr_t;
 typedef void __sighandler_t(int);
 typedef	__sighandler_t	*sig_t;	/* type of pointer to a signal function */
 #define NSIG    32
-struct	sigaltstack {
-	char	*ss_sp;			/* signal stack base */
-	int	ss_size;		/* signal stack length */
-	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
+#if (__RTEMS_HAVE_DECL_SIGALTSTACK__ == 0)
+struct sigaltstack {
+       char    *ss_sp;                 /* signal stack base */
+       int     ss_size;                /* signal stack length */
+       int     ss_flags;               /* SS_DISABLE and/or SS_ONSTACK */
 };
+#endif
 
 #ifdef _KERNEL
 typedef	int		boolean_t;
@@ -155,6 +155,18 @@ rtems_id rtems_bsdnet_newproc (
   void  *arg
 );
 
+#ifdef RTEMS_SMP
+/* As rtems_bsdnet_newproc() but with ability to set CPU affinity too */
+rtems_id rtems_bsdnet_newproc_affinity (
+  char  *name,
+  int   stacksize,
+  void  (*entry)(void *),
+  void  *arg,
+  const cpu_set_t *set,
+  const size_t setsize
+);
+#endif
+
 rtems_status_code rtems_bsdnet_event_receive (
   rtems_event_set  event_in,
   rtems_option     option_set,
@@ -186,7 +198,7 @@ extern char *rtems_bsdnet_domain_name;
 /*
  * Some extra prototypes
  */
-int sethostname (char *name, size_t namelen);
+int sethostname (const char *name, size_t namelen);
 void domaininit (void *);
 void ifinit (void *);
 void ipintr (void);
@@ -205,7 +217,7 @@ int ioctl (int, ioctl_command_t, ...);
 #define NETISR_IP_EVENT        (1L << NETISR_IP)
 #define NETISR_ARP_EVENT       (1L << NETISR_ARP)
 #define NETISR_EVENTS  (NETISR_IP_EVENT|NETISR_ARP_EVENT)
-#if (SBWAIT_EVENT & SOSLEEP_EVENT & NETISR_EVENTS)
+#if (SBWAIT_EVENT & SOSLEEP_EVENT & NETISR_EVENTS & RTEMS_EVENT_SYSTEM_NETWORK_CLOSE)
 # error "Network event conflict"
 #endif
 

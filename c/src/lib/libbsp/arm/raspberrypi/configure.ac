@@ -36,6 +36,12 @@ RTEMS_BSPOPTS_HELP([BSP_ENABLE_SPI],[Define to 1 to use the SPI bus. This will r
 RTEMS_BSPOPTS_SET([BSP_ENABLE_I2C],[*],[0])
 RTEMS_BSPOPTS_HELP([BSP_ENABLE_I2C],[Define to 1 to use the I2C bus. This will register the bus in /dev/i2c and also any device driver mentioned in i2c/i2c_init.c .])
 
+# Is this a Raspberry Pi 2?
+RTEMS_BSPOPTS_SET([BSP_IS_RPI2],[raspberrypi2],[1])
+RTEMS_BSPOPTS_SET([BSP_IS_RPI2],[*],[0])
+RTEMS_BSPOPTS_HELP([BSP_IS_RPI2],[Set if the BSP variant is Raspberry Pi 2.])
+AM_CONDITIONAL(RTEMS_RPI2,[test "$BSP_IS_RPI2" = "1"])
+
 RTEMS_BSP_CLEANUP_OPTIONS(0, 0)
 RTEMS_BSP_LINKCMDS
 

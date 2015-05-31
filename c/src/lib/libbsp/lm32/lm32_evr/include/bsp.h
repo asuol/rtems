@@ -70,13 +70,18 @@ extern int rtems_tsmac_driver_attach(struct rtems_bsdnet_ifconfig *config,
 #endif
 
 /* functions */
-#if 0
 rtems_isr_entry set_vector(                     /* returns old vector */
   rtems_isr_entry     handler,                  /* isr routine        */
   rtems_vector_number vector,                   /* vector number      */
   int                 type                      /* RTEMS or RAW intr  */
 );
-#endif
+
+/*
+ * Prototypes for BSP methods that cross file boundaries
+ */
+void BSP_uart_polled_write(char ch);
+int BSP_uart_polled_read( void );
+char BSP_uart_is_character_ready(char *ch);
 
 #ifdef __cplusplus
 }

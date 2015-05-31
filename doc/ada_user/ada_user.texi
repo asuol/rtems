@@ -108,10 +108,12 @@
 * Configuring a System::
 * Multiprocessing Manager::
 * Symmetric Multiprocessing Services::
+* PCI Library::
 * Stack Bounds Checker::
 * CPU Usage Statistics::
 * Object Services::
 * Chains::
+* Red-Black Trees::
 * Timespec Helpers::
 * Constant Bandwidth Server Scheduler API::
 * Directive Status Codes::
@@ -152,10 +154,12 @@
 @include user/conf.texi
 @include user/mp.texi
 @include user/smp.texi
+@include user/libpci.texi
 @include user/stackchk.texi
 @include user/cpuuse.texi
 @include user/object.texi
 @include user/chains.texi
+@include user/rbtree.texi
 @include user/timespec.texi
 @include user/cbs.texi
 @include user/dirstat.texi

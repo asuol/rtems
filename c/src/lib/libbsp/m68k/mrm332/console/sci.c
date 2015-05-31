@@ -86,8 +86,8 @@
 #include <libchip/serial.h>
 #include <libchip/sersupp.h>
 #include "sci.h"
+#include <rtems/m68k/qsm.h>
 /*#include "../misc/include/cpu332.h" */
-
 
 /*****************************************************************************
   Section B - Manifest Constants
@@ -152,6 +152,8 @@ rtems_device_driver SciControl(                        /* device driver api */
 rtems_device_driver SciRead (
     rtems_device_major_number, rtems_device_minor_number, void *);
 
+rtems_isr SciIsr( rtems_vector_number vector );
+
 int     SciInterruptOpen(int, int, void *);               /* termios api */
 int     SciInterruptClose(int, int, void *);              /* termios api */
 ssize_t SciInterruptWrite(int, const char *, size_t);     /* termios api */
@@ -184,8 +186,8 @@ void SciWriteCharNoWait( uint8_t );                     /* hardware routine */
 
 uint8_t   inline SciCharAvailable( void );              /* hardware routine */
 
-uint8_t   inline SciReadCharWait( void );               /* hardware routine */
-uint8_t   inline SciReadCharNoWait( void );             /* hardware routine */
+static uint8_t   inline SciReadCharWait( void );        /* hardware routine */
+static uint8_t   inline SciReadCharNoWait( void );      /* hardware routine */
 
 void SciSendBreak( void );                              /* test routine */
 
@@ -1036,7 +1038,6 @@ rtems_device_driver SciRead (
 {
     rtems_libio_rw_args_t *rw_args;             /* ptr to argument struct */
     char      *buffer;
-    uint16_t   length;
 
     rw_args = (rtems_libio_rw_args_t *) arg;    /* arguments to read() */
 
@@ -1051,8 +1052,6 @@ rtems_device_driver SciRead (
     }
 
     buffer = rw_args->buffer;                   /* points to user's buffer */
-
-    length = rw_args->count;                    /* how many bytes they want */
 
 /*  *buffer = SciReadCharWait();                   wait for a character */
 
@@ -1096,7 +1095,7 @@ rtems_device_driver SciWrite (
 {
     rtems_libio_rw_args_t *rw_args;             /* ptr to argument struct */
     uint8_t   *buffer;
-    uint16_t   length;
+    size_t     length;
 
     rw_args = (rtems_libio_rw_args_t *) arg;
 
@@ -1145,8 +1144,6 @@ rtems_device_driver SciControl (
 {
     rtems_libio_ioctl_args_t *args = arg;       /* rtems arg struct */
     uint16_t   command;                         /* the cmd to execute */
-    uint16_t   unused;                          /* maybe later */
-    uint16_t   *ptr;                            /* ptr to user data */
 
 /*printk("%s major=%d minor=%d\r\n", __FUNCTION__,major,minor); */
 
@@ -1170,8 +1167,6 @@ rtems_device_driver SciControl (
     args->ioctl_return = -1;                    /* assume an error */
 
     command = args->command;                    /* get the command */
-    ptr     = args->buffer;                     /* this is an address */
-    unused  = *ptr;                             /* brightness */
 
     if (command == SCI_SEND_BREAK)              /* process the command */
     {
@@ -1439,7 +1434,7 @@ void SciWriteCharNoWait(uint8_t   c)
 * Scope:    public
 ****************************************************************************/
 
-uint8_t   inline SciReadCharWait( void )
+static uint8_t   inline SciReadCharWait( void )
 {
     uint8_t   ch;
 
@@ -1469,7 +1464,7 @@ uint8_t   inline SciReadCharWait( void )
 * Scope:    public
 ****************************************************************************/
 
-uint8_t   inline SciReadCharNoWait( void )
+static uint8_t   inline SciReadCharNoWait( void )
 {
     uint8_t   ch;
 

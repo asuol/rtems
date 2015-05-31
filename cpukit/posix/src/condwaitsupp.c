@@ -23,6 +23,7 @@
 
 #include <rtems/system.h>
 #include <rtems/score/watchdog.h>
+#include <rtems/score/statesimpl.h>
 #include <rtems/posix/condimpl.h>
 #include <rtems/posix/time.h>
 #include <rtems/posix/muteximpl.h>
@@ -73,13 +74,18 @@ int _POSIX_Condition_variables_Wait_support(
       if ( !already_timedout ) {
         the_cond->Mutex = *mutex;
 
-        _Thread_queue_Enter_critical_section( &the_cond->Wait_queue );
         executing = _Thread_Executing;
         executing->Wait.return_code = 0;
-        executing->Wait.queue       = &the_cond->Wait_queue;
         executing->Wait.id          = *cond;
 
-        _Thread_queue_Enqueue( &the_cond->Wait_queue, executing, timeout );
+        _Thread_queue_Enqueue(
+          &the_cond->Wait_queue,
+          executing,
+          STATES_WAITING_FOR_CONDITION_VARIABLE
+            | STATES_INTERRUPTIBLE_BY_SIGNAL,
+          timeout,
+          ETIMEDOUT
+        );
 
         _Objects_Put( &the_cond->Object );
 

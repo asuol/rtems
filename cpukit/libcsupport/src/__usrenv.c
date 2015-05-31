@@ -128,14 +128,6 @@ static int null_op_mount(
   return -1;
 }
 
-static int null_op_fsmount_me(
-  rtems_filesystem_mount_table_entry_t *mt_entry,
-  const void *data
-)
-{
-  return -1;
-}
-
 static int null_op_unmount(
   rtems_filesystem_mount_table_entry_t *mt_entry
 )
@@ -203,7 +195,6 @@ static const rtems_filesystem_operations_table null_ops = {
   .eval_path_h = rtems_filesystem_default_eval_path,
   .link_h = null_op_link,
   .are_nodes_equal_h = rtems_filesystem_default_are_nodes_equal,
-  .node_type_h = rtems_filesystem_default_node_type,
   .mknod_h = null_op_mknod,
   .rmnod_h = null_op_rmnod,
   .fchmod_h = null_op_fchmod,
@@ -211,7 +202,6 @@ static const rtems_filesystem_operations_table null_ops = {
   .clonenod_h = null_op_clonenode,
   .freenod_h = rtems_filesystem_default_freenode,
   .mount_h = null_op_mount,
-  .fsmount_me_h = null_op_fsmount_me,
   .unmount_h = null_op_unmount,
   .fsunmount_me_h = null_op_fsunmount_me,
   .utime_h = null_op_utime,
@@ -229,7 +219,8 @@ rtems_filesystem_mount_table_entry_t rtems_filesystem_null_mt_entry = {
   .mt_point_node = &rtems_filesystem_global_location_null,
   .mt_fs_root = &rtems_filesystem_global_location_null,
   .mounted = false,
-  .writeable = false
+  .writeable = false,
+  .type = ""
 };
 
 rtems_filesystem_global_location_t rtems_filesystem_global_location_null = {

@@ -7,7 +7,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 1989-1998.
+ *  COPYRIGHT (c) 1989-2014.
  *  On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
@@ -26,10 +26,9 @@
  *
  *  This routine transmits a character using polling.
  */
-
 void console_outbyte_polled(
-  int  port,
-  char ch
+  int           port,
+  unsigned char ch
 );
 
 /* body is in debugputs.c */
@@ -54,7 +53,7 @@ int console_inbyte_nonblocking( int port );
  *  Buffers between task and ISRs
  */
 
-#include <ringbuf.h>
+#include <rtems/ringbuf.h>
 
 Ring_buffer_t  TX_Buffer[ 2 ];
 bool           Is_TX_active[ 2 ];
@@ -274,7 +273,7 @@ void console_outbyte_interrupt(
  *
  */
 
-ssize_t console_write_support (int minor, const char *buf, size_t len)
+static ssize_t console_write_support (int minor, const char *buf, size_t len)
 {
   int nwrite = 0;
 
@@ -322,7 +321,7 @@ rtems_device_driver console_initialize(
 
   LEON_REG.UART_Control_1 |= LEON_REG_UART_CTRL_RE | LEON_REG_UART_CTRL_TE;
   LEON_REG.UART_Control_2 |= LEON_REG_UART_CTRL_RE | LEON_REG_UART_CTRL_TE |
-  	LEON_REG_UART_CTRL_RI;	/* rx irq default enable for remote debugger */
+      LEON_REG_UART_CTRL_RI;  /* rx irq default enable for remote debugger */
   LEON_REG.UART_Status_1 = 0;
   LEON_REG.UART_Status_2 = 0;
 #if (CONSOLE_USE_INTERRUPTS)
@@ -375,6 +374,7 @@ rtems_device_driver console_open(
 #else
   sc = rtems_termios_open (major, minor, arg, &pollCallbacks);
 #endif
+  (void) sc; /* avoid set but not used warning */
 
   return RTEMS_SUCCESSFUL;
 }

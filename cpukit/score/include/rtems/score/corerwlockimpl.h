@@ -21,6 +21,7 @@
 
 #include <rtems/score/corerwlock.h>
 #include <rtems/score/thread.h>
+#include <rtems/score/threadqimpl.h>
 #include <rtems/score/watchdog.h>
 
 #ifdef __cplusplus
@@ -86,6 +87,13 @@ void _CORE_RWLock_Initialize(
   CORE_RWLock_Control       *the_rwlock,
   CORE_RWLock_Attributes    *the_rwlock_attributes
 );
+
+RTEMS_INLINE_ROUTINE void _CORE_RWLock_Destroy(
+  CORE_RWLock_Control *the_rwlock
+)
+{
+  _Thread_queue_Destroy( &the_rwlock->Wait_queue );
+}
 
 /**
  *  @brief Obtain RWLock for reading.
@@ -166,21 +174,6 @@ CORE_RWLock_Status _CORE_RWLock_Release(
     (_remote_extract_callout), \
     (_status) \
   )
-
-/**
- *  @brief RWLock specific thread queue timeout.
- *
- *  This routine processes a thread which timeouts while waiting on
- *  an RWLock's thread queue. It is called by the watchdog handler.
- *
- *  @param[in] id is the Id of thread to timeout
- *  @param[in] ignored is an unused pointer to a caller defined area
- */
-
-void _CORE_RWLock_Timeout(
-  Objects_Id  id,
-  void       *ignored
-);
 
 /**
  * This method is used to initialize core rwlock attributes.

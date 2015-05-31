@@ -48,6 +48,7 @@
 
 #include <bsp.h>
 #include <bsp/vectors.h>
+#include <bsp/bootcard.h>
 #include <libcpu/spr.h>
 #include <bsp/pci.h>
 #include <rtems/bspIo.h>
@@ -58,6 +59,12 @@
 #define SRR1_MCP_EXC	(1<<(31-12))
 
 static volatile BSP_ExceptionExtension	BSP_exceptionExtension = 0;
+
+/*
+ * We know task variables are deprecated and don't want a warning. The
+ * use of task variables needs to be fixed in this file.
+ */
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 
 BSP_ExceptionExtension
 BSP_exceptionHandlerInstall(BSP_ExceptionExtension e)

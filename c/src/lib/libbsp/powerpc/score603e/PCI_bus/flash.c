@@ -1,5 +1,4 @@
 /*
- *
  *  COPYRIGHT (c) 1989-2009.
  *  On-Line Applications Research Corporation (OAR).
  *
@@ -17,13 +16,11 @@
 #include <bsp/irq.h>
 #include "PCI.h"
 
-/*PAGE
- *
+/*
  *  SCORE603e_FLASH_Disable
  */
-
 unsigned int SCORE603e_FLASH_Disable(
-  uint32_t                       area                           /* IN  */
+  uint32_t        area
 )
 {
   uint8_t         value;
@@ -63,6 +60,7 @@ unsigned int SCORE603e_FLASH_verify_enable( void )
   return RTEMS_SUCCESSFUL;
 }
 
+#if 0
 unsigned int SCORE603e_FLASH_pci_reset_reg(
   uint8_t          reg,
   uint32_t         cmask,
@@ -82,13 +80,13 @@ unsigned int SCORE603e_FLASH_pci_reset_reg(
   }
   return RTEMS_SUCCESSFUL;
 }
+#endif
 
-/*PAGE
- *
+/*
  *  SCORE603e_FLASH_Enable_writes
  */
 unsigned int SCORE603e_FLASH_Enable_writes(
-  uint32_t                       area                           /* IN  */
+  uint32_t         area
 )
 {
   uint8_t          ctrl_value;

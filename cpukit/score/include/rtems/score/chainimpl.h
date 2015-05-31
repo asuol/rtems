@@ -7,7 +7,7 @@
 /*
  *  Copyright (c) 2010 embedded brains GmbH.
  *
- *  COPYRIGHT (c) 1989-2006.
+ *  COPYRIGHT (c) 1989-2014.
  *  On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
@@ -20,6 +20,7 @@
 
 #include <rtems/score/chain.h>
 #include <rtems/score/address.h>
+#include <rtems/score/assert.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -269,23 +270,6 @@ RTEMS_INLINE_ROUTINE bool _Chain_Are_nodes_equal(
 )
 {
   return left == right;
-}
-
-/**
- * @brief Is this chain control pointer NULL.
- *
- * This function returns true if the_chain is NULL and false otherwise.
- *
- * @param[in] the_chain is the chain to be checked for empty status.
- *
- * @retval true @a the_chain is @c NULL.
- * @retval false @a the_chain is not @c NULL.
- */
-RTEMS_INLINE_ROUTINE bool _Chain_Is_null(
-  const Chain_Control *the_chain
-)
-{
-  return (the_chain == NULL);
 }
 
 /**
@@ -630,8 +614,13 @@ RTEMS_INLINE_ROUTINE void _Chain_Initialize_empty(
   Chain_Control *the_chain
 )
 {
-  Chain_Node *head = _Chain_Head( the_chain );
-  Chain_Node *tail = _Chain_Tail( the_chain );
+  Chain_Node *head;
+  Chain_Node *tail;
+
+  _Assert( the_chain != NULL );
+
+  head = _Chain_Head( the_chain );
+  tail = _Chain_Tail( the_chain );
 
   head->next = tail;
   head->previous = NULL;

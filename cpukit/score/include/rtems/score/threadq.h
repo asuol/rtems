@@ -8,7 +8,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 1989-2008.
+ *  COPYRIGHT (c) 1989-2014.
  *  On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
@@ -20,8 +20,11 @@
 #define _RTEMS_SCORE_THREADQ_H
 
 #include <rtems/score/chain.h>
+#include <rtems/score/isrlock.h>
+#include <rtems/score/percpu.h>
+#include <rtems/score/priority.h>
+#include <rtems/score/rbtree.h>
 #include <rtems/score/states.h>
-#include <rtems/score/threadsync.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -32,11 +35,125 @@ extern "C" {
  *
  *  @ingroup Score
  *
- *  This handler defines the data shared between the thread and thread
- *  queue handlers.  Having this handler define these data structure
- *  avoids potentially circular references.
+ *  This handler provides the capability to have threads block in
+ *  ordered sets. The sets may be ordered using the FIFO or priority
+ *  discipline.
  */
 /**@{*/
+
+typedef struct Thread_queue_Control Thread_queue_Control;
+
+/**
+ * @brief Thread queue priority change operation.
+ *
+ * @param[in] the_thread The thread.
+ * @param[in] new_priority The new priority value.
+ * @param[in] the_thread_queue The thread queue.
+ *
+ * @see Thread_queue_Operations.
+ */
+typedef void ( *Thread_queue_Priority_change_operation )(
+  Thread_Control       *the_thread,
+  Priority_Control      new_priority,
+  Thread_queue_Control *the_thread_queue
+);
+
+/**
+ * @brief Thread queue initialize operation.
+ *
+ * @param[in] the_thread_queue The thread queue.
+ *
+ * @see _Thread_Wait_set_operations().
+ */
+typedef void ( *Thread_queue_Initialize_operation )(
+  Thread_queue_Control *the_thread_queue
+);
+
+/**
+ * @brief Thread queue enqueue operation.
+ *
+ * @param[in] the_thread_queue The thread queue.
+ * @param[in] the_thread The thread to enqueue on the queue.
+ *
+ * @see _Thread_Wait_set_operations().
+ */
+typedef void ( *Thread_queue_Enqueue_operation )(
+  Thread_queue_Control *the_thread_queue,
+  Thread_Control       *the_thread
+);
+
+/**
+ * @brief Thread queue extract operation.
+ *
+ * @param[in] the_thread_queue The thread queue.
+ * @param[in] the_thread The thread to extract from the thread queue.
+ *
+ * @see _Thread_Wait_set_operations().
+ */
+typedef void ( *Thread_queue_Extract_operation )(
+  Thread_queue_Control *the_thread_queue,
+  Thread_Control       *the_thread
+);
+
+/**
+ * @brief Thread queue first operation.
+ *
+ * @param[in] the_thread_queue The thread queue.
+ *
+ * @retval NULL No thread is present on the thread queue.
+ * @retval first The first thread of the thread queue according to the insert
+ * order.  This thread remains on the thread queue.
+ *
+ * @see _Thread_Wait_set_operations().
+ */
+typedef Thread_Control *( *Thread_queue_First_operation )(
+  Thread_queue_Control *the_thread_queue
+);
+
+/**
+ * @brief Thread queue operations.
+ *
+ * @see _Thread_wait_Set_operations().
+ */
+typedef struct {
+  /**
+   * @brief Thread queue priority change operation.
+   *
+   * Called by _Thread_Change_priority() to notify a thread about a priority
+   * change.  In case this thread waits currently for a resource the handler
+   * may adjust its data structures according to the new priority value.  This
+   * handler must not be NULL, instead the default handler
+   * _Thread_Do_nothing_priority_change() should be used in case nothing needs
+   * to be done during a priority change.
+   */
+  Thread_queue_Priority_change_operation priority_change;
+
+  /**
+   * @brief Thread queue initialize operation.
+   *
+   * Called by object initialization routines.
+   */
+  Thread_queue_Initialize_operation initialize;
+
+  /**
+   * @brief Thread queue enqueue operation.
+   *
+   * Called by object routines to enqueue the thread.
+   */
+  Thread_queue_Enqueue_operation enqueue;
+
+  /**
+   * @brief Thread queue extract operation.
+   *
+   * Called by object routines to extract a thread from a thread queue.
+   */
+  Thread_queue_Extract_operation extract;
+
+  /**
+   * @brief Thread queue first operation.
+   */
+  Thread_queue_First_operation first;
+} Thread_queue_Operations;
 
 /**
  *  The following enumerated type details all of the disciplines
@@ -48,48 +165,36 @@ typedef enum {
 }   Thread_queue_Disciplines;
 
 /**
- *  This is one of the constants used to manage the priority queues.
- *
- *  There are four chains used to maintain a priority -- each chain
- *  manages a distinct set of task priorities.  The number of chains
- *  is determined by TASK_QUEUE_DATA_NUMBER_OF_PRIORITY_HEADERS.
- *  The following set must be consistent.
- *
- *  The set below configures 4 headers -- each contains 64 priorities.
- *  Header x manages priority range (x*64) through ((x*64)+63).  If
- *  the priority is more than half way through the priority range it
- *  is in, then the search is performed from the rear of the chain.
- *  This halves the search time to find the insertion point.
- */
-#define TASK_QUEUE_DATA_NUMBER_OF_PRIORITY_HEADERS 4
-
-/**
  *  This is the structure used to manage sets of tasks which are blocked
  *  waiting to acquire a resource.
  */
-typedef struct {
+struct Thread_queue_Control {
   /** This union contains the data structures used to manage the blocked
    *  set of tasks which varies based upon the discipline.
    */
   union {
     /** This is the FIFO discipline list. */
     Chain_Control Fifo;
-    /** This is the set of lists for priority discipline waiting. */
-    Chain_Control Priority[TASK_QUEUE_DATA_NUMBER_OF_PRIORITY_HEADERS];
+    /** This is the set of threads for priority discipline waiting. */
+    RBTree_Control Priority;
   } Queues;
-  /** This field is used to manage the critical section. */
-  Thread_blocking_operation_States sync_state;
-  /** This field indicates the thread queue's blocking discipline. */
-  Thread_queue_Disciplines discipline;
-  /** This indicates the blocking state for threads waiting on this
-   *  thread queue.
+
+  /**
+   * @brief The operations for this thread queue.
    */
-  States_Control           state;
-  /** This is the status value returned to threads which timeout while
-   *  waiting on this thread queue.
+  const Thread_queue_Operations *operations;
+
+  /**
+   * @brief Lock to protect this thread queue.
+   *
+   * It may be used to protect additional state of the object embedding this
+   * thread queue.
+   *
+   * @see _Thread_queue_Acquire(), _Thread_queue_Acquire_critical() and
+   * _Thread_queue_Release().
    */
-  uint32_t                 timeout_status;
-}   Thread_queue_Control;
+  ISR_LOCK_MEMBER( Lock )
+};
 
 /**@}*/
 

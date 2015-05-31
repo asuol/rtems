@@ -268,8 +268,6 @@ uninitialized =
 
 /*dpmemimpl.h*/ (sizeof _Dual_ported_memory_Information)  +
 
-/*eventimpl.h*/ (sizeof _Event_Sync_state)                +
-
 #if defined(RTEMS_MULTIPROCESSING)
 /*eventmp.h*/   0                                         +
 #endif
@@ -392,20 +390,15 @@ uninitialized =
 
 /*timerimpl.h*/ (sizeof _Timer_Information)               +
 
-/*tod.h*/       (sizeof _TOD.now)                         +
-                (sizeof _TOD.uptime)                      +
-
 /*tqdata.h*/    0                                         +
 
 /*types.h*/     0                                         +
 
 /*userext.h*/   (sizeof _User_extensions_List)            +
 
-/*watchdog.h*/  (sizeof _Watchdog_Sync_level)             +
-                (sizeof _Watchdog_Sync_count)             +
-                (sizeof _Watchdog_Ticks_since_boot)       +
-                (sizeof _Watchdog_Ticks_chain)            +
-                (sizeof _Watchdog_Seconds_chain)          +
+/*watchdog.h*/  (sizeof _Watchdog_Ticks_since_boot)       +
+                (sizeof _Watchdog_Ticks_header)           +
+                (sizeof _Watchdog_Seconds_header)         +
 
 /*wkspace.h*/   (sizeof _Workspace_Area);
 
@@ -455,8 +448,7 @@ uninitialized += (sizeof _CPU_Null_fp_context) +
 
 /* cpu.h */
 uninitialized += (sizeof _CPU_Interrupt_stack_low) +
-                 (sizeof _CPU_Interrupt_stack_high) +
-                 (sizeof _CPU_IRQ_info);
+                 (sizeof _CPU_Interrupt_stack_high);
 
 #endif
 #endif /* !unix */

@@ -34,14 +34,6 @@ extern "C" {
  */
 /**@{*/
 
-#if defined(__RTEMS_HAVE_SYS_CPUSET_H__) && defined(RTEMS_SMP)
-  #define SCHEDULER_PRIORITY_ADDITIONAL_SMP_ENTRY_POINTS \
-    _Scheduler_default_Get_affinity,     /* get affinity entry point */ \
-    _Scheduler_default_Set_affinity      /* set affinity entry point */
-#else
-  #define SCHEDULER_PRIORITY_ADDITIONAL_SMP_ENTRY_POINTS
-#endif
-
 /**
  *  Entry points for the Deterministic Priority Based Scheduler.
  */
@@ -53,14 +45,15 @@ extern "C" {
     _Scheduler_priority_Block,            /* block entry point */ \
     _Scheduler_priority_Unblock,          /* unblock entry point */ \
     _Scheduler_priority_Change_priority,  /* change priority entry point */ \
-    _Scheduler_default_Allocate,          /* allocate entry point */ \
-    _Scheduler_default_Free,              /* free entry point */ \
-    _Scheduler_priority_Update,           /* update entry point */ \
+    SCHEDULER_OPERATION_DEFAULT_ASK_FOR_HELP \
+    _Scheduler_default_Node_initialize,   /* node initialize entry point */ \
+    _Scheduler_default_Node_destroy,      /* node destroy entry point */ \
+    _Scheduler_priority_Update_priority,  /* update priority entry point */ \
     _Scheduler_priority_Priority_compare, /* compares two priorities */ \
     _Scheduler_default_Release_job,       /* new period of task */ \
     _Scheduler_default_Tick,              /* tick entry point */ \
-    _Scheduler_default_Start_idle,        /* start idle entry point */ \
-    SCHEDULER_PRIORITY_ADDITIONAL_SMP_ENTRY_POINTS \
+    _Scheduler_default_Start_idle         /* start idle entry point */ \
+    SCHEDULER_OPERATION_DEFAULT_GET_SET_AFFINITY \
   }
 
 typedef struct {
@@ -120,6 +113,7 @@ void _Scheduler_priority_Initialize( const Scheduler_Control *scheduler );
  *  any necessary scheduling operations including the selection of
  *  a new heir thread.
  *
+ *  @param[in] scheduler The scheduler instance.
  *  @param[in] the_thread is the thread to be blocked
  */
 void _Scheduler_priority_Block(
@@ -139,16 +133,13 @@ void _Scheduler_priority_Schedule(
 );
 
 /**
- *  @brief Update the scheduler priority.
- *  This routine updates @a the_thread->scheduler based on @a the_scheduler
- *  structures and thread state.
- *
- *  @param[in] the_thread will have its scheduler specific information
- *             structure updated.
+ *  @brief Updates the scheduler node to reflect the new priority of the
+ *  thread.
  */
-void _Scheduler_priority_Update(
+void _Scheduler_priority_Update_priority(
   const Scheduler_Control *scheduler,
-  Thread_Control          *the_thread
+  Thread_Control          *the_thread,
+  Priority_Control         new_priority
 );
 
 /**
@@ -158,14 +149,15 @@ void _Scheduler_priority_Update(
  *  that is, adds it to the ready queue and
  *  updates any appropriate scheduling variables, for example the heir thread.
  *
+ *  @param[in] scheduler The scheduler instance.
  *  @param[in] the_thread will be unblocked
  */
-void _Scheduler_priority_Unblock(
+Scheduler_Void_or_thread _Scheduler_priority_Unblock(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread
 );
 
-void _Scheduler_priority_Change_priority(
+Scheduler_Void_or_thread _Scheduler_priority_Change_priority(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread,
   Priority_Control         new_priority,
@@ -189,9 +181,10 @@ void _Scheduler_priority_Change_priority(
  *    + ready chain
  *    + select heir
  *
- *  @param[in,out] thread The yielding thread.
+ *  @param[in] scheduler The scheduler instance.
+ *  @param[in,out] the_thread The yielding thread.
  */
-void _Scheduler_priority_Yield(
+Scheduler_Void_or_thread _Scheduler_priority_Yield(
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread
 );
@@ -200,6 +193,8 @@ void _Scheduler_priority_Yield(
  *  @brief Compare two priorities.
  *
  *  This routine compares two priorities.
+ *
+ * @retval >0 for p1 > p2; 0 for p1 == p2; <0 for p1 < p2.
  */
 int _Scheduler_priority_Priority_compare(
   Priority_Control   p1,

@@ -61,6 +61,7 @@ static char *rcsid = "$FreeBSD: src/lib/libc/xdr/xdr_float.c,v 1.7 1999/08/28 00
 #if defined(__alpha__) || \
     defined(_AM29K) || \
     defined(__arm__) || \
+    defined(__epiphany__) ||  defined(__EPIPHANY__) || \
     defined(__H8300__) || defined(__h8300__) || \
     defined(__hppa__) || \
     defined(__i386__) || \
@@ -69,6 +70,7 @@ static char *rcsid = "$FreeBSD: src/lib/libc/xdr/xdr_float.c,v 1.7 1999/08/28 00
     defined(__mips__) || defined(__moxie__) || \
     defined(__nios2__) || \
     defined(__ns32k__) || \
+    defined(__or1k__)  || defined(__or1knd__) || \
     defined(__sparc__) || \
     defined(__ppc__) || defined(__PPC__) || \
     defined(__sh__) || \

@@ -15,10 +15,6 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
 
@@ -28,8 +24,10 @@ extern "C" {
 #include <rtems/console.h>
 #include <rtems/iosupp.h>
 #include <mrm332.h>
-#include <rtems/m68k/sim.h>
-#include <rtems/m68k/qsm.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #define CONSOLE_SCI
 

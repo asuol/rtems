@@ -39,12 +39,10 @@ static void sync_wrapper(FILE *f)
   int fn = fileno(f);
 
   /*
-   *  We are explicitly NOT checking the return values as it does not
-   *  matter if they succeed.  We are just making a best faith attempt
-   *  at both and trusting that we were passed a good FILE pointer.
+   * There is no way to report errors here.  So this is a best-effort approach.
    */
-  fsync(fn);
-  fdatasync(fn);
+  (void) fsync(fn);
+  (void) fdatasync(fn);
 }
 
 /* iterate over all FILE *'s for this thread */

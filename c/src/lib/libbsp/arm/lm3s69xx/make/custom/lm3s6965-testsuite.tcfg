@@ -5,14 +5,21 @@
 #
 
 fileio
+iostream
 flashdisk01
 fsdosfsname01
+ftp01
 jffs2_fserror
 jffs2_fslink
 jffs2_fspatheval
 jffs2_fspermission
 jffs2_fsrdwr
+jffs2_fsscandir01
 jffs2_fssymlink
 jffs2_fstime
+mghttpd01
 monitor02
 utf8proc01
+pppd
+rtems++
+spstkalloc02

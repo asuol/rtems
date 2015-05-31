@@ -308,6 +308,8 @@ generally result in an exception condition.
 
 @cindex per task variables
 
+Per task variables are deprecated, see the warning below.
+
 Per task variables are used to support global variables whose value
 may be unique to a task. After indicating that a variable should be
 treated as private (i.e. per-task) the task can access and modify the
@@ -346,6 +348,9 @@ that task is the logical owner of the value in the per-task variable's
 location. There is no way for a single memory image to contain the
 correct value for each task executing on each core. Consequently,
 per-task variables are disabled in SMP configurations of RTEMS.
+Instead the application developer should
+consider the use of POSIX Keys or Thread Local Storage (TLS). POSIX Keys
+are not enabled in all RTEMS configurations.
 
 @subsection Building a Task Attribute Set
 
@@ -645,6 +650,7 @@ to set a task's notepad entry to a specified note.  The
 @code{@value{DIRPREFIX}task_get_note}
 directive allows the user to obtain the note
 contained in any one of the sixteen notepads of a specified task.
+Notepads are deprecated and will be removed.
 
 @subsection Task Deletion
 
@@ -1291,6 +1297,9 @@ The calling task may be preempted if its preemption mode is
 enabled and it lowers its own priority or raises another task's
 priority.
 
+In case the new priority equals the current priority of the task, then nothing
+happens.
+
 Setting the priority of a global task which does not reside on
 the local node will generate a request to the remote node to
 change the priority of the specified task.
@@ -1512,6 +1521,8 @@ This directive returns the note contained in the notepad
 location of the task specified by id.
 
 @subheading NOTES:
+This directive is deprecated and will be removed.
+
 This directive will not cause the running task to be preempted.
 
 If id is set to @code{@value{RPREFIX}SELF},
@@ -1564,6 +1575,8 @@ procedure Task_Set_Note (
 @code{@value{RPREFIX}INVALID_NUMBER} - invalid notepad location
 
 @subheading DESCRIPTION:
+This directive is deprecated and will be removed.
+
 This directive sets the notepad entry for the task specified by
 id to the value note.
 
@@ -1779,6 +1792,8 @@ passed to the destructor function is the task's value of the variable.
 
 @subheading NOTES:
 
+This directive is deprecated and task variables will be removed.
+
 Task variables increase the context switch time to and from the
 tasks that own them so it is desirable to minimize the number of
 task variables.  One efficient method
@@ -1836,6 +1851,8 @@ task, which can get its private value by directly accessing the variable.
 
 @subheading NOTES:
 
+This directive is deprecated and task variables will be removed.
+
 If you change memory which @code{task_variable_value} points to,
 remember to declare that memory as volatile, so that the compiler
 will optimize it correctly.  In this case both the pointer
@@ -1886,6 +1903,8 @@ procedure Task_Variable_Delete (
 This directive removes the given location from a task's context.
 
 @subheading NOTES:
+
+This directive is deprecated and task variables will be removed.
 
 Per-task variables are disabled in SMP configurations and this service
 is not available.

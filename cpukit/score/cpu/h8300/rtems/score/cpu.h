@@ -55,30 +55,6 @@ extern "C" {
 #define CPU_INLINE_ENABLE_DISPATCH       FALSE
 
 /*
- *  Should the body of the search loops in _Thread_queue_Enqueue_priority
- *  be unrolled one time?  In unrolled each iteration of the loop examines
- *  two "nodes" on the chain being searched.  Otherwise, only one node
- *  is examined per iteration.
- *
- *  If TRUE, then the loops are unrolled.
- *  If FALSE, then the loops are not unrolled.
- *
- *  The primary factor in making this decision is the cost of disabling
- *  and enabling interrupts (_ISR_Flash) versus the cost of rest of the
- *  body of the loop.  On some CPUs, the flash is more expensive than
- *  one iteration of the loop body.  In this case, it might be desirable
- *  to unroll the loop.  It is important to note that on some CPUs, this
- *  code is the longest interrupt disable period in RTEMS.  So it is
- *  necessary to strike a balance when setting this parameter.
- *
- *  H8300 Specific Information:
- *
- *  XXX
- */
-
-#define CPU_UNROLL_ENQUEUE_PRIORITY      FALSE
-
-/*
  *  Should this target use 16 or 32 bit object Ids?
  *
  */
@@ -637,7 +613,7 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
  *
  *  H8300 Specific Information:
  *
- *  XXX
+ *  TODO: As of 8 October 2014, this method is not implemented for the SX.
  */
 
 #if defined(__H8300H__) || defined(__H8300S__)
@@ -649,7 +625,10 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
     (_isr_cookie) = __ccr; \
   } while (0)
 #else
-#define _CPU_ISR_Disable( _isr_cookie ) (_isr_cookie) = 0
+#define _CPU_ISR_Disable( _isr_cookie ) \
+  do { \
+    (_isr_cookie) = 0; \
+  } while (0)
 #endif
 
 
@@ -660,7 +639,7 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
  *
  *  H8300 Specific Information:
  *
- *  XXX
+ *  TODO: As of 8 October 2014, this method is not implemented for the SX.
  */
 
 #if defined(__H8300H__) || defined(__H8300S__)
@@ -670,7 +649,10 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
     __asm__ volatile( "ldc %0, ccr" :  : "m" (__ccr) ); \
   } while (0)
 #else
-#define _CPU_ISR_Enable( _isr_cookie )
+#define _CPU_ISR_Enable( _isr_cookie ) \
+  do { \
+    (_isr_cookie) = (_isr_cookie); \
+  } while (0)
 #endif
 
 /*
@@ -681,7 +663,7 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
  *
  *  H8300 Specific Information:
  *
- *  XXX
+ *  TODO: As of 8 October 2014, this method is not implemented for the SX.
  */
 
 #if defined(__H8300H__) || defined(__H8300S__)
@@ -691,7 +673,11 @@ SCORE_EXTERN Context_Control_fp  _CPU_Null_fp_context;
     __asm__ volatile( "ldc %0, ccr ; orc #0x80,ccr " :  : "m" (__ccr) ); \
   } while (0)
 #else
-#define _CPU_ISR_Flash( _isr_cookie )
+#define _CPU_ISR_Flash( _isr_cookie ) \
+  do { \
+    _CPU_ISR_Enable( _isr_cookie ); \
+    _CPU_ISR_Disable( _isr_cookie ); \
+  } while (0)
 #endif
 
 #endif /* end of old gcc */
@@ -764,6 +750,7 @@ uint32_t   _CPU_ISR_Get_level( void );
     if ( (_isr) ) (_the_context)->ccr = CPU_CCR_INTERRUPTS_OFF; \
     else          (_the_context)->ccr = CPU_CCR_INTERRUPTS_ON; \
     \
+    (void) _is_fp; /* to eliminate set but not used warning */ \
     _stack = ((uintptr_t)(_stack_base)) + (_size) - 4; \
     *((proc_ptr *)(_stack)) = (_entry_point); \
      (_the_context)->er7     = (void *) _stack; \
@@ -847,8 +834,8 @@ uint32_t   _CPU_ISR_Get_level( void );
  *  XXX
  */
 
-#define _CPU_Fatal_halt( _error ) \
- 	printk("Fatal Error %d Halted\n",_error); \
+#define _CPU_Fatal_halt( _source, _error ) \
+ 	printk("Fatal Error %d.%d Halted\n",_source, _error); \
 	for(;;)
 
 

@@ -13,16 +13,6 @@
 
 #include <tmacros.h>
 
-/* buffered IO */
-
-void buffered_io_initialize( void );
-
-void buffered_io_flush(void);
-
-void buffered_io_add_string( char *s );
-
-/* end of buffered IO */
-
 /* functions */
 
 rtems_task Init(
@@ -74,6 +64,8 @@ void Task_exit_extension(
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
 
+#define CONFIGURE_ENABLE_CLASSIC_API_NOTEPADS
+
 #define CONFIGURE_MAXIMUM_USER_EXTENSIONS     2
 #define CONFIGURE_TICKS_PER_TIMESLICE       100
 
@@ -93,5 +85,24 @@ TEST_EXTERN rtems_name Task_name[ 5 ];       /* array of task names */
 
 TEST_EXTERN rtems_id   Extension_id[ 4 ];
 TEST_EXTERN rtems_name Extension_name[ 4 ];  /* array of task names */
+
+TEST_EXTERN int Task_created[ RTEMS_ARRAY_SIZE( Task_id ) ];
+
+TEST_EXTERN int Task_started[ RTEMS_ARRAY_SIZE( Task_id ) ];
+
+TEST_EXTERN int Task_restarted[ RTEMS_ARRAY_SIZE( Task_id ) ];
+
+TEST_EXTERN int Task_deleted[ RTEMS_ARRAY_SIZE( Task_id ) ];
+
+RTEMS_INLINE_ROUTINE void assert_extension_counts( const int *table, int tasks )
+{
+  size_t i;
+
+  for ( i = 0; i < RTEMS_ARRAY_SIZE( Task_id ); ++i ) {
+    rtems_test_assert(
+      ( tasks & ( 1 << i ) ) != 0 ? table[ i ] == 1 : table[ i ] == 0
+    );
+  }
+}
 
 /* end of include file */

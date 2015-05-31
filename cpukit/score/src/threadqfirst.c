@@ -6,7 +6,7 @@
  */
 
 /*
- *  COPYRIGHT (c) 1989-2008.
+ *  COPYRIGHT (c) 1989-2014.
  *  On-Line Applications Research Corporation (OAR).
  *
  *  The license and distribution terms for this file may be
@@ -24,12 +24,12 @@ Thread_Control *_Thread_queue_First(
   Thread_queue_Control *the_thread_queue
 )
 {
-  Thread_Control * (*first_p)(Thread_queue_Control *);
+  Thread_Control   *the_thread;
+  ISR_lock_Context  lock_context;
 
-  if ( the_thread_queue->discipline == THREAD_QUEUE_DISCIPLINE_PRIORITY )
-      first_p = _Thread_queue_First_priority;
-  else /* must be THREAD_QUEUE_DISCIPLINE_FIFO */
-      first_p = _Thread_queue_First_fifo;
+  _Thread_queue_Acquire( the_thread_queue, &lock_context );
+  the_thread = _Thread_queue_First_locked( the_thread_queue );
+  _Thread_queue_Release( the_thread_queue, &lock_context );
 
-  return (*first_p)( the_thread_queue );
+  return the_thread;
 }

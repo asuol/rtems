@@ -8,7 +8,9 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <errno.h>
+#include <ctype.h>
 #include "ptf.h"
 
 #define PTFPARSER_MAXDEPTH 20
@@ -539,7 +541,7 @@ void ptf_dump_ptf_item(FILE *f, struct ptf_item *pi)
     }
     else
     {
-        fprintf(f, "  %d: NULL\n");
+        fprintf(f, "  %d: NULL\n", i);
     }
     fflush(f);
   }

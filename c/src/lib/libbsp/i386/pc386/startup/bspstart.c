@@ -34,12 +34,19 @@
 #include <libcpu/cpuModel.h>
 
 /*
- *  External routines
+ * Helper to initialize the PCI Bus
  */
-extern void Calibrate_loop_1ms(void);
-extern void rtems_irq_mngt_init(void);
-extern void bsp_size_memory(void);
-void Clock_driver_install_handler(void);
+static void bsp_pci_initialize_helper(void)
+{
+#if (BSP_IS_EDISON == 0)
+  int pci_init_retval;
+
+  pci_init_retval = pci_initialize();
+  if (pci_init_retval != PCIB_ERR_SUCCESS) {
+      printk("PCI bus: could not initialize PCI BIOS interface\n");
+  }
+#endif
+}
 
 /*-------------------------------------------------------------------------+
 |         Function: bsp_start
@@ -48,19 +55,28 @@ void Clock_driver_install_handler(void);
 |        Arguments: None.
 |          Returns: Nothing.
 +--------------------------------------------------------------------------*/
-void bsp_start_default( void )
+static void bsp_start_default( void )
 {
-  int pci_init_retval;
-
   /*
    *  We need to determine how much memory there is in the system.
    */
   bsp_size_memory();
 
   /*
+   * Turn off watchdog
+   */
+#if (BSP_IS_EDISON == 1)
+  volatile uint32_t *edison_wd = (volatile uint32_t *)0xff009000;
+  *edison_wd = 0x11f8;
+#endif
+
+
+  /*
    * Calibrate variable for 1ms-loop (see timer.c)
    */
+#if (BSP_IS_EDISON == 0)
   Calibrate_loop_1ms();
+#endif
 
   /*
    * Init rtems interrupt management
@@ -75,20 +91,20 @@ void bsp_start_default( void )
   /*
    * init PCI Bios interface...
    */
-  pci_init_retval = pci_initialize();
-  if (pci_init_retval != PCIB_ERR_SUCCESS) {
-      printk("PCI bus: could not initialize PCI BIOS interface\n");
-  }
+  bsp_pci_initialize_helper();
 
+#if (BSP_IS_EDISON == 0)
   Clock_driver_install_handler();
+#endif
 
+#if BSP_ENABLE_IDE
   bsp_ide_cmdline_init();
+#endif
 
-} /* bsp_start */
+} /* bsp_start_default */
 
 /*
  *  By making this a weak alias for bsp_start_default, a brave soul
  *  can override the actual bsp_start routine used.
  */
-
 void bsp_start (void) __attribute__ ((weak, alias("bsp_start_default")));

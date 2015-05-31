@@ -54,18 +54,22 @@ static bool _RTEMS_tasks_Create_extension(
 
   api = created->API_Extensions[ THREAD_API_RTEMS ];
 
-  _Event_Initialize( &api->Event );
-  _Event_Initialize( &api->System_event );
   _ASR_Create( &api->Signal );
   _Thread_Action_initialize( &api->Signal_action, _Signal_Action_handler );
 #if !defined(RTEMS_SMP)
   created->task_variables = NULL;
 #endif
 
+  /*
+   * We know this is deprecated and don't want a warning on every BSP built.
+   */
+  #pragma GCC diagnostic push
+  #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
   if ( rtems_configuration_get_notepads_enabled() ) {
     for (i=0; i < RTEMS_NUMBER_NOTEPADS; i++)
       api->Notepads[i] = 0;
   }
+  #pragma GCC diagnostic pop
 
   return true;
 }
@@ -109,9 +113,14 @@ static void _RTEMS_tasks_Terminate_extension(
   /*
    *  Free per task variable memory
    *
-   *  Per Task Variables are only enabled in uniprocessor configurations
+   *  Per Task Variables are only enabled in uniprocessor configurations.
    */
   #if !defined(RTEMS_SMP)
+    /*
+     * We know this is deprecated and don't want a warning on every BSP built.
+     */
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     do { 
       rtems_task_variable_t *tvp, *next;
 
@@ -123,6 +132,7 @@ static void _RTEMS_tasks_Terminate_extension(
 	tvp = next;
       }
     } while (0);
+    #pragma GCC diagnostic pop
   #endif
 
   /*

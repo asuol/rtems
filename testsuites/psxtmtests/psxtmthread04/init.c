@@ -14,7 +14,7 @@
 #include <timesys.h>
 #include <pthread.h>
 #include <sched.h>
-#include <rtems/timerdrv.h>
+#include <rtems/btimer.h>
 #include "test_support.h"
 
 const char rtems_test_name[] = "PSXTMTHREAD 04";
@@ -26,10 +26,10 @@ void *POSIX_Init(void *argument);
 
 void benchmark_pthread_getschedparam(void)
 {
-  long end_time;
-  int  status;
-  int policy;
-  struct sched_param param;
+  uint32_t            end_time;
+  int                 status;
+  int                 policy;
+  struct sched_param  param;
 
   benchmark_timer_initialize();
   status = pthread_getschedparam( pthread_self(), &policy, &param );
@@ -48,10 +48,10 @@ void benchmark_pthread_getschedparam(void)
 
 void benchmark_pthread_setschedparam(void)
 {
-  long end_time;
-  int status;
-  int policy;
-  struct sched_param param;
+  uint32_t            end_time;
+  int                 status;
+  int                 policy;
+  struct sched_param  param;
 
   status = pthread_getschedparam( pthread_self(), &policy, &param );
   rtems_test_assert( status == 0 );

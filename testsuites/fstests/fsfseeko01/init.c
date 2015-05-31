@@ -62,10 +62,17 @@ static void test(void)
   rtems_test_assert(rv == 0);
   rtems_test_assert(errno == 0);
 
-  errno = 0;
-  actual_long_off = ftell(file);
-  rtems_test_assert(actual_long_off == -1L);
-  rtems_test_assert(errno == EOVERFLOW);
+  if (sizeof(off_t) == sizeof(long)) {
+    errno = 0;
+    actual_long_off = ftell(file);
+    rtems_test_assert(actual_long_off == off);
+    rtems_test_assert(errno == 0);
+  } else {
+    errno = 0;
+    actual_long_off = ftell(file);
+    rtems_test_assert(actual_long_off == -1L);
+    rtems_test_assert(errno == EOVERFLOW);
+  }
 
   errno = 0;
   actual_off = ftello(file);
@@ -92,8 +99,6 @@ static void Init(rtems_task_argument arg)
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 
 #define CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS 4
-
-#define CONFIGURE_USE_IMFS_AS_BASE_FILESYSTEM
 
 #define CONFIGURE_MAXIMUM_TASKS 1
 

@@ -9,7 +9,7 @@
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
- *  http://www.rtems.com/license/LICENSE.
+ *  http://www.rtems.org/license/LICENSE.
  */
 
 #include <tmacros.h>
@@ -28,6 +28,8 @@ rtems_task Task_1(
 
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_NEEDS_CLOCK_DRIVER
+
+#define CONFIGURE_ENABLE_CLASSIC_API_NOTEPADS
 
 #define CONFIGURE_MAXIMUM_TASKS 2
 

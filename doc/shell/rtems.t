@@ -11,10 +11,11 @@ The RTEMS shell has the following rtems commands:
 
 @itemize @bullet
 
-@item @code{halt} - Shutdown the system
+@item @code{shutdown} - Shutdown the system
 @item @code{cpuuse} - print or reset per thread cpu usage
 @item @code{stackuse} - print per thread stack usage
 @item @code{perioduse} - print or reset per period usage
+@item @code{profreport} - print a profiling report
 @item @code{wkspace} - Display information on Executive Workspace
 @item @code{config} - Show the system configuration.
 @item @code{itask} - List init tasks for the system
@@ -42,14 +43,14 @@ command as well as providing an example usage.
 @c
 @c
 @page
-@subsection halt - Shutdown the system
+@subsection shutdown - Shutdown the system
 
-@pgindex halt
+@pgindex shutdown
 
 @subheading SYNOPSYS:
 
 @example
-halt
+shutdown
 @end example
 
 @subheading DESCRIPTION:
@@ -65,10 +66,11 @@ This command does not return.
 
 @subheading EXAMPLES:
 
-The following is an example of how to use @code{halt}:
+The following is an example of how to use @code{shutdown}:
 
 @example
-SHLL [/] $ halt
+SHLL [/] $ shutdown
+System shutting down at user request
 @end example
 
 The user will not see another prompt and the system will 
@@ -76,37 +78,25 @@ shutdown.
 
 @subheading CONFIGURATION:
 
-@findex CONFIGURE_SHELL_NO_COMMAND_HALT
-@findex CONFIGURE_SHELL_COMMAND_HALT
+@findex CONFIGURE_SHELL_NO_COMMAND_SHUTDOWN
+@findex CONFIGURE_SHELL_COMMAND_SHUTDOWN
 
 This command is included in the default shell command set.  
 When building a custom command set, define
-@code{CONFIGURE_SHELL_COMMAND_HALT} to have this
+@code{CONFIGURE_SHELL_COMMAND_SHUTDOWN} to have this
 command included.
 
 This command can be excluded from the shell command set by
-defining @code{CONFIGURE_SHELL_NO_COMMAND_HALT} when all
+defining @code{CONFIGURE_SHELL_NO_COMMAND_SHUTDOWN} when all
 shell commands have been configured.
 
 @subheading PROGRAMMING INFORMATION:
 
-@findex rtems_shell_rtems_main_halt
-
-The @code{halt} is implemented by a C language function
-which has the following prototype:
-
-@example
-int rtems_shell_rtems_main_halt(
-  int    argc,
-  char **argv
-);
-@end example
-
-The configuration structure for the @code{halt} has the
+The configuration structure for the @code{shutdown} has the
 following prototype:
 
 @example
-extern rtems_shell_cmd_t rtems_shell_HALT_Command;
+extern rtems_shell_cmd_t rtems_shell_SHUTDOWN_Command;
 @end example
 
 @c
@@ -388,6 +378,113 @@ following prototype:
 
 @example
 extern rtems_shell_cmd_t rtems_shell_PERIODUSE_Command;
+@end example
+
+@c
+@c
+@c
+@page
+@subsection profreport - print a profiling report
+
+@pgindex profreport
+
+@subheading SYNOPSYS:
+
+@example
+profreport
+@end example
+
+@subheading DESCRIPTION:
+
+This command may be used to print a profiling report.
+
+@subheading EXIT STATUS:
+
+This command returns 0.
+
+@subheading NOTES:
+
+Profiling must be enabled at build configuration time to get profiling
+information.
+
+@subheading EXAMPLES:
+
+The following is an example of how to use @code{profreport}:
+
+@smallexample
+SHLL [/] $ profreport
+<ProfilingReport name="Shell">
+  <PerCPUProfilingReport processorIndex="0">
+    <MaxThreadDispatchDisabledTime unit="ns">10447</MaxThreadDispatchDisabledTime>
+    <MeanThreadDispatchDisabledTime unit="ns">2</MeanThreadDispatchDisabledTime>
+    <TotalThreadDispatchDisabledTime unit="ns">195926627</TotalThreadDispatchDisabledTime>
+    <ThreadDispatchDisabledCount>77908688</ThreadDispatchDisabledCount>
+    <MaxInterruptDelay unit="ns">0</MaxInterruptDelay>
+    <MaxInterruptTime unit="ns">688</MaxInterruptTime>
+    <MeanInterruptTime unit="ns">127</MeanInterruptTime>
+    <TotalInterruptTime unit="ns">282651157</TotalInterruptTime>
+    <InterruptCount>2215855</InterruptCount>
+  </PerCPUProfilingReport>
+  <PerCPUProfilingReport processorIndex="1">
+    <MaxThreadDispatchDisabledTime unit="ns">9053</MaxThreadDispatchDisabledTime>
+    <MeanThreadDispatchDisabledTime unit="ns">41</MeanThreadDispatchDisabledTime>
+    <TotalThreadDispatchDisabledTime unit="ns">3053830335</TotalThreadDispatchDisabledTime>
+    <ThreadDispatchDisabledCount>73334202</ThreadDispatchDisabledCount>
+    <MaxInterruptDelay unit="ns">0</MaxInterruptDelay>
+    <MaxInterruptTime unit="ns">57</MaxInterruptTime>
+    <MeanInterruptTime unit="ns">35</MeanInterruptTime>
+    <TotalInterruptTime unit="ns">76980203</TotalInterruptTime>
+    <InterruptCount>2141179</InterruptCount>
+  </PerCPUProfilingReport>
+  <SMPLockProfilingReport name="SMP lock stats">
+    <MaxAcquireTime unit="ns">608</MaxAcquireTime>
+    <MaxSectionTime unit="ns">1387</MaxSectionTime>
+    <MeanAcquireTime unit="ns">112</MeanAcquireTime>
+    <MeanSectionTime unit="ns">338</MeanSectionTime>
+    <TotalAcquireTime unit="ns">119031</TotalAcquireTime>
+    <TotalSectionTime unit="ns">357222</TotalSectionTime>
+    <UsageCount>1055</UsageCount>
+    <ContentionCount initialQueueLength="0">1055</ContentionCount>
+    <ContentionCount initialQueueLength="1">0</ContentionCount>
+    <ContentionCount initialQueueLength="2">0</ContentionCount>
+    <ContentionCount initialQueueLength="3">0</ContentionCount>
+  </SMPLockProfilingReport>
+  <SMPLockProfilingReport name="Giant">
+    <MaxAcquireTime unit="ns">4186</MaxAcquireTime>
+    <MaxSectionTime unit="ns">7575</MaxSectionTime>
+    <MeanAcquireTime unit="ns">160</MeanAcquireTime>
+    <MeanSectionTime unit="ns">183</MeanSectionTime>
+    <TotalAcquireTime unit="ns">1772793111</TotalAcquireTime>
+    <TotalSectionTime unit="ns">2029733879</TotalSectionTime>
+    <UsageCount>11039140</UsageCount>
+    <ContentionCount initialQueueLength="0">11037655</ContentionCount>
+    <ContentionCount initialQueueLength="1">1485</ContentionCount>
+    <ContentionCount initialQueueLength="2">0</ContentionCount>
+    <ContentionCount initialQueueLength="3">0</ContentionCount>
+  </SMPLockProfilingReport>
+</ProfilingReport>
+@end smallexample
+
+@subheading CONFIGURATION:
+
+@findex CONFIGURE_SHELL_NO_COMMAND_PROFREPORT
+@findex CONFIGURE_SHELL_COMMAND_PROFREPORT
+
+When building a custom command set, define
+@code{CONFIGURE_SHELL_COMMAND_PROFREPORT} to have this
+command included.
+
+This command can be excluded from the shell command set by
+defining @code{CONFIGURE_SHELL_NO_COMMAND_PROFREPORT} when all
+shell commands have been configured.
+
+@subheading PROGRAMMING INFORMATION:
+
+The configuration structure for the @code{profreport} has the
+following prototype:
+
+@example
+extern rtems_shell_cmd_t rtems_shell_PROFREPORT_Command;
 @end example
 
 @c

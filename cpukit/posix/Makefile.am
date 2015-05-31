@@ -25,7 +25,9 @@ if HAS_PTHREADS
 # include
 include_HEADERS = include/aio.h
 include_HEADERS += include/mqueue.h
+if !HAVE_SEMAPHORE_H
 include_HEADERS += include/semaphore.h
+endif
 
 # include/rtems/posix
 include_rtems_posix_HEADERS += include/rtems/posix/aio_misc.h
@@ -91,7 +93,9 @@ libposix_a_SOURCES += src/cond.c src/condattrdestroy.c \
     src/condtimedwait.c src/condwait.c src/condwaitsupp.c src/condget.c
 
 ## MEMORY_C_FILES
+libposix_a_SOURCES += src/mmap.c
 libposix_a_SOURCES += src/mprotect.c
+libposix_a_SOURCES += src/munmap.c
 
 ## MESSAGE_QUEUE_C_FILES
 libposix_a_SOURCES += src/mqueue.c src/mqueueclose.c \

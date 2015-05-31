@@ -26,7 +26,7 @@ extern "C" {
 #endif
 
 /**
- * @addtogroup ScoreSchedulerEDF EDF
+ * @addtogroup ScoreSchedulerEDF
  *
  * @{
  */
@@ -37,12 +37,17 @@ RTEMS_INLINE_ROUTINE Scheduler_EDF_Context *
   return (Scheduler_EDF_Context *) _Scheduler_Get_context( scheduler );
 }
 
-RTEMS_INLINE_ROUTINE Scheduler_EDF_Node *_Scheduler_EDF_Node_get(
+RTEMS_INLINE_ROUTINE Scheduler_EDF_Node *_Scheduler_EDF_Thread_get_node(
   Thread_Control *the_thread
 )
 {
-  return (Scheduler_EDF_Node *) _Scheduler_Node_get( the_thread );
+  return (Scheduler_EDF_Node *) _Scheduler_Thread_get_node( the_thread );
 }
+
+RBTree_Compare_result _Scheduler_EDF_Compare(
+  const RBTree_Node* n1,
+  const RBTree_Node* n2
+);
 
 RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Enqueue(
   const Scheduler_Control *scheduler,
@@ -51,9 +56,14 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Enqueue(
 {
   Scheduler_EDF_Context *context =
     _Scheduler_EDF_Get_context( scheduler );
-  Scheduler_EDF_Node *node = _Scheduler_EDF_Node_get( the_thread );
+  Scheduler_EDF_Node *node = _Scheduler_EDF_Thread_get_node( the_thread );
 
-  _RBTree_Insert( &context->Ready, &node->Node );
+  _RBTree_Insert(
+    &context->Ready,
+    &node->Node,
+    _Scheduler_EDF_Compare,
+    false
+  );
   node->queue_state = SCHEDULER_EDF_QUEUE_STATE_YES;
 }
 
@@ -64,7 +74,7 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Extract(
 {
   Scheduler_EDF_Context *context =
     _Scheduler_EDF_Get_context( scheduler );
-  Scheduler_EDF_Node *node = _Scheduler_EDF_Node_get( the_thread );
+  Scheduler_EDF_Node *node = _Scheduler_EDF_Thread_get_node( the_thread );
 
   _RBTree_Extract( &context->Ready, &node->Node );
 }
@@ -79,7 +89,7 @@ RTEMS_INLINE_ROUTINE void _Scheduler_EDF_Schedule_body(
     _Scheduler_EDF_Get_context( scheduler );
   RBTree_Node *first = _RBTree_First( &context->Ready, RBT_LEFT );
   Scheduler_EDF_Node *node =
-    _RBTree_Container_of(first, Scheduler_EDF_Node, Node);
+    RTEMS_CONTAINER_OF( first, Scheduler_EDF_Node, Node );
   Thread_Control *heir = node->thread;
 
   ( void ) the_thread;

@@ -1,10 +1,9 @@
 /*  bspstart.c for bf537Stamp
  *
- *  This routine starts the application.  It includes application,
- *  board, and monitor specific initialization and configuration.
- *  The generic CPU dependent initialization has been performed
- *  before this routine is invoked.
- *
+ *  This routine does the bulk of the system initialisation.
+ */
+
+/*
  *  Copyright (c) 2006 by Atos Automacao Industrial Ltda.
  *             written by Alain Schaefer <alain.schaefer@easc.ch>
  *                    and Antonio Giovanini <antonio@atos.com.br>
@@ -16,6 +15,7 @@
 
 
 #include <bsp.h>
+#include <bsp/bootcard.h>
 #include <libcpu/bf537.h>
 #include <libcpu/ebiuRegs.h>
 #include <libcpu/gpioRegs.h>
@@ -65,8 +65,6 @@ static bfin_mmu_config_t mmuRegions = {
     }
 };
 
-void Init_RTC(void);
-
 static void initPLL(void);
 static void initEBIU(void);
 static void initGPIO(void);
@@ -79,11 +77,6 @@ void bsp_pretasking_hook(void)
   bfin_interrupt_init();
 }
 
-/*
- *  bsp_start
- *
- *  This routine does the bulk of the BSP initialization.
- */
 void bsp_start(void)
 {
   /* BSP Hardware Initialization*/

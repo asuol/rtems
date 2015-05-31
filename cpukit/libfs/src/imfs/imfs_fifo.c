@@ -19,7 +19,7 @@
 
 #include "imfs.h"
 
-#define JNODE2PIPE(_jnode)  ( (_jnode)->info.fifo.pipe )
+#define JNODE2PIPE(_jnode)  ( ((IMFS_fifo_t *)(_jnode))->pipe )
 
 #define LIBIO2PIPE(_iop)  ( JNODE2PIPE((IMFS_jnode_t *)(_iop)->pathinfo.node_access) )
 
@@ -130,10 +130,12 @@ static const rtems_filesystem_file_handlers_r IMFS_fifo_handlers = {
   .writev_h = rtems_filesystem_default_writev
 };
 
-const IMFS_node_control IMFS_node_control_fifo = {
-  .imfs_type = IMFS_FIFO,
-  .handlers = &IMFS_fifo_handlers,
-  .node_initialize = IMFS_node_initialize_default,
-  .node_remove = IMFS_node_remove_default,
-  .node_destroy = IMFS_node_destroy_default
+const IMFS_mknod_control IMFS_mknod_control_fifo = {
+  {
+    .handlers = &IMFS_fifo_handlers,
+    .node_initialize = IMFS_node_initialize_default,
+    .node_remove = IMFS_node_remove_default,
+    .node_destroy = IMFS_node_destroy_default
+  },
+  .node_size = sizeof( IMFS_fifo_t )
 };

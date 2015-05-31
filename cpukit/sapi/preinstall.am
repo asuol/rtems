@@ -8,20 +8,10 @@ endif
 PREINSTALL_DIRS =
 DISTCLEANFILES = $(PREINSTALL_DIRS)
 
-all-local: $(TMPINSTALL_FILES)
-
-TMPINSTALL_FILES =
-CLEANFILES = $(TMPINSTALL_FILES)
-
 all-am: $(PREINSTALL_FILES)
 
 PREINSTALL_FILES =
-CLEANFILES += $(PREINSTALL_FILES)
-
-$(PROJECT_LIB)/$(dirstamp):
-	@$(MKDIR_P) $(PROJECT_LIB)
-	@: > $(PROJECT_LIB)/$(dirstamp)
-PREINSTALL_DIRS += $(PROJECT_LIB)/$(dirstamp)
+CLEANFILES = $(PREINSTALL_FILES)
 
 $(PROJECT_INCLUDE)/rtems/$(dirstamp):
 	@$(MKDIR_P) $(PROJECT_INCLUDE)/rtems
@@ -31,6 +21,10 @@ PREINSTALL_DIRS += $(PROJECT_INCLUDE)/rtems/$(dirstamp)
 $(PROJECT_INCLUDE)/rtems/confdefs.h: include/confdefs.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/confdefs.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/confdefs.h
+
+$(PROJECT_INCLUDE)/rtems/bsd.h: include/rtems/bsd.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/bsd.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/bsd.h
 
 $(PROJECT_INCLUDE)/rtems/chain.h: include/rtems/chain.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/chain.h
@@ -92,15 +86,11 @@ $(PROJECT_INCLUDE)/rtems/sptables.h: include/rtems/sptables.h $(PROJECT_INCLUDE)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/sptables.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/sptables.h
 
-$(PROJECT_INCLUDE)/rtems/test.h: include/rtems/test.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/test.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/test.h
+$(PROJECT_INCLUDE)/rtems/timecounter.h: include/rtems/timecounter.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
+	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/timecounter.h
+PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/timecounter.h
 
 $(PROJECT_INCLUDE)/rtems/timespec.h: include/rtems/timespec.h $(PROJECT_INCLUDE)/rtems/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/rtems/timespec.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/rtems/timespec.h
-
-$(PROJECT_LIB)/libsapi.a: libsapi.a $(PROJECT_LIB)/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_LIB)/libsapi.a
-TMPINSTALL_FILES += $(PROJECT_LIB)/libsapi.a
 

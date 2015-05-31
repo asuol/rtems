@@ -17,7 +17,7 @@
 #include "test_support.h"
 #include <pthread.h>
 #include <sched.h>
-#include <rtems/timerdrv.h>
+#include <rtems/btimer.h>
 
 const char rtems_test_name[] = "PSXTMCOND 03";
 
@@ -52,7 +52,7 @@ void *POSIX_Init(
 {
   int        status;
   pthread_t  threadId;
-  long       end_time;
+  uint32_t   end_time;
   struct sched_param param;
   int policy;
 

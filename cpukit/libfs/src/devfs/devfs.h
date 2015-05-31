@@ -20,7 +20,6 @@
  * @brief This structure defines the type of device table
  */
 /**@{*/
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -191,22 +190,6 @@ extern int devFS_stat(
 );
 
 /**
- *  @brief Invoked upon Determination of a Node Type
- *
- *  This routine is invoked upon determination of a node type.
- *  Since this is a device-only filesystem, so there is only
- *  one node type in the system.
- *
- *  @param loc contains filesytem access information, this
- *         parameter is ignored
- *
- *  @retval always returns RTEMS_FILESYSTEM_DEVICE
- */
-extern rtems_filesystem_node_types_t devFS_node_type(
-  const rtems_filesystem_location_info_t*loc
-);
-
-/**
  *  @brief Creates an item in the main device table.
  *
  *  This routine is invoked upon registration of a new device
@@ -257,7 +240,7 @@ extern int devFS_initialize(
  *    /dev/clock       1  0
  *    /dev/tty0        0  0
  *    /flash           2  0
- *  @end code
+ *  @endcode
  *
  *  This routine is intended for debugging, and can be used by shell
  *  program to provide user with the system information.
@@ -267,6 +250,6 @@ extern void devFS_Show(void);
 #ifdef __cplusplus
 }
 #endif
-/** @} */
+/**@}*/
 #endif
 

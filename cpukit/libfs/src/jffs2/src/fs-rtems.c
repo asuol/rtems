@@ -25,6 +25,7 @@
 #include <errno.h>
 #include <string.h>
 #include <assert.h>
+#include <rtems/libio.h>
 #include <rtems/libio_.h>
 
 /* Ensure that the JFFS2 values are identical to the POSIX defines */
@@ -318,12 +319,14 @@ static void rtems_jffs2_do_lock(const struct super_block *sb)
 {
 	rtems_status_code sc = rtems_semaphore_obtain(sb->s_mutex, RTEMS_WAIT, RTEMS_NO_TIMEOUT);
 	assert(sc == RTEMS_SUCCESSFUL);
+	(void) sc; /* avoid unused variable warning */
 }
 
 static void rtems_jffs2_do_unlock(const struct super_block *sb)
 {
 	rtems_status_code sc = rtems_semaphore_release(sb->s_mutex);
 	assert(sc == RTEMS_SUCCESSFUL);
+	(void) sc; /* avoid unused variable warning */
 }
 
 static void rtems_jffs2_free_directory_entries(struct _inode *inode)
@@ -366,6 +369,7 @@ static void rtems_jffs2_free_fs_info(rtems_jffs2_fs_info *fs_info, bool do_mount
 	if (sb->s_mutex != 0) {
 		rtems_status_code sc = rtems_semaphore_delete(sb->s_mutex);
 		assert(sc == RTEMS_SUCCESSFUL);
+		(void) sc; /* avoid unused variable warning */
 	}
 
 	rtems_jffs2_flash_control_destroy(fs_info->sb.s_flash_control);
@@ -405,9 +409,12 @@ static int rtems_jffs2_fstat(
 )
 {
 	struct _inode *inode = rtems_jffs2_get_inode_by_location(loc);
+	struct super_block *sb = inode->i_sb;
+	rtems_jffs2_flash_control *fc = sb->s_flash_control;
 
-	rtems_jffs2_do_lock(inode->i_sb);
+	rtems_jffs2_do_lock(sb);
 
+	buf->st_dev = fc->device_identifier;
 	buf->st_blksize = PAGE_SIZE;
 	buf->st_mode = inode->i_mode;
 	buf->st_ino = inode->i_ino;
@@ -419,7 +426,7 @@ static int rtems_jffs2_fstat(
 	buf->st_mtime = inode->i_mtime;
 	buf->st_ctime = inode->i_ctime;
 
-	rtems_jffs2_do_unlock(inode->i_sb);
+	rtems_jffs2_do_unlock(sb);
 
 	return 0;
 }
@@ -838,31 +845,6 @@ static bool rtems_jffs2_are_nodes_equal(
 	return inode_a->i_ino == inode_b->i_ino;
 }
 
-static rtems_filesystem_node_types_t rtems_jffs2_node_type(
-	const rtems_filesystem_location_info_t *loc
-)
-{
-	struct _inode *inode = rtems_jffs2_get_inode_by_location(loc);
-	rtems_filesystem_node_types_t type;
-
-	switch (inode->i_mode & S_IFMT) {
-		case S_IFDIR:
-			type = RTEMS_FILESYSTEM_DIRECTORY;
-			break;
-		case S_IFREG:
-			type = RTEMS_FILESYSTEM_MEMORY_FILE;
-			break;
-		case S_IFLNK:
-			type = RTEMS_FILESYSTEM_SYM_LINK;
-			break;
-		default:
-			type = RTEMS_FILESYSTEM_INVALID_NODE_TYPE;
-			break;
-	}
-
-	return type;
-}
-
 static int rtems_jffs2_mknod(
 	const rtems_filesystem_location_info_t *parentloc,
 	const char *name,
@@ -1116,7 +1098,6 @@ static const rtems_filesystem_operations_table rtems_jffs2_ops = {
 	.eval_path_h = rtems_jffs2_eval_path,
 	.link_h = rtems_jffs2_link,
 	.are_nodes_equal_h = rtems_jffs2_are_nodes_equal,
-	.node_type_h = rtems_jffs2_node_type,
 	.mknod_h = rtems_jffs2_mknod,
 	.rmnod_h = rtems_jffs2_rmnod,
 	.fchmod_h = rtems_jffs2_fchmod,
@@ -1124,7 +1105,6 @@ static const rtems_filesystem_operations_table rtems_jffs2_ops = {
 	.clonenod_h = rtems_jffs2_clonenode,
 	.freenod_h = rtems_jffs2_freenode,
 	.mount_h = rtems_filesystem_default_mount,
-	.fsmount_me_h = rtems_jffs2_initialize,
 	.unmount_h = rtems_filesystem_default_unmount,
 	.fsunmount_me_h = rtems_jffs2_fsunmount,
 	.utime_h = rtems_jffs2_utime,

@@ -103,7 +103,7 @@ rtems_monitor_dump_name(rtems_id id)
 
     rtems_object_get_name( id, sizeof(name_buffer), name_buffer );
 
-    return fprintf( stdout, name_buffer );
+    return fprintf(stdout, "%s", name_buffer);
 }
 
 int
@@ -127,6 +127,7 @@ static const rtems_assoc_t rtems_monitor_state_assoc[] = {
     { "Wmutex", STATES_WAITING_FOR_MUTEX, 0 },
     { "Wcvar",  STATES_WAITING_FOR_CONDITION_VARIABLE, 0 },
     { "Wjatx",  STATES_WAITING_FOR_JOIN_AT_EXIT, 0 },
+    { "Wjoin",  STATES_WAITING_FOR_JOIN, 0 },
     { "Wrpc",   STATES_WAITING_FOR_RPC_REPLY, 0 },
     { "WRATE",  STATES_WAITING_FOR_PERIOD, 0 },
     { "Wsig",   STATES_WAITING_FOR_SIGNAL, 0 },
@@ -252,11 +253,14 @@ int
 rtems_monitor_dump_notepad(uint32_t   *notepad)
 {
     int   length = 0;
-    int i;
 
-    for (i=0; i < RTEMS_NUMBER_NOTEPADS; i++)
-        if (notepad[i])
-            length += fprintf(stdout,"%d: 0x%" PRIx32, i, notepad[i]);
+    if (rtems_configuration_get_notepads_enabled()) {
+      int i;
+
+      for (i=0; i < RTEMS_NUMBER_NOTEPADS; i++)
+          if (notepad[i])
+              length += fprintf(stdout,"%d: 0x%" PRIx32, i, notepad[i]);
+    }
 
     return length;
 }

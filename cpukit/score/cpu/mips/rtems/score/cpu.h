@@ -81,26 +81,6 @@ extern "C" {
 #define CPU_INLINE_ENABLE_DISPATCH       FALSE
 
 /*
- *  Should the body of the search loops in _Thread_queue_Enqueue_priority
- *  be unrolled one time?  In unrolled each iteration of the loop examines
- *  two "nodes" on the chain being searched.  Otherwise, only one node
- *  is examined per iteration.
- *
- *  If TRUE, then the loops are unrolled.
- *  If FALSE, then the loops are not unrolled.
- *
- *  The primary factor in making this decision is the cost of disabling
- *  and enabling interrupts (_ISR_Flash) versus the cost of rest of the
- *  body of the loop.  On some CPUs, the flash is more expensive than
- *  one iteration of the loop body.  In this case, it might be desirable
- *  to unroll the loop.  It is important to note that on some CPUs, this
- *  code is the longest interrupt disable period in RTEMS.  So it is
- *  necessary to strike a balance when setting this parameter.
- */
-
-#define CPU_UNROLL_ENQUEUE_PRIORITY      TRUE
-
-/*
  *  Does RTEMS manage a dedicated interrupt stack in software?
  *
  *  If TRUE, then a stack is allocated in _Interrupt_Manager_initialization.
@@ -913,7 +893,7 @@ void _CPU_Context_Initialize(
  *  halts/stops the CPU.
  */
 
-#define _CPU_Fatal_halt( _error ) \
+#define _CPU_Fatal_halt( _source, _error ) \
   do { \
     unsigned int _level; \
     _CPU_ISR_Disable(_level); \
@@ -1137,14 +1117,7 @@ static inline void _CPU_Context_validate( uintptr_t pattern )
   }
 }
 
-void _BSP_Exception_frame_print( const CPU_Exception_frame *frame );
-
-static inline void _CPU_Exception_frame_print(
-  const CPU_Exception_frame *frame
-)
-{
-  _BSP_Exception_frame_print( frame );
-}
+void _CPU_Exception_frame_print( const CPU_Exception_frame *frame );
 
 /*  The following routine swaps the endian format of an unsigned int.
  *  It must be static because it is referenced indirectly.

@@ -22,17 +22,17 @@
 
 #include <rtems/score/schedulerpriorityimpl.h>
 
-void _Scheduler_priority_Unblock (
+Scheduler_Void_or_thread _Scheduler_priority_Unblock (
   const Scheduler_Control *scheduler,
   Thread_Control          *the_thread
 )
 {
   Scheduler_priority_Context *context =
     _Scheduler_priority_Get_context( scheduler );
-  Scheduler_priority_Node *node = _Scheduler_priority_Node_get( the_thread );
+  Scheduler_priority_Node *node = _Scheduler_priority_Thread_get_node( the_thread );
 
   _Scheduler_priority_Ready_queue_enqueue(
-    the_thread,
+    &the_thread->Object.Node,
     &node->Ready_queue,
     &context->Bit_map
   );
@@ -52,9 +52,11 @@ void _Scheduler_priority_Unblock (
    *    a pseudo-ISR system task, we need to do a context switch.
    */
   if ( the_thread->current_priority < _Thread_Heir->current_priority ) {
-    _Thread_Heir = the_thread;
-    if ( _Thread_Executing->is_preemptible ||
-        the_thread->current_priority == 0 )
-      _Thread_Dispatch_necessary = true;
+    _Scheduler_Update_heir(
+      the_thread,
+      the_thread->current_priority == PRIORITY_PSEUDO_ISR
+    );
   }
+
+  SCHEDULER_RETURN_VOID_OR_NULL;
 }

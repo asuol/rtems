@@ -585,7 +585,7 @@ requirements @b{ABOVE} the minimum size required.  See
 @ref{Configuring a System Reserve Task/Thread Stack Memory Above Minimum}
 for more information about @code{CONFIGURE_EXTRA_TASK_STACKS}.
 
-The maximumm number of POSIX threads is specified by
+The maximum number of POSIX threads is specified by
 @code{CONFIGURE_MAXIMUM_POSIX_THREADS}.
 @c XXX - Add xref to CONFIGURE_MAXIMUM_POSIX_THREADS.
 
@@ -593,6 +593,40 @@ A future enhancement to @code{<rtems/confdefs.h>} could be to eliminate
 the assumption that all tasks have floating point enabled. This would
 require the addition of a new configuration parameter to specify the
 number of tasks which enable floating point support.
+
+@c
+@c === CONFIGURE_ENABLE_CLASSIC_API_NOTEPADS ===
+@c
+@subsection Enable Classic API Notepads
+
+@findex CONFIGURE_ENABLE_CLASSIC_API_NOTEPADS
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_ENABLE_CLASSIC_API_NOTEPADS}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default, and Classic API Notepads are not supported.
+
+@end table
+
+@subheading DESCRIPTION:
+@code{CONFIGURE_ENABLE_CLASSIC_API_NOTEPADS} should be defined if the
+user wants to have support for Classic API Notepads in their application.
+
+@subheading NOTES:
+Disabling Classic API Notepads saves the allocation of sixteen (16)
+thirty-two bit integers. This saves sixty-four bytes per task/thread
+plus the allocation overhead. Notepads are rarely used in applications
+and this can save significant memory in a low RAM system. Classic API 
+Notepads are deprecated, and this option is expected to be obsolete in
+the near future.
 
 @c
 @c === CONFIGURE_DISABLE_CLASSIC_API_NOTEPADS ===
@@ -612,20 +646,22 @@ Boolean feature macro.
 Defined or undefined.
 
 @item DEFAULT VALUE:
-This is not defined by default, and Classic API Notepads are supported.
+This is not defined by default, and Classic API Notepads are not supported.
 
 @end table
 
 @subheading DESCRIPTION:
-@code{CONFIGURE_DISABLE_CLASSIC_API_NOTEPADS} should be defined if the
-user does not want to have support for Classic API Notepads in their
-application.
+@code{CONFIGURE_DISABLE_CLASSIC_API_NOTEPADS} is deprecated. If users
+want to have support for Classic API Notepads, they should use
+@code{CONFIGURE_ENABLE_CLASSIC_API_NOTEPADS}.
 
 @subheading NOTES:
 Disabling Classic API Notepads saves the allocation of sixteen (16)
 thirty-two bit integers. This saves sixty-four bytes per task/thread
 plus the allocation overhead. Notepads are rarely used in applications
-and this can save significant memory in a low RAM system.
+and this can save significant memory in a low RAM system. Classic API 
+Notepads are deprecated, and this option is expected to be obsolete in
+the near future.
 
 @c
 @c === CONFIGURE_MAXIMUM_TIMERS ===
@@ -684,6 +720,38 @@ API Semaphores that can be concurrently active.
 
 @subheading NOTES:
 This object class can be configured in unlimited allocation mode.
+
+@c
+@c === CONFIGURE_MAXIMUM_MRSP_SEMAPHORES ===
+@c
+@subsection Specify Maximum Classic API Semaphores usable with MrsP
+
+@findex CONFIGURE_MAXIMUM_MRSP_SEMAPHORES
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_MAXIMUM_MRSP_SEMAPHORES}
+
+@item DATA TYPE:
+Unsigned integer (@code{uint32_t}).
+
+@item RANGE:
+Zero or positive.
+
+@item DEFAULT VALUE:
+The default value is 0.
+
+@end table
+
+@subheading DESCRIPTION:
+@code{CONFIGURE_MAXIMUM_MRSP_SEMAPHORES} is the
+maximum number of Classic API Semaphores using the Multiprocessor Resource
+Sharing Protocol (MrsP) that can be concurrently active.
+
+@subheading NOTES:
+This configuration option is only used on SMP configurations.  On uni-processor
+configurations the Priority Ceiling Protocol is used for MrsP semaphores and
+thus no extra memory is necessary.
 
 @c
 @c === CONFIGURE_MAXIMUM_MESSAGE_QUEUES ===
@@ -2402,37 +2470,6 @@ related configuration parameters supported by
 @code{<rtems/confdefs.h>}.
 
 @c
-@c === CONFIGURE_MALLOC_STATISTICS ===
-@c
-@subsection Enable Malloc Family Statistics
-
-@findex CONFIGURE_MALLOC_STATISTICS
-
-
-@table @b
-@item CONSTANT:
-@code{CONFIGURE_MALLOC_STATISTICS}
-
-@item DATA TYPE:
-Boolean feature macro.
-
-@item RANGE:
-Defined or undefined.
-
-@item DEFAULT VALUE:
-This is not defined by default, and Malloc Statistics are disabled.
-
-@end table
-
-@subheading DESCRIPTION:
-This configuration parameter is defined when the application wishes to
-enable the gathering of more detailed statistics on the C Malloc Family
-of routines.
-
-@subheading NOTES:
-None.
-
-@c
 @c === CONFIGURE_LIBIO_MAXIMUM_FILE_DESCRIPTORS ===
 @c
 @subsection Specify Maximum Number of File Descriptors
@@ -2576,40 +2613,6 @@ None.
 @c XXX - Please provide an example
 
 @c
-@c === CONFIGURE_USE_MINIIMFS_AS_BASE_SYSTEM ===
-@c
-@subsection Configure miniIMFS as Root File System
-
-@findex CONFIGURE_USE_MINIIMFS_AS_BASE_FILESYSTEM
-
-@table @b
-@item CONSTANT:
-@code{CONFIGURE_USE_MINIIMFS_AS_BASE_FILESYSTEM}
-
-@item DATA TYPE:
-Boolean feature macro.
-
-@item RANGE:
-Defined or undefined.
-
-@item DEFAULT VALUE:
-This is not defined by default. If no other root file system
-configuration parameters are specified, the IMFS will be used as the
-root file system.
-
-@end table
-
-@subheading DESCRIPTION:
-This configuration parameter is defined if the application wishes to use
-the reduced functionality miniIMFS as the root filesystem. This reduced
-version of the full IMFS does not include the capability to mount other
-file system types, but it does support directories, device nodes, and
-symbolic links.
-
-@subheading NOTES:
-The miniIMFS nodes and is smaller in executable code size than the full IMFS.
-
-@c
 @c === CONFIGURE_USE_DEVFS_AS_BASE_FILESYSTEM ===
 @c
 @subsection Configure devFS as Root File System
@@ -2708,6 +2711,381 @@ infrastructure necessary to support @code{printf()}.
 
 @subheading NOTES:
 None.
+
+@c
+@c === CONFIGURE_USE_MINIIMFS_AS_BASE_FILESYSTEM ===
+@c
+@subsection Use a Root IMFS with a Minimalistic Feature Set
+
+@findex CONFIGURE_USE_MINIIMFS_AS_BASE_FILESYSTEM
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_USE_MINIIMFS_AS_BASE_FILESYSTEM}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the following configuration
+options will be defined as well
+@itemize @bullet
+@item @code{CONFIGURE_IMFS_DISABLE_CHMOD},
+@item @code{CONFIGURE_IMFS_DISABLE_CHOWN},
+@item @code{CONFIGURE_IMFS_DISABLE_UTIME},
+@item @code{CONFIGURE_IMFS_DISABLE_LINK},
+@item @code{CONFIGURE_IMFS_DISABLE_SYMLINK},
+@item @code{CONFIGURE_IMFS_DISABLE_READLINK},
+@item @code{CONFIGURE_IMFS_DISABLE_RENAME}, and
+@item @code{CONFIGURE_IMFS_DISABLE_UNMOUNT}.
+@end itemize
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_CHOWN ===
+@c
+@subsection Disable Change Owner Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_CHOWN
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_CHOWN}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to change the
+owner is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_CHMOD ===
+@c
+@subsection Disable Change Mode Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_CHMOD
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_CHMOD}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to change the
+mode is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_UTIME ===
+@c
+@subsection Disable Change Times Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_UTIME
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_UTIME}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to change times
+is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_LINK ===
+@c
+@subsection Disable Create Hard Link Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_LINK
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_LINK}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to create hard
+links is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_SYMLINK ===
+@c
+@subsection Disable Create Symbolic Link Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_SYMLINK
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_SYMLINK}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to create
+symbolic links is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_READLINK ===
+@c
+@subsection Disable Read Symbolic Link Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_READLINK
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_READLINK}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to read symbolic
+links is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_RENAME ===
+@c
+@subsection Disable Rename Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_RENAME
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_RENAME}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to rename nodes
+is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_READDIR ===
+@c
+@subsection Disable Directory Read Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_READDIR
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_READDIR}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to read a
+directory is disabled in the root IMFS.  It is still possible to open nodes in
+a directory.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_MOUNT ===
+@c
+@subsection Disable Mount Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_MOUNT
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_MOUNT}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to mount other
+file systems is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_UNMOUNT ===
+@c
+@subsection Disable Unmount Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_UNMOUNT
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_UNMOUNT}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to unmount file
+systems is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_MKNOD ===
+@c
+@subsection Disable Make Nodes Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_MKNOD
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_MKNOD}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to make
+directories, devices, regular files and FIFOs is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_MKNOD_FILE ===
+@c
+@subsection Disable Make Files Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_MKNOD_FILE
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_MKNOD_FILE}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to make regular
+files is disabled in the root IMFS.
+
+@c
+@c === CONFIGURE_IMFS_DISABLE_RMNOD ===
+@c
+@subsection Disable Remove Nodes Support of Root IMFS
+
+@findex CONFIGURE_IMFS_DISABLE_RMNOD
+
+@table @b
+@item CONSTANT:
+@code{CONFIGURE_IMFS_DISABLE_RMNOD}
+
+@item DATA TYPE:
+Boolean feature macro.
+
+@item RANGE:
+Defined or undefined.
+
+@item DEFAULT VALUE:
+This is not defined by default.
+
+@end table
+
+@subheading DESCRIPTION:
+In case this configuration option is defined, then the support to remove nodes
+is disabled in the root IMFS.
 
 @c
 @c === Block Device Cache Configuration ===
@@ -4893,6 +5271,59 @@ uses the Ada run-time.
 
 @subheading NOTES:
 None.
+
+@c
+@c === PCI Library ===
+@c
+@section PCI Library
+
+This section defines the system configuration parameters supported
+by @code{rtems/confdefs.h} related to configuring the PCI Library
+for RTEMS.
+
+The PCI Library startup behaviour can be configured in four different
+ways depending on how @code{CONFIGURE_PCI_CONFIG_LIB} is defined:
+
+@itemize @bullet
+@findex PCI_LIB_AUTO
+@item @code{PCI_LIB_AUTO} is used to enable the PCI auto configuration
+software. PCI will be automatically probed, PCI buses enumerated, all
+devices and bridges will be initialized using Plug & Play software
+routines. The PCI device tree will be populated based on the PCI devices
+found in the system, PCI devices will be configured by allocating address
+region resources automatically in PCI space according to the BSP or host
+bridge driver set up.
+
+@findex PCI_LIB_READ
+@item @code{PCI_LIB_READ} is used to enable the PCI read configuration
+software. The current PCI configuration is read to create the RAM
+representation (the PCI device tree) of the PCI devices present. PCI devices
+are assumed to already have been initialized and PCI buses enumerated, it is
+therefore required that a BIOS or a boot loader has set up configuration space
+prior to booting into RTEMS.
+
+@findex PCI_LIB_STATIC
+@item @code{PCI_LIB_STATIC} is used to enable the PCI static configuration
+software. The user provides a PCI tree with information how all PCI devices
+are to be configured at compile time by linking in a custom
+@code{struct pci_bus pci_hb} tree. The static PCI library will not probe PCI
+for devices, instead it will assume that all devices defined by the user are
+present, it will enumerate the PCI buses and configure all PCI devices in
+static configuration accordingly. Since probe and allocation software is not
+needed the startup is faster, has smaller footprint and does not require
+dynamic memory allocation.
+
+@findex PCI_LIB_PERIPHERAL
+@item @code{PCI_LIB_PERIPHERAL} is used to enable the PCI peripheral
+configuration. It is similar to @code{PCI_LIB_STATIC}, but it will never write
+the configuration to the PCI devices since PCI peripherals are not allowed to
+access PCI configuration space.
+
+@end itemize
+
+Note that selecting PCI_LIB_STATIC or PCI_LIB_PERIPHERAL but not defining
+@code{pci_hb} will reuslt in link errors. Note also that in these modes
+Plug & Play is not performed.
 
 @c
 @c === Go Tasks ===

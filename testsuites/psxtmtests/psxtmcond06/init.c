@@ -17,7 +17,7 @@
 #include "test_support.h"
 #include <pthread.h>
 #include <sched.h>
-#include <rtems/timerdrv.h>
+#include <rtems/btimer.h>
 
 #define N 5
 
@@ -52,7 +52,7 @@ void *POSIX_Init(
   void *argument
 )
 {
-  long                end_time;
+  uint32_t            end_time;
   int                 status;
   int                 i;
   pthread_t           threadId;

@@ -7,6 +7,8 @@
  *  COPYRIGHT (c) 1989-2011.
  *  On-Line Applications Research Corporation (OAR).
  *
+ *  Copyright (c) 2014-2015 embedded brains GmbH
+ *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
  *  http://www.rtems.org/license/LICENSE.
@@ -165,17 +167,18 @@ done_flushing:
 
 #if defined(RTEMS_SMP)
         ! The executing context no longer executes on this processor
-        stb     %g0, [%o0 + SPARC_CONTEXT_CONTROL_IS_EXECUTING_OFFSET]
+        st      %g0, [%o0 + SPARC_CONTEXT_CONTROL_IS_EXECUTING_OFFSET]
 
-        ! Wait for heir context to stop execution
-1:
-        ldub    [%o1 + SPARC_CONTEXT_CONTROL_IS_EXECUTING_OFFSET], %g1
+        ! Try to update the is executing indicator of the heir context
+        mov     1, %g1
+
+try_update_is_executing:
+
+        swap    [%o1 + SPARC_CONTEXT_CONTROL_IS_EXECUTING_OFFSET], %g1
         cmp     %g1, 0
-        bne     1b
-         mov    1, %g1
+        bne     check_is_executing
 
-        ! The heir context executes now on this processor
-        stb     %g1, [%o1 + SPARC_CONTEXT_CONTROL_IS_EXECUTING_OFFSET]
+        ! The next load is in a delay slot, which is all right
 #endif
 
         ld      [%o1 + G5_OFFSET], %g5        ! restore the global registers
@@ -203,6 +206,44 @@ done_flushing:
         jmp     %o7 + 8                       ! return
         nop                                   ! delay slot
 
+#if defined(RTEMS_SMP)
+check_is_executing:
+
+        ! Check the is executing indicator of the heir context
+        ld      [%o1 + SPARC_CONTEXT_CONTROL_IS_EXECUTING_OFFSET], %g1
+        cmp     %g1, 0
+        beq     try_update_is_executing
+         mov    1, %g1
+
+        ! Check if a thread dispatch is necessary
+        ldub    [%g6 + PER_CPU_DISPATCH_NEEDED], %g1
+        cmp     %g1, 0
+        beq     check_is_executing
+         nop
+
+        ! We have a new heir
+
+        ! Clear the thread dispatch necessary flag
+        stub    %g0, [%g6 + PER_CPU_DISPATCH_NEEDED]
+
+        ! Here we assume a strong memory order, otherwise a memory barrier must
+        ! be inserted here
+
+        ! Read the executing and heir
+        ld      [%g6 + PER_CPU_OFFSET_EXECUTING], %g1
+        ld      [%g6 + PER_CPU_OFFSET_HEIR], %g2
+
+        ! Calculate the heir context pointer
+        sub     %o1, %g1, %g1
+        add     %g1, %g2, %o1
+
+        ! Update the executing
+        st      %g2, [%g6 + PER_CPU_OFFSET_EXECUTING]
+
+        ba      try_update_is_executing
+         mov    1, %g1
+#endif
+
 /*
  *  void _CPU_Context_restore(
  *    Context_Control *new_context
@@ -218,8 +259,8 @@ SYM(_CPU_Context_restore):
         save    %sp, -CPU_MINIMUM_STACK_FRAME_SIZE, %sp
         rd      %psr, %o2
 #if defined(RTEMS_SMP)
-	! On SPARC the restore path needs also a valid executing context on SMP
-	! to update the is executing indicator.
+        ! On SPARC the restore path needs also a valid executing context on SMP
+        ! to update the is executing indicator.
         mov     %i0, %o0
 #endif
         ba      SYM(_CPU_Context_restore_heir)
@@ -331,8 +372,6 @@ dont_do_the_window:
          *  %l5 directly into the ISF below.
          */
 
-save_isf:
-
         /*
          *  Save the state of the interrupted task -- especially the global
          *  registers -- in the Interrupt Stack Frame.  Note that the ISF
@@ -384,6 +423,14 @@ save_isf:
         add      %l6, 1, %l6
         st       %l6, [%g6 + PER_CPU_THREAD_DISPATCH_DISABLE_LEVEL]
 
+#if SPARC_HAS_FPU == 1
+        /*
+         * We cannot use an intermediate value for operations with the PSR[EF]
+         * bit since they use a 13-bit sign extension and PSR[EF] is bit 12.
+         */
+        sethi    %hi(SPARC_PSR_EF_MASK), %l5
+#endif
+
         /*
          *  If ISR nest level was zero (now 1), then switch stack.
          */
@@ -400,7 +447,23 @@ save_isf:
          nop
 #endif
 
-	ld       [%g6 + PER_CPU_INTERRUPT_STACK_HIGH], %sp
+        ld       [%g6 + PER_CPU_INTERRUPT_STACK_HIGH], %sp
+
+#if SPARC_HAS_FPU == 1
+        /*
+         * Test if the interrupted thread uses the floating point unit
+         * (PSR[EF] == 1).  In case it uses the floating point unit, then store
+         * the floating point status register.  This has the side-effect that
+         * all pending floating point operations complete before the store
+         * completes.  The PSR[EF] bit is restored after the call to the
+         * interrupt handler.  Thus post-switch actions (e.g. signal handlers)
+         * and context switch extensions may still corrupt the floating point
+         * context.
+         */
+        andcc    %l0, %l5, %g0
+        bne,a    dont_switch_stacks
+         st      %fsr, [%g6 + SPARC_PER_CPU_FSR_OFFSET]
+#endif
 
 dont_switch_stacks:
         /*
@@ -419,7 +482,7 @@ dont_switch_stacks:
          */
 
         mov      %l0, %g5
-	and	 %l3, 0x0ff, %g4
+        and      %l3, 0x0ff, %g4
         subcc    %g4, 0x11, %g0
         bl       dont_fix_pil
         subcc    %g4, 0x1f, %g0
@@ -432,8 +495,16 @@ dont_switch_stacks:
 dont_fix_pil:
         or       %g5, SPARC_PSR_PIL_MASK, %g5
 pil_fixed:
+
+#if SPARC_HAS_FPU == 1
+        /*
+         * Clear the PSR[EF] bit of the interrupted context to ensure that
+         * interrupt service routines cannot corrupt the floating point context.
+         */
+        andn     %g5, %l5, %g5
+#endif
+
         wr       %g5, SPARC_PSR_ET_MASK, %psr ! **** ENABLE TRAPS ****
-dont_fix_pil2:
 
         /*
          *  Vector to user's handler.
@@ -458,8 +529,7 @@ dont_fix_pil2:
         cmp      %l7, 0
         bne      profiling_not_outer_most_exit
          nop
-        call     SYM(sparc_disable_interrupts), 0
-         nop
+        ta       SPARC_SWTRAP_IRQDIS    ! Call interrupt disable trap handler
         ld       [%l4], %o2             ! o2 = 3rd arg = interrupt exit instant
         mov      %l3, %o1               ! o1 = 2nd arg = interrupt entry instant
         call     SYM(_Profiling_Outer_most_interrupt_entry_and_exit), 0
@@ -544,39 +614,31 @@ profiling_not_outer_most_exit:
         nop
 isr_dispatch:
         call    SYM(_Thread_Dispatch), 0
-        nop
+         nop
 
-	/*
-	 *  We invoked _Thread_Dispatch in a state similar to the interrupted
-	 *  task.  In order to safely be able to tinker with the register
-	 *  windows and get the task back to its pre-interrupt state,
-	 *  we need to disable interrupts disabled so we can safely tinker
-	 *  with the register windowing.  In particular, the CWP in the PSR
-	 *  is fragile during this period. (See PR578.)
-	 */
-	mov	2,%g1				! syscall (disable interrupts)
-	ta	0				! syscall (disable interrupts)
+        /*
+         *  We invoked _Thread_Dispatch in a state similar to the interrupted
+         *  task.  In order to safely be able to tinker with the register
+         *  windows and get the task back to its pre-interrupt state,
+         *  we need to disable interrupts disabled so we can safely tinker
+         *  with the register windowing.  In particular, the CWP in the PSR
+         *  is fragile during this period. (See PR578.)
+         */
+        ta      SPARC_SWTRAP_IRQDIS  ! syscall (disable interrupts)
 
         /*
          *  While we had ISR dispatching disabled in this thread,
          *  did we miss anything.  If so, then we need to do another
          *  _Thread_Dispatch before leaving this ISR Dispatch context.
          */
+        ldub    [%g6 + PER_CPU_DISPATCH_NEEDED], %l7
 
-        ldub     [%g6 + PER_CPU_DISPATCH_NEEDED], %l7
+        orcc    %l7, %g0, %g0        ! Is thread switch necesary?
+        bne,a   isr_dispatch         ! Yes, then invoke the dispatcher.
+                                     ! g1 = Old PSR PIL returned from IRQDis
+        ta      SPARC_SWTRAP_IRQEN   ! syscall (enable interrupts to same level)
 
-        orcc     %l7, %g0, %g0    ! Is thread switch necesary?
-        bz       allow_nest_again ! No, then clear out and return
-        nop
-
-        ! Yes, then invoke the dispatcher
-dispatchAgain:
-	mov	3,%g1				! syscall (enable interrupts)
-	ta	0				! syscall (enable interrupts)
-        ba      isr_dispatch
-        nop
-
-allow_nest_again:
+        ! No, then clear out and return
 
         ! Zero out ISR stack nesting prevention flag
         st       %g0, [%g6 + SPARC_PER_CPU_ISR_DISPATCH_DISABLE]
@@ -684,7 +746,7 @@ simple_return:
 good_task_window:
 
         mov     %l0, %psr                  !  **** DISABLE TRAPS ****
-	nop; nop; nop
+        nop; nop; nop
                                            !  and restore condition codes.
         ld      [%g1 + ISF_G1_OFFSET], %g1 ! restore g1
         jmp     %l1                        ! transfer control and

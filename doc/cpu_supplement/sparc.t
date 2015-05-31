@@ -214,11 +214,9 @@ initialization time.
 
 @section Calling Conventions
 
-
-Each high-level language compiler generates
-subroutine entry and exit code based upon a set of rules known
-as the compiler's calling convention.   These rules address the
-following issues:
+Each high-level language compiler generates subroutine entry and exit code
+based upon a set of rules known as the application binary interface (ABI)
+calling convention.   These rules address the following issues:
 
 @itemize @bullet
 @item register preservation and usage
@@ -228,12 +226,13 @@ following issues:
 @item call and return mechanism
 @end itemize
 
-A compiler's calling convention is of importance when
-interfacing to subroutines written in another language either
-assembly or high-level.  Even when the high-level language and
-target processor are the same, different compilers may use
-different calling conventions.  As a result, calling conventions
-are both processor and compiler dependent.
+An ABI calling convention is of importance when interfacing to subroutines
+written in another language either assembly or high-level.  It determines also
+the set of registers to be saved or restored during a context switch and
+interrupt processing.
+
+The ABI relevant for RTEMS on SPARC is defined by SYSTEM V APPLICATION BINARY
+INTERFACE, SPARC Processor Supplement, Third Edition.
 
 @subsection Programming Model
 
@@ -426,9 +425,14 @@ f4, ... f30)
 f8, ... f28)
 @end itemize
 
-The floating point status register (fpsr) specifies
+The floating point status register (FSR) specifies
 the behavior of the floating point unit for rounding, contains
 its condition codes, version specification, and trap information.
+
+According to the ABI all floating point registers and the floating point status
+register (FSR) are volatile.  Thus the floating point context of a thread is the
+empty set.  The rounding direction is a system global state and must not be
+modified by threads.
 
 A queue of the floating point instructions which have
 started execution but not yet completed is maintained.  This
@@ -566,6 +570,12 @@ It is important to note that the SPARC subroutine
 call and return mechanism does not automatically save and
 restore any registers.  This is accomplished via the save and
 restore instructions which manage the set of registers windows.
+
+In case a floating-point unit is supported, then floating-point return values
+appear in the floating-point registers.  Single-precision values occupy %f0;
+double-precision values occupy %f0 and %f1.  Otherwise, these are scratch
+registers.  Due to this the hardware and software floating-point ABIs are
+incompatible.
 
 @subsection Calling Mechanism
 
@@ -846,7 +856,12 @@ supported by the SPARC architecture with level fifteen (15)
 being the highest priority.  Level zero (0) indicates that
 interrupts are fully enabled.  Interrupt requests for interrupts
 with priorities less than or equal to the current interrupt mask
-level are ignored.
+level are ignored. Level fifteen (15) is a non-maskable interrupt
+(NMI), which makes it unsuitable for standard usage since it can
+affect the real-time behaviour by interrupting critical sections
+and spinlocks. Disabling traps stops also the NMI interrupt from
+happening. It can however be used for power-down or other
+critical events.
 
 Although RTEMS supports 256 interrupt levels, the
 SPARC only supports sixteen.  RTEMS interrupt levels 0 through
@@ -854,14 +869,21 @@ SPARC only supports sixteen.  RTEMS interrupt levels 0 through
 other RTEMS interrupt levels are undefined and their behavior is
 unpredictable.
 
+Many LEON SPARC v7/v8 systems features an extended interrupt controller
+which adds an extra step of interrupt decoding to allow handling of
+interrupt 16-31. When such an extended interrupt is generated the CPU
+traps into a specific interrupt trap level 1-14 and software reads out from
+the interrupt controller which extended interrupt source actually caused the
+interrupt.
+
 @subsection Disabling of Interrupts by RTEMS
 
 During the execution of directive calls, critical
 sections of code may be executed.  When these sections are
-encountered, RTEMS disables interrupts to level seven (15)
-before the execution of this section and restores them to the
+encountered, RTEMS disables interrupts to level fifteen (15)
+before the execution of the section and restores them to the
 previous level upon completion of the section.  RTEMS has been
-optimized to insure that interrupts are disabled for less than
+optimized to ensure that interrupts are disabled for less than
 RTEMS_MAXIMUM_DISABLE_PERIOD microseconds on a RTEMS_MAXIMUM_DISABLE_PERIOD_MHZ 
 Mhz ERC32 with zero wait states.
 These numbers will vary based the number of wait states and
@@ -881,6 +903,17 @@ calls.  If a directive is invoked, unpredictable results may
 occur due to the inability of RTEMS to protect its critical
 sections.  However, ISRs that make no system calls may safely
 execute as non-maskable interrupts.
+
+Interrupts are disabled or enabled by performing a system call
+to the Operating System reserved software traps 9
+(SPARC_SWTRAP_IRQDIS) or 10 (SPARC_SWTRAP_IRQDIS). The trap is
+generated by the software trap (Ticc) instruction or indirectly
+by calling sparc_disable_interrupts() or sparc_enable_interrupts()
+functions. Disabling interrupts return the previous interrupt level
+(on trap entry) in register G1 and sets PSR.PIL to 15 to disable
+all maskable interrupts. The interrupt level can be restored by
+trapping into the enable interrupt handler with G1 containing the
+new interrupt level.
 
 @subsection Interrupt Stack
 
@@ -923,10 +956,18 @@ handler.
 
 The default fatal error handler which is invoked by
 the fatal_error_occurred directive when there is no user handler
-configured or the user handler returns control to RTEMS.  The
-default fatal error handler disables processor interrupts to
-level 15, places the error code in g1, and goes into an infinite
-loop to simulate a halt processor instruction.
+configured or the user handler returns control to RTEMS.
+
+If the BSP has been configured with @code{BSP_POWER_DOWN_AT_FATAL_HALT}
+set to true, the default handler will disable interrupts
+and enter power down mode. If power down mode is not available,
+it goes into an infinite loop to simulate a halt processor instruction.
+
+If @code{BSP_POWER_DOWN_AT_FATAL_HALT} is set to false, the default
+handler will place the value @code{1} in register @code{g1}, the
+error source in register @code{g2}, and the error code in register
+@code{g3}. It will then generate a system error which will
+hand over control to the debugger, simulator, etc.
 
 @section Thread-Local Storage
 

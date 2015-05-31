@@ -24,6 +24,7 @@
 #include <rtems/score/isr.h>
 #include <rtems/score/threaddispatch.h>
 #include <rtems/score/nios2-utility.h>
+#include <rtems/score/interr.h>
 
 /*
  *  This routine provides the RTEMS interrupt management.
@@ -34,6 +35,12 @@
 #if( CPU_HAS_SOFTWARE_INTERRUPT_STACK == TRUE)
   unsigned long    *_old_stack_ptr;
 #endif
+
+/*
+ * Prototypes
+ */
+void __ISR_Handler(void);
+void __Exception_Handler(CPU_Exception_frame *efr);
 
 register unsigned long  *stack_ptr __asm__ ("sp");
 
@@ -133,5 +140,5 @@ void __ISR_Handler(void)
 
 void __Exception_Handler(CPU_Exception_frame *efr)
 {
-  _CPU_Fatal_halt(0xECC0);
+  _CPU_Fatal_halt(RTEMS_FATAL_SOURCE_EXCEPTION, 0xECC0); /* source ignored */
 }

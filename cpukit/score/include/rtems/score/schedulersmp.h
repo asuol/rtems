@@ -51,6 +51,15 @@ typedef struct {
    * @brief The chain of scheduled nodes.
    */
   Chain_Control Scheduled;
+
+  /**
+   * @brief Chain of the available idle threads.
+   *
+   * Idle threads are used for the scheduler helping protocol.  It is crucial
+   * that the idle threads preserve their relative order.  This is the case for
+   * this priority based scheduler.
+   */
+  Chain_Control Idle_threads;
 } Scheduler_SMP_Context;
 
 /**
@@ -96,6 +105,11 @@ typedef struct {
    * @brief The state of this node.
    */
   Scheduler_SMP_Node_state state;
+
+  /**
+   * @brief The current priority of thread owning this node.
+   */
+  Priority_Control priority;
 } Scheduler_SMP_Node;
 
 void _Scheduler_SMP_Start_idle(

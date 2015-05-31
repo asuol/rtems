@@ -107,11 +107,17 @@ uint32_t _Thread_Dispatch_decrement_disable_level( void )
 
   cpu_self = _Per_CPU_Get();
   disable_level = cpu_self->thread_dispatch_disable_level;
+  _Assert( disable_level > 0);
   --disable_level;
   cpu_self->thread_dispatch_disable_level = disable_level;
 
   _Giant_Do_release( cpu_self );
-  _Assert( disable_level != 0 || _Giant.owner_cpu != cpu_self );
+  _Assert(
+    ( disable_level == cpu_self->isr_nest_level
+      && _Giant.owner_cpu != cpu_self )
+    || ( disable_level > cpu_self->isr_nest_level
+      && _Giant.owner_cpu == cpu_self )
+  );
 
   _Profiling_Thread_dispatch_enable( cpu_self, disable_level );
   _ISR_Enable_without_giant( isr_level );
@@ -119,23 +125,23 @@ uint32_t _Thread_Dispatch_decrement_disable_level( void )
   return disable_level;
 }
 
-void _Giant_Acquire( void )
+void _Giant_Acquire( Per_CPU_Control *cpu_self )
 {
   ISR_Level isr_level;
 
   _ISR_Disable_without_giant( isr_level );
   _Assert( _Thread_Dispatch_disable_level != 0 );
-  _Giant_Do_acquire( _Per_CPU_Get() );
+  _Giant_Do_acquire( cpu_self );
   _ISR_Enable_without_giant( isr_level );
 }
 
-void _Giant_Release( void )
+void _Giant_Release( Per_CPU_Control *cpu_self )
 {
   ISR_Level isr_level;
 
   _ISR_Disable_without_giant( isr_level );
   _Assert( _Thread_Dispatch_disable_level != 0 );
-  _Giant_Do_release( _Per_CPU_Get() );
+  _Giant_Do_release( cpu_self );
   _ISR_Enable_without_giant( isr_level );
 }
 

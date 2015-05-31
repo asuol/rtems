@@ -30,7 +30,6 @@ include_bsp_HEADERS += ../../shared/include/irq-generic.h
 include_bsp_HEADERS += ../../shared/include/irq-info.h
 include_bsp_HEADERS += ../../shared/include/stackalloc.h
 include_bsp_HEADERS += ../../shared/include/uart-output-char.h
-include_bsp_HEADERS += ../../shared/tod.h
 include_bsp_HEADERS += ../shared/include/start.h
 include_bsp_HEADERS += ../shared/include/arm-pl111-fb.h
 include_bsp_HEADERS += ../shared/include/arm-pl111-regs.h
@@ -66,19 +65,20 @@ libbspstart_a_SOURCES = ../shared/start/start.S
 project_lib_DATA = start.$(OBJEXT)
 
 project_lib_DATA += startup/linkcmds
-EXTRA_DIST = 
-EXTRA_DIST += startup/linkcmds.lpc17xx_ea_ram
-EXTRA_DIST += startup/linkcmds.lpc17xx_ea_rom_int
-EXTRA_DIST += startup/linkcmds.lpc17xx_plx800_ram
-EXTRA_DIST += startup/linkcmds.lpc17xx_plx800_rom_int
-EXTRA_DIST += startup/linkcmds.lpc2362
-EXTRA_DIST += startup/linkcmds.lpc23xx_tli800
-EXTRA_DIST += startup/linkcmds.lpc24xx_ea
-EXTRA_DIST += startup/linkcmds.lpc24xx_ncs_ram
-EXTRA_DIST += startup/linkcmds.lpc24xx_ncs_rom_ext
-EXTRA_DIST += startup/linkcmds.lpc24xx_ncs_rom_int
-EXTRA_DIST += startup/linkcmds.lpc24xx_plx800_ram
-EXTRA_DIST += startup/linkcmds.lpc24xx_plx800_rom_int
+project_lib_DATA += startup/linkcmds.lpc17xx_ea_ram
+project_lib_DATA += startup/linkcmds.lpc17xx_ea_rom_int
+project_lib_DATA += startup/linkcmds.lpc17xx_plx800_ram
+project_lib_DATA += startup/linkcmds.lpc17xx_plx800_rom_int
+project_lib_DATA += startup/linkcmds.lpc2362
+project_lib_DATA += startup/linkcmds.lpc23xx_tli800
+project_lib_DATA += startup/linkcmds.lpc24xx_ea
+project_lib_DATA += startup/linkcmds.lpc24xx_ncs_ram
+project_lib_DATA += startup/linkcmds.lpc24xx_ncs_rom_ext
+project_lib_DATA += startup/linkcmds.lpc24xx_ncs_rom_int
+project_lib_DATA += startup/linkcmds.lpc24xx_plx800_ram
+project_lib_DATA += startup/linkcmds.lpc24xx_plx800_rom_int
+project_lib_DATA += startup/linkcmds.lpc40xx_ea_ram
+project_lib_DATA += startup/linkcmds.lpc40xx_ea_rom_int
 
 ###############################################################################
 #                  LibBSP                                                     #
@@ -121,11 +121,8 @@ libbsp_a_SOURCES += irq/irq.c
 libbsp_a_SOURCES += irq/irq-dispatch.c
 
 # Console
-libbsp_a_SOURCES += ../../shared/console.c
-libbsp_a_SOURCES += ../../shared/console_control.c
-libbsp_a_SOURCES += ../../shared/console_read.c
-libbsp_a_SOURCES += ../../shared/console_select.c
-libbsp_a_SOURCES += ../../shared/console_write.c
+libbsp_a_SOURCES += ../../shared/console-termios-init.c
+libbsp_a_SOURCES += ../../shared/console-termios.c
 libbsp_a_SOURCES += console/console-config.c
 libbsp_a_SOURCES += console/uart-probe-1.c
 libbsp_a_SOURCES += console/uart-probe-2.c

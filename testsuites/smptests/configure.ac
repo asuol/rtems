@@ -1,7 +1,7 @@
 ## Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
-AC_INIT([rtems-c-src-tests-smptests],[_RTEMS_VERSION],[http://www.rtems.org/bugzilla])
+AC_INIT([rtems-c-src-tests-smptests],[_RTEMS_VERSION],[https://devel.rtems.org/newticket])
 AC_CONFIG_SRCDIR([smp01])
 AC_CONFIG_HEADER([config.h])
 RTEMS_TOP([../..],[..])
@@ -66,27 +66,37 @@ smp08/Makefile
 smp09/Makefile
 smpaffinity01/Makefile
 smpatomic01/Makefile
+smpcache01/Makefile
+smpcapture01/Makefile
+smpcapture02/Makefile
 smpfatal01/Makefile
 smpfatal02/Makefile
 smpfatal03/Makefile
 smpfatal04/Makefile
 smpfatal05/Makefile
-smpfatal07/Makefile
 smpfatal08/Makefile
 smpipi01/Makefile
 smpload01/Makefile
 smplock01/Makefile
 smpmigration01/Makefile
 smpmigration02/Makefile
+smpmrsp01/Makefile
 smppsxaffinity01/Makefile
 smppsxaffinity02/Makefile
 smppsxsignal01/Makefile
+smpschedaffinity01/Makefile
+smpschedaffinity02/Makefile
+smpschedaffinity03/Makefile
+smpschedaffinity04/Makefile
+smpschedaffinity05/Makefile
 smpscheduler01/Makefile
 smpscheduler02/Makefile
 smpscheduler03/Makefile
+smpschedsem01/Makefile
 smpsignal01/Makefile
 smpswitchextension01/Makefile
 smpthreadlife01/Makefile
 smpunsupported01/Makefile
+smpwakeafter01/Makefile
 ])
 AC_OUTPUT

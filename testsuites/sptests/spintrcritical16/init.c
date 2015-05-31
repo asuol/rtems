@@ -14,57 +14,56 @@
 #include <tmacros.h>
 #include <intrcritical.h>
 
-#include <rtems/rtems/semimpl.h>
+#include <rtems/score/threadimpl.h>
 
 const char rtems_test_name[] = "SPINTRCRITICAL 16";
 
-/* forward declarations to avoid warnings */
-rtems_task Init(rtems_task_argument argument);
-rtems_timer_service_routine test_release_from_isr(rtems_id  timer, void *arg);
-Thread_blocking_operation_States getState(void);
+static Thread_Control *Main_TCB;
 
-Thread_Control *Main_TCB;
-rtems_id        Main_task;
-rtems_id        Semaphore;
-volatile bool   case_hit;
+static rtems_id Semaphore;
 
-Thread_blocking_operation_States getState(void)
+static bool case_hit;
+
+static bool interrupts_blocking_op(void)
 {
-  Objects_Locations  location;
-  Semaphore_Control *sem;
+  Thread_Wait_flags flags = _Thread_Wait_flags_get( Main_TCB );
 
-  sem = (Semaphore_Control *)_Objects_Get(
-    &_Semaphore_Information, Semaphore, &location );
-  if ( location != OBJECTS_LOCAL ) {
-    puts( "Bad object lookup" );
-    rtems_test_exit(0);
-  }
-  _Thread_Unnest_dispatch();
-
-  return sem->Core_control.semaphore.Wait_queue.sync_state;
+  return
+    flags == ( THREAD_WAIT_CLASS_OBJECT | THREAD_WAIT_STATE_INTEND_TO_BLOCK );
 }
 
-rtems_timer_service_routine test_release_from_isr(
+static rtems_timer_service_routine test_release_from_isr(
   rtems_id  timer,
   void     *arg
 )
 {
-  if ( getState() == THREAD_BLOCKING_OPERATION_NOTHING_HAPPENED ) {
+  if ( interrupts_blocking_op() ) {
     case_hit = true;
     (void) rtems_semaphore_release( Semaphore );
   }
 
   if ( Main_TCB->Wait.queue != NULL ) {
-    _Thread_queue_Process_timeout( Main_TCB );
+    _Thread_Timeout( 0, Main_TCB );
   }
 }
 
-rtems_task Init(
+static bool test_body( void *arg )
+{
+  rtems_status_code sc;
+
+  (void) arg;
+
+  sc = rtems_semaphore_obtain( Semaphore, RTEMS_DEFAULT_OPTIONS, 2 );
+  rtems_test_assert( sc == RTEMS_SUCCESSFUL || sc == RTEMS_TIMEOUT );
+
+  return case_hit;
+}
+
+static rtems_task Init(
   rtems_task_argument ignored
 )
 {
   rtems_status_code     sc;
-  int                   resets;
 
   TEST_BEGIN();
   puts(
@@ -82,22 +81,9 @@ rtems_task Init(
   );
   directive_failed( sc, "rtems_semaphore_create of SM1" );
 
-  Main_task = rtems_task_self();
   Main_TCB  = _Thread_Get_executing();
 
-  interrupt_critical_section_test_support_initialize( test_release_from_isr );
-
-  case_hit = false;
-
-  for (resets=0 ; !case_hit && resets<10 ;) {
-    if ( interrupt_critical_section_test_support_delay() )
-      resets++;
-
-    sc = rtems_semaphore_obtain( Semaphore, RTEMS_DEFAULT_OPTIONS, 2 );
-    if ( sc == RTEMS_SUCCESSFUL )
-      break;
-    fatal_directive_status( sc, RTEMS_TIMEOUT, "rtems_semaphore_obtain" );
-  }
+  interrupt_critical_section_test( test_body, NULL, test_release_from_isr );
 
   if ( case_hit ) {
     puts( "Init - Case hit" );
@@ -117,6 +103,7 @@ rtems_task Init(
 #define CONFIGURE_MAXIMUM_TASKS          1
 #define CONFIGURE_MAXIMUM_TIMERS         1
 #define CONFIGURE_MAXIMUM_SEMAPHORES     1
+#define CONFIGURE_MAXIMUM_USER_EXTENSIONS 1
 #define CONFIGURE_MICROSECONDS_PER_TICK  1000
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 

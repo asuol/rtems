@@ -15,7 +15,7 @@
 #include <timesys.h>
 #include <pthread.h>
 #include <sched.h>
-#include <rtems/timerdrv.h>
+#include <rtems/btimer.h>
 #include "test_support.h"
 
 const char rtems_test_name[] = "PSXTMTHREAD 05";
@@ -54,7 +54,8 @@ void *test_thread(
   void *argument
 )
 {
-  long end_time;
+  uint32_t end_time;
+
   sched_yield();
 
   end_time = benchmark_timer_read();

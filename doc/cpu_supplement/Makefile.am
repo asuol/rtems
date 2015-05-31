@@ -15,6 +15,7 @@ GENERATED_FILES += general.texi
 GENERATED_FILES += arm.texi
 GENERATED_FILES += avr.texi
 GENERATED_FILES += bfin.texi
+GENERATED_FILES += epiphany.texi
 GENERATED_FILES += h8300.texi
 GENERATED_FILES += i386.texi
 GENERATED_FILES += lm32.texi
@@ -23,6 +24,7 @@ GENERATED_FILES += m32r.texi
 GENERATED_FILES += m68k.texi
 GENERATED_FILES += microblaze.texi
 GENERATED_FILES += mips.texi
+GENERATED_FILES += or1k.texi
 GENERATED_FILES += powerpc.texi
 GENERATED_FILES += nios2.texi
 GENERATED_FILES += sh.texi
@@ -57,6 +59,11 @@ avr.texi: avr.t
 	    -n "" < $< > $@
 
 bfin.texi: bfin.t
+	$(BMENU2) -p "" \
+	    -u "Top" \
+	    -n "" < $< > $@
+
+epiphany.texi: epiphany.t
 	$(BMENU2) -p "" \
 	    -u "Top" \
 	    -n "" < $< > $@
@@ -97,6 +104,11 @@ microblaze.texi: microblaze.t
 	    -n "" < $< > $@
 
 mips.texi: mips.t
+	$(BMENU2) -p "" \
+	    -u "Top" \
+	    -n "" < $< > $@
+
+or1k.texi: or1k.t
 	$(BMENU2) -p "" \
 	    -u "Top" \
 	    -n "" < $< > $@

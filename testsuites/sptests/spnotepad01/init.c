@@ -15,6 +15,11 @@
 
 const char rtems_test_name[] = "SPNOTEPAD 1";
 
+/*
+ * We know this is deprecated and don't want a warning on every BSP built.
+ */
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 /* forward declarations to avoid warnings */
 rtems_task Init(rtems_task_argument argument);
 
@@ -53,7 +58,6 @@ rtems_task Init(
 #define CONFIGURE_APPLICATION_NEEDS_CONSOLE_DRIVER
 #define CONFIGURE_APPLICATION_DOES_NOT_NEED_CLOCK_DRIVER
 
-#define CONFIGURE_DISABLE_CLASSIC_API_NOTEPADS
 #define CONFIGURE_MAXIMUM_TASKS         1
 #define CONFIGURE_INITIAL_EXTENSIONS RTEMS_TEST_INITIAL_EXTENSION
 

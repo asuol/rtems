@@ -56,6 +56,10 @@ Semaphore_Control   *the_networkSemaphore;
 #endif
 static rtems_id networkDaemonTid;
 static uint32_t   networkDaemonPriority;
+#ifdef RTEMS_SMP
+static const cpu_set_t *networkDaemonCpuset = 0;
+static size_t          networkDaemonCpusetSize = 0;
+#endif
 static void networkDaemon (void *task_argument);
 
 /*
@@ -113,9 +117,12 @@ uint32_t
 rtems_bsdnet_semaphore_release_recursive(void)
 {
 #ifdef RTEMS_FAST_MUTEX
-	uint32_t nest_count = the_networkSemaphore->Core_control.mutex.nest_count;
+	uint32_t nest_count;
 	uint32_t i;
 
+	nest_count =
+		the_networkSemaphore ?
+		the_networkSemaphore->Core_control.mutex.nest_count : 0;
 	for (i = 0; i < nest_count; ++i) {
 		rtems_bsdnet_semaphore_release();
 	}
@@ -281,6 +288,14 @@ rtems_bsdnet_initialize (void)
 		networkDaemonPriority = rtems_bsdnet_config.network_task_priority;
 
 	/*
+	 * Default network task CPU affinity
+	 */
+#ifdef RTEMS_SMP
+	networkDaemonCpuset = rtems_bsdnet_config.network_task_cpuset;
+	networkDaemonCpusetSize = rtems_bsdnet_config.network_task_cpuset_size;
+#endif
+
+	/*
 	 * Set the memory allocation limits
 	 */
 	if (rtems_bsdnet_config.mbuf_bytecount)
@@ -361,12 +376,11 @@ void
 rtems_bsdnet_semaphore_obtain (void)
 {
 #ifdef RTEMS_FAST_MUTEX
-	ISR_Level level;
+	ISR_lock_Context lock_context;
 	Thread_Control *executing;
-#ifdef RTEMS_SMP
-	_Thread_Disable_dispatch();
-#endif
-	_ISR_Disable (level);
+	_ISR_lock_ISR_disable(&lock_context);
+	if (!the_networkSemaphore)
+		rtems_panic ("rtems-net: network sema obtain: network not initialised\n");
 	executing = _Thread_Executing;
 	_CORE_mutex_Seize (
 		&the_networkSemaphore->Core_control.mutex,
@@ -374,11 +388,8 @@ rtems_bsdnet_semaphore_obtain (void)
 		networkSemaphore,
 		1,		/* wait */
 		0,		/* forever */
-		level
+		&lock_context
 		);
-#ifdef RTEMS_SMP
-	_Thread_Enable_dispatch();
-#endif
 	if (executing->Wait.return_code)
 		rtems_panic ("rtems-net: can't obtain network sema: %d\n",
                  executing->Wait.return_code);
@@ -399,16 +410,19 @@ void
 rtems_bsdnet_semaphore_release (void)
 {
 #ifdef RTEMS_FAST_MUTEX
-	int i;
+        ISR_lock_Context lock_context;
+	CORE_mutex_Status status;
 
-	_Thread_Disable_dispatch();
-	i = _CORE_mutex_Surrender (
+	if (!the_networkSemaphore)
+		rtems_panic ("rtems-net: network sema obtain: network not initialised\n");
+        _ISR_lock_ISR_disable(&lock_context);
+	status = _CORE_mutex_Surrender (
 		&the_networkSemaphore->Core_control.mutex,
 		networkSemaphore,
-		NULL
+		NULL,
+                &lock_context
 		);
-	_Thread_Enable_dispatch();
-	if (i)
+	if (status != CORE_MUTEX_STATUS_SUCCESSFUL)
 		rtems_panic ("rtems-net: can't release network sema: %i\n");
 #else
 	rtems_status_code sc;
@@ -420,57 +434,68 @@ rtems_bsdnet_semaphore_release (void)
 #endif
 }
 
+static int
+rtems_bsdnet_sleep(rtems_event_set in, rtems_interval ticks)
+{
+	rtems_status_code sc;
+	rtems_event_set out;
+	rtems_event_set out2;
+
+	in |= RTEMS_EVENT_SYSTEM_NETWORK_CLOSE;
+
+	/*
+	 * Soak up any pending events.  The sleep/wakeup synchronization in the
+	 * FreeBSD kernel has no memory.
+	 */
+	rtems_event_system_receive(in, RTEMS_EVENT_ANY | RTEMS_NO_WAIT,
+	    RTEMS_NO_TIMEOUT, &out);
+
+	/*
+	 * Wait for the wakeup event.
+	 */
+	sc = rtems_bsdnet_event_receive(in, RTEMS_EVENT_ANY | RTEMS_WAIT,
+	    ticks, &out);
+
+	/*
+	 * Get additional events that may have been received between the
+	 * rtems_event_system_receive() and the rtems_bsdnet_semaphore_obtain().
+	 */
+	rtems_event_system_receive(in, RTEMS_EVENT_ANY | RTEMS_NO_WAIT,
+	    RTEMS_NO_TIMEOUT, &out2);
+	out |= out2;
+
+	if (out & RTEMS_EVENT_SYSTEM_NETWORK_CLOSE)
+		return (ENXIO);
+
+	if (sc == RTEMS_SUCCESSFUL)
+		return (0);
+
+	return (EWOULDBLOCK);
+}
+
 /*
  * Wait for something to happen to a socket buffer
  */
 int
 sbwait(struct sockbuf *sb)
 {
-	rtems_event_set events;
-	rtems_id tid;
-	rtems_status_code sc;
-
-	/*
-	 * Soak up any pending events.
-	 * The sleep/wakeup synchronization in the FreeBSD
-	 * kernel has no memory.
-	 */
-	rtems_event_system_receive (SBWAIT_EVENT, RTEMS_EVENT_ANY | RTEMS_NO_WAIT, RTEMS_NO_TIMEOUT, &events);
+	int error;
 
 	/*
 	 * Set this task as the target of the wakeup operation.
 	 */
-	rtems_task_ident (RTEMS_SELF, 0, &tid);
-	sb->sb_sel.si_pid = tid;
+	sb->sb_sel.si_pid = rtems_task_self();
 
 	/*
 	 * Show that socket is waiting
 	 */
 	sb->sb_flags |= SB_WAIT;
 
-	/*
-	 * Release the network semaphore.
-	 */
-	rtems_bsdnet_semaphore_release ();
+	error = rtems_bsdnet_sleep(SBWAIT_EVENT, sb->sb_timeo);
+	if (error != ENXIO)
+		sb->sb_flags &= ~SB_WAIT;
 
-	/*
-	 * Wait for the wakeup event.
-	 */
-	sc = rtems_event_system_receive (SBWAIT_EVENT, RTEMS_EVENT_ANY | RTEMS_WAIT, sb->sb_timeo, &events);
-
-	/*
-	 * Reobtain the network semaphore.
-	 */
-	rtems_bsdnet_semaphore_obtain ();
-
-	/*
-	 * Return the status of the wait.
-	 */
-	switch (sc) {
-	case RTEMS_SUCCESSFUL:	return 0;
-	case RTEMS_TIMEOUT:	return EWOULDBLOCK;
-	default:		return ENXIO;
-	}
+	return (error);
 }
 
 
@@ -483,7 +508,6 @@ sowakeup(
 	struct sockbuf *sb)
 {
 	if (sb->sb_flags & SB_WAIT) {
-		sb->sb_flags &= ~SB_WAIT;
 		rtems_event_system_send (sb->sb_sel.si_pid, SBWAIT_EVENT);
 	}
 	if (sb->sb_wakeup) {
@@ -512,40 +536,20 @@ wakeup (void *p)
 int
 soconnsleep (struct socket *so)
 {
-	rtems_event_set events;
-	rtems_id tid;
-	rtems_status_code sc;
-
-	/*
-	 * Soak up any pending events.
-	 * The sleep/wakeup synchronization in the FreeBSD
-	 * kernel has no memory.
-	 */
-	rtems_event_system_receive (SOSLEEP_EVENT, RTEMS_EVENT_ANY | RTEMS_NO_WAIT, RTEMS_NO_TIMEOUT, &events);
+	int error;
 
 	/*
 	 * Set this task as the target of the wakeup operation.
 	 */
 	if (so->so_pgid)
 		rtems_panic ("Another task is already sleeping on that socket");
-	rtems_task_ident (RTEMS_SELF, 0, &tid);
-	so->so_pgid = tid;
+	so->so_pgid = rtems_task_self();
 
-	/*
-	 * Wait for the wakeup event.
-	 */
-	sc = rtems_bsdnet_event_receive (SOSLEEP_EVENT, RTEMS_EVENT_ANY | RTEMS_WAIT, so->so_rcv.sb_timeo, &events);
+	error = rtems_bsdnet_sleep(SOSLEEP_EVENT, so->so_rcv.sb_timeo);
+	if (error != ENXIO)
+		so->so_pgid = 0;
 
-	/*
-	 * Relinquish ownership of the socket.
-	 */
-	so->so_pgid = 0;
-
-	switch (sc) {
-	case RTEMS_SUCCESSFUL:	return 0;
-	case RTEMS_TIMEOUT:	return EWOULDBLOCK;
-	default:		return ENXIO;
-	}
+	return (error);
 }
 
 /*
@@ -660,11 +664,25 @@ taskEntry (rtems_task_argument arg)
 	rtems_panic ("Network task returned!\n");
 }
 
+
 /*
  * Start a network task
  */
+#ifdef RTEMS_SMP
 rtems_id
 rtems_bsdnet_newproc (char *name, int stacksize, void(*entry)(void *), void *arg)
+{
+	return rtems_bsdnet_newproc_affinity( name, stacksize, entry, arg,
+		networkDaemonCpuset, networkDaemonCpusetSize );
+}
+
+rtems_id
+rtems_bsdnet_newproc_affinity (char *name, int stacksize, void(*entry)(void *),
+    void *arg, const cpu_set_t *set, const size_t setsize)
+#else
+rtems_id
+rtems_bsdnet_newproc (char *name, int stacksize, void(*entry)(void *), void *arg)
+#endif
 {
 	struct newtask *t;
 	char nm[4];
@@ -680,6 +698,14 @@ rtems_bsdnet_newproc (char *name, int stacksize, void(*entry)(void *), void *arg
 		&tid);
 	if (sc != RTEMS_SUCCESSFUL)
 		rtems_panic ("Can't create network daemon `%s': `%s'\n", name, rtems_status_text (sc));
+
+#ifdef RTEMS_SMP
+	/*
+	 * Use the default affinity or use the user-provided CPU set
+	 */
+	if ( set != 0 )
+		rtems_task_set_affinity( tid, setsize, set );
+#endif
 
 	/*
 	 * Set up task arguments
@@ -1312,3 +1338,4 @@ m_clalloc(int ncl, int nowait)
 	}
 	return 1;
 }
+

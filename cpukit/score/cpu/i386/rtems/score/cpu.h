@@ -38,7 +38,6 @@ extern "C" {
 /* conditional compilation parameters */
 
 #define CPU_INLINE_ENABLE_DISPATCH       TRUE
-#define CPU_UNROLL_ENQUEUE_PRIORITY      FALSE
 
 /*
  *  Does the CPU follow the simple vectored interrupt model?
@@ -472,6 +471,7 @@ uint32_t   _CPU_ISR_Get_level( void );
   do { \
     uint32_t   _stack; \
     \
+    (void) _is_fp; /* avoid warning for being unused */ \
     if ( (_isr) ) (_the_context)->eflags = CPU_EFLAGS_INTERRUPTS_OFF; \
     else          (_the_context)->eflags = CPU_EFLAGS_INTERRUPTS_ON; \
     \
@@ -492,6 +492,8 @@ uint32_t   _CPU_ISR_Get_level( void );
   bool _CPU_SMP_Start_processor( uint32_t cpu_index );
 
   void _CPU_SMP_Finalize_initialization( uint32_t cpu_count );
+
+  void _CPU_SMP_Prepare_start_multitasking( void );
 
   uint32_t _CPU_SMP_Get_current_processor( void );
 
@@ -525,7 +527,7 @@ uint32_t   _CPU_ISR_Get_level( void );
  *    + disable interrupts and halt the CPU
  */
 
-#define _CPU_Fatal_halt( _error ) \
+#define _CPU_Fatal_halt( _source, _error ) \
   { \
     uint32_t _error_lvalue = ( _error ); \
     __asm__ volatile ( "cli ; \

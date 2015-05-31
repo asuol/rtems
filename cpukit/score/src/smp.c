@@ -118,11 +118,24 @@ void _SMP_Request_start_multitasking( void )
   }
 }
 
+bool _SMP_Should_start_processor( uint32_t cpu_index )
+{
+  const Scheduler_Assignment *assignment =
+    _Scheduler_Get_assignment( cpu_index );
+
+  return _Scheduler_Should_start_processor( assignment );
+}
+
 void _SMP_Start_multitasking_on_secondary_processor( void )
 {
   Per_CPU_Control *self_cpu = _Per_CPU_Get();
+  uint32_t cpu_index_self = _Per_CPU_Get_index( self_cpu );
 
-  if ( !_Per_CPU_Is_processor_started( self_cpu ) ) {
+  if ( cpu_index_self >= rtems_configuration_get_maximum_processors() ) {
+    _SMP_Fatal( SMP_FATAL_MULTITASKING_START_ON_INVALID_PROCESSOR );
+  }
+
+  if ( !_SMP_Should_start_processor( cpu_index_self ) ) {
     _SMP_Fatal( SMP_FATAL_MULTITASKING_START_ON_UNASSIGNED_PROCESSOR );
   }
 
@@ -155,7 +168,7 @@ void _SMP_Send_message( uint32_t cpu_index, unsigned long message )
   _CPU_SMP_Send_interrupt( cpu_index );
 }
 
-void _SMP_Broadcast_message( uint32_t message )
+void _SMP_Send_message_broadcast( unsigned long message )
 {
   uint32_t cpu_count = _SMP_Get_processor_count();
   uint32_t cpu_index_self = _SMP_Get_current_processor();
@@ -165,6 +178,22 @@ void _SMP_Broadcast_message( uint32_t message )
 
   for ( cpu_index = 0 ; cpu_index < cpu_count ; ++cpu_index ) {
     if ( cpu_index != cpu_index_self ) {
+      _SMP_Send_message( cpu_index, message );
+    }
+  }
+}
+
+void _SMP_Send_message_multicast(
+    const size_t setsize,
+    const cpu_set_t *cpus,
+    unsigned long message
+)
+{
+  uint32_t cpu_count = _SMP_Get_processor_count();
+  uint32_t cpu_index;
+
+  for ( cpu_index = 0 ; cpu_index < cpu_count ; ++cpu_index ) {
+    if ( CPU_ISSET_S( cpu_index, setsize, cpus ) ) {
       _SMP_Send_message( cpu_index, message );
     }
   }

@@ -13,7 +13,7 @@
 
 #include <timesys.h>
 #include <pthread.h>
-#include <rtems/timerdrv.h>
+#include <rtems/btimer.h>
 #include "test_support.h"
 
 const char rtems_test_name[] = "PSXTMCOND 05";
@@ -26,8 +26,8 @@ pthread_cond_t CondID;
 
 void benchmark_broadcast(void)
 {
-  long end_time;
-  int  status;
+  uint32_t end_time;
+  int      status;
 
   benchmark_timer_initialize();
   status = pthread_cond_broadcast(&CondID);

@@ -20,6 +20,7 @@
 #include <rtems/test.h>
 #include <rtems/score/percpu.h>
 #include <rtems/score/smpimpl.h>
+#include <rtems/score/smpbarrier.h>
 
 #include <assert.h>
 #include <stdlib.h>
@@ -29,6 +30,8 @@ const char rtems_test_name[] = "SMPFATAL 1";
 #define MAX_CPUS 32
 
 static uint32_t main_cpu;
+
+static SMP_barrier_Control barrier = SMP_BARRIER_CONTROL_INITIALIZER;
 
 static void Init(rtems_task_argument arg)
 {
@@ -41,6 +44,8 @@ static void fatal_extension(
   rtems_fatal_code code
 )
 {
+  SMP_barrier_State barrier_state = SMP_BARRIER_STATE_INITIALIZER;
+
   if (source == RTEMS_FATAL_SOURCE_SMP) {
     uint32_t self = rtems_get_current_processor();
 
@@ -60,6 +65,8 @@ static void fatal_extension(
       rtems_test_endk();
     }
   }
+
+  _SMP_barrier_Wait(&barrier, &barrier_state, rtems_get_processor_count());
 }
 
 static rtems_status_code test_driver_init(

@@ -26,6 +26,7 @@
 #include <rtems/posix/pthreadimpl.h>
 #include <rtems/score/threadimpl.h>
 #include <rtems/score/threadqimpl.h>
+#include <rtems/score/statesimpl.h>
 
 int pthread_join(
   pthread_t   thread,
@@ -66,11 +67,12 @@ on_EINTR:
          _Thread_Clear_state( the_thread, STATES_WAITING_FOR_JOIN_AT_EXIT );
       } else {
         executing->Wait.return_argument = &return_pointer;
-        _Thread_queue_Enter_critical_section( &api->Join_List );
         _Thread_queue_Enqueue(
           &api->Join_List,
           executing,
-          WATCHDOG_NO_TIMEOUT
+          STATES_WAITING_FOR_JOIN | STATES_INTERRUPTIBLE_BY_SIGNAL,
+          WATCHDOG_NO_TIMEOUT,
+          0
         );
       }
       _Objects_Put( &the_thread->Object );

@@ -39,22 +39,6 @@ extern "C" {
 #define CPU_INLINE_ENABLE_DISPATCH       TRUE
 
 /**
- * Should the body of the search loops in _Thread_queue_Enqueue_priority
- * be unrolled one time?  In unrolled each iteration of the loop examines
- * two "nodes" on the chain being searched.  Otherwise, only one node
- * is examined per iteration.
- *
- * - If TRUE, then the loops are unrolled.
- * - If FALSE, then the loops are not unrolled.
- *
- * This parameter could go either way on the SPARC.  The interrupt flash
- * code is relatively lengthy given the requirements for nops following
- * writes to the psr.  But if the clock speed were high enough, this would
- * not represent a great deal of time.
- */
-#define CPU_UNROLL_ENQUEUE_PRIORITY      TRUE
-
-/**
  * Does the executive manage a dedicated interrupt stack in software?
  *
  * If TRUE, then a stack is allocated in _ISR_Handler_initialization.
@@ -357,13 +341,25 @@ typedef struct {
 /** This defines the size of the minimum stack frame. */
 #define CPU_MINIMUM_STACK_FRAME_SIZE          0x60
 
-#define CPU_PER_CPU_CONTROL_SIZE 4
+#if ( SPARC_HAS_FPU == 1 )
+  #define CPU_PER_CPU_CONTROL_SIZE 8
+#else
+  #define CPU_PER_CPU_CONTROL_SIZE 4
+#endif
 
 /**
  * @brief Offset of the CPU_Per_CPU_control::isr_dispatch_disable field
  * relative to the Per_CPU_Control begin.
  */
 #define SPARC_PER_CPU_ISR_DISPATCH_DISABLE 0
+
+#if ( SPARC_HAS_FPU == 1 )
+  /**
+   * @brief Offset of the CPU_Per_CPU_control::fsr field relative to the
+   * Per_CPU_Control begin.
+   */
+  #define SPARC_PER_CPU_FSR_OFFSET 4
+#endif
 
 /**
  * @defgroup Contexts SPARC Context Structures
@@ -396,6 +392,17 @@ typedef struct {
    * attempts on a previously interrupted thread's stack.
    */
   uint32_t isr_dispatch_disable;
+
+#if ( SPARC_HAS_FPU == 1 )
+  /**
+   * @brief Memory location to store the FSR register during interrupt
+   * processing.
+   *
+   * This is a write-only field.  The FSR is written to force a completion of
+   * floating point operations in progress.
+   */
+  uint32_t fsr;
+#endif
 } CPU_Per_CPU_control;
 
 /**
@@ -475,7 +482,7 @@ typedef struct {
   uint32_t   isr_dispatch_disable;
 
 #if defined(RTEMS_SMP)
-  volatile bool is_executing;
+  volatile uint32_t is_executing;
 #endif
 } Context_Control;
 
@@ -562,9 +569,6 @@ typedef struct {
 #if defined(RTEMS_SMP)
   #define SPARC_CONTEXT_CONTROL_IS_EXECUTING_OFFSET 0x58
 #endif
-
-/** This defines the size of the context area for use in assembly. */
-#define CONTEXT_CONTROL_SIZE 0x68
 
 #ifndef ASM
 /**
@@ -716,8 +720,6 @@ typedef struct {
  *  Offsets of fields with CPU_Interrupt_frame for assembly routines.
  */
 
-/** This macro defines an offset into the ISF for use in assembly. */
-#define ISF_STACK_FRAME_OFFSET 0x00
 /** This macro defines an offset into the ISF for use in assembly. */
 #define ISF_PSR_OFFSET         CPU_MINIMUM_STACK_FRAME_SIZE + 0x00
 /** This macro defines an offset into the ISF for use in assembly. */
@@ -1080,14 +1082,8 @@ void _CPU_Context_Initialize(
  * location or a register, optionally disables interrupts, and
  * halts/stops the CPU.
  */
-#define _CPU_Fatal_halt( _error ) \
-  do { \
-    uint32_t   level; \
-    \
-    level = sparc_disable_interrupts(); \
-    __asm__ volatile ( "mov  %0, %%g1 " : "=r" (level) : "0" (level) ); \
-    while (1); /* loop forever */ \
-  } while (0)
+extern void _CPU_Fatal_halt(uint32_t source, uint32_t error)
+  RTEMS_COMPILER_NO_RETURN_ATTRIBUTE;
 
 /* end of Fatal Error manager macros */
 
@@ -1192,7 +1188,9 @@ register struct Per_CPU_Control *_SPARC_Per_CPU_current __asm__( "g6" );
 
   void _CPU_SMP_Finalize_initialization( uint32_t cpu_count );
 
-  #if defined(__leon__)
+  void _CPU_SMP_Prepare_start_multitasking( void );
+
+  #if defined(__leon__) && !defined(RTEMS_PARAVIRT)
     static inline uint32_t _CPU_SMP_Get_current_processor( void )
     {
       return _LEON3_Get_current_processor();
@@ -1236,31 +1234,16 @@ void _CPU_Context_restore_fp(
   Context_Control_fp **fp_context_ptr
 );
 
-static inline void _CPU_Context_volatile_clobber( uintptr_t pattern )
-{
-  /* TODO */
-}
+void _CPU_Context_volatile_clobber( uintptr_t pattern );
 
-static inline void _CPU_Context_validate( uintptr_t pattern )
-{
-  while (1) {
-    /* TODO */
-  }
-}
+void _CPU_Context_validate( uintptr_t pattern );
 
 typedef struct {
   uint32_t trap;
   CPU_Interrupt_frame *isf;
 } CPU_Exception_frame;
 
-void _BSP_Exception_frame_print( const CPU_Exception_frame *frame );
-
-static inline void _CPU_Exception_frame_print(
-  const CPU_Exception_frame *frame
-)
-{
-  _BSP_Exception_frame_print( frame );
-}
+void _CPU_Exception_frame_print( const CPU_Exception_frame *frame );
 
 /**
  * @brief SPARC specific method to endian swap an uint32_t.

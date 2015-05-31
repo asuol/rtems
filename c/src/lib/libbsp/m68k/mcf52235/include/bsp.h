@@ -5,10 +5,6 @@
 #ifndef _BSP_H
 #define _BSP_H
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <bspopts.h>
 #include <bsp/default-initial-extension.h>
 #include <rtems.h>
@@ -21,6 +17,10 @@ extern "C" {
 /***************************************************************************/
 /**  Hardware data structure headers                                      **/
 #include <mcf5223x/mcf5223x.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Declare base address of peripherals area */
 #define __IPSBAR ((vuint8 *) 0x40000000)
@@ -62,6 +62,11 @@ rtems_isr_entry set_vector(
 #define UART1_IRQ_PRIORITY  6
 #define UART2_IRQ_LEVEL     3
 #define UART2_IRQ_PRIORITY  5
+
+/*
+ * Prototypes for BSP methods which cross file boundaries
+ */
+void Init52235(void);
 
 #ifdef __cplusplus
 }

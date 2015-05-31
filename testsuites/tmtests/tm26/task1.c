@@ -99,6 +99,10 @@ static void set_thread_dispatch_necessary( bool dispatch_necessary )
 
   _Thread_Dispatch_necessary = dispatch_necessary;
 
+  if ( !dispatch_necessary ) {
+    _Thread_Heir = _Thread_Executing;
+  }
+
 #if defined( PREVENT_SMP_ASSERT_FAILURES )
   _ISR_Enable_without_giant( level );
 #endif
@@ -170,7 +174,7 @@ static void thread_resume( Thread_Control *thread )
   _Thread_Disable_dispatch();
 #endif
 
-  _Thread_Resume( thread );
+  _Thread_Clear_state( thread, STATES_SUSPENDED );
 
 #if defined( PREVENT_SMP_ASSERT_FAILURES )
   _Thread_Unnest_dispatch();
@@ -435,9 +439,6 @@ rtems_task Low_task(
   thread_disable_dispatch();
 
   benchmark_timer_initialize();
-#if (CPU_HARDWARE_FP == 1) || (CPU_SOFTWARE_FP == 1)
-    _Context_Restore_fp( &_Thread_Get_executing()->fp_context );
-#endif
     _Context_Switch(
       &executing->Registers,
       &_Thread_Get_executing()->Registers

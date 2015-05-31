@@ -83,7 +83,7 @@ rtems_bsdnet_makeFdForSocket (void *so)
   if (iop == 0)
       rtems_set_errno_and_return_minus_one( ENFILE );
 
-  fd = iop - rtems_libio_iops;
+  fd = rtems_libio_iop_to_descriptor(iop);
   iop->flags |= LIBIO_FLAGS_WRITE | LIBIO_FLAGS_READ;
   iop->data0 = fd;
   iop->data1 = so;
@@ -204,17 +204,17 @@ connect (int s, struct sockaddr *name, int namelen)
 		rtems_bsdnet_semaphore_release ();
 		return -1;
 	}
-	while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0) {
+	error = so->so_error;
+	while (error == 0 && (so->so_state & SS_ISCONNECTING)) {
 		error = soconnsleep (so);
 		if (error)
 			break;
-	}
-	if (error == 0) {
 		error = so->so_error;
 		so->so_error = 0;
 	}
     bad:
-	so->so_state &= ~SS_ISCONNECTING;
+	if (error != ENXIO)
+		so->so_state &= ~SS_ISCONNECTING;
 	m_freem (nam);
 	if (error)
 		errno = error;
@@ -249,6 +249,7 @@ accept (int s, struct sockaddr *name, int *namelen)
 	int fd;
 	struct socket *head, *so;
 	struct mbuf *nam;
+	int error;
 
 	rtems_bsdnet_semaphore_obtain ();
 	if ((head = rtems_bsdnet_fdToSocket (s)) == NULL) {
@@ -265,16 +266,16 @@ accept (int s, struct sockaddr *name, int *namelen)
 		rtems_bsdnet_semaphore_release ();
 		return -1;
 	}
-        while (head->so_comp.tqh_first == NULL && head->so_error == 0) {
+	error = head->so_error;
+        while (error ==  0 && head->so_comp.tqh_first == NULL) {
                 if (head->so_state & SS_CANTRCVMORE) {
-                        head->so_error = ECONNABORTED;
+                        error = ECONNABORTED;
                         break;
                 }
-		head->so_error = soconnsleep (head);
+		error = soconnsleep (head);
         }
-	if (head->so_error) {
-		errno = head->so_error;
-		head->so_error = 0;
+	if (error) {
+		errno = error;
 		rtems_bsdnet_semaphore_release ();
 		return -1;
 	}
@@ -715,6 +716,7 @@ rtems_bsdnet_close (rtems_libio_t *iop)
 		rtems_bsdnet_semaphore_release ();
 		return -1;
 	}
+	iop->data1 = NULL;
 	error = soclose (so);
 	rtems_bsdnet_semaphore_release ();
 	if (error) {
