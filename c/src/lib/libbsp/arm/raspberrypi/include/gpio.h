@@ -36,6 +36,17 @@ extern "C" {
 #define GPIO_PHYSICAL_PIN_COUNT 32
 
 /**
+ * @brief GPIO API mutex atributes.
+ */
+#define MUTEX_ATRIBUTES                         \
+  ( RTEMS_LOCAL                                 \
+    | RTEMS_PRIORITY                            \
+    | RTEMS_BINARY_SEMAPHORE                    \
+    | RTEMS_INHERIT_PRIORITY                    \
+    | RTEMS_NO_PRIORITY_CEILING                 \
+    )
+
+/**
  * @brief The set of possible configurations for a GPIO pull-up resistor.
  *
  * Enumerated type to define the possible pull-up resistor configuratons 
@@ -259,6 +270,21 @@ void *arg
  */
 extern rtems_status_code gpio_disable_interrupt(int dev_pin);
 
+/**
+ * @brief Disables the interrupt vector. This must be implemented by each BSP.
+ */
+extern void interrupt_vector_disable(void);
+
+/**
+ * @brief Enables the interrupt vector. This must be implemented by each BSP.
+ */
+extern void interrupt_vector_enable(void);
+
+/**
+ * @brief Disables interrupt on hardware. This must be implemented by each BSP.
+ */
+extern void bsp_disable_interrupt(int dev_pin, gpio_interrupt enabled_interrupt);
+  
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
