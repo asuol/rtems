@@ -271,6 +271,16 @@ void *arg
 extern rtems_status_code gpio_disable_interrupt(int dev_pin);
 
 /**
+ * @brief Turns on the given pin. This must be implemented by each BSP.
+ */
+extern void bsp_gpio_set(int pin);
+
+/**
+ * @brief Turns off the given pin. This must be implemented by each BSP.
+ */
+extern void bsp_gpio_clear(int pin);
+  
+/**
  * @brief Disables the interrupt vector. This must be implemented by each BSP.
  */
 extern void interrupt_vector_disable(void);
@@ -280,6 +290,11 @@ extern void interrupt_vector_disable(void);
  */
 extern void interrupt_vector_enable(void);
 
+/**
+ * @brief Enables interrupt on hardware. This must be implemented by each BSP.
+ */
+extern void bsp_enable_interrupt(int dev_pin, gpio_interrupt interrupt);
+  
 /**
  * @brief Disables interrupt on hardware. This must be implemented by each BSP.
  */
