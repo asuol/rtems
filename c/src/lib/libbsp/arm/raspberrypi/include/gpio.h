@@ -24,29 +24,6 @@ extern "C" {
 #endif /* __cplusplus */
 
 /**
- * @brief  Total number of GPIOs on the Raspberry Pi,
- *         including physical GPIO pins (available on the board hardware)
- *         and system GPIOs (only accessible to the system).
- */
-#define GPIO_COUNT 54
-
-/**
- * @brief  Highest GPIO index physically accessible on the Raspberry Pi board.
- */
-#define GPIO_PHYSICAL_PIN_COUNT 32
-
-/**
- * @brief GPIO API mutex atributes.
- */
-#define MUTEX_ATRIBUTES                         \
-  ( RTEMS_LOCAL                                 \
-    | RTEMS_PRIORITY                            \
-    | RTEMS_BINARY_SEMAPHORE                    \
-    | RTEMS_INHERIT_PRIORITY                    \
-    | RTEMS_NO_PRIORITY_CEILING                 \
-    )
-
-/**
  * @brief The set of possible configurations for a GPIO pull-up resistor.
  *
  * Enumerated type to define the possible pull-up resistor configuratons 
@@ -57,7 +34,7 @@ typedef enum
   PULL_UP = 1,
   PULL_DOWN,
   NO_PULL_RESISTOR
-} rpi_gpio_input_mode;
+} gpio_pull_mode;
 
 /**
  * @brief The set of possible functions a pin can have.
@@ -68,14 +45,9 @@ typedef enum
 {
   DIGITAL_INPUT = 0,
   DIGITAL_OUTPUT,
-  ALT_FUNC_5,
-  ALT_FUNC_4,
-  ALT_FUNC_0,
-  ALT_FUNC_1,
-  ALT_FUNC_2,
-  ALT_FUNC_3,
+  BSP_SPECIFIC,
   NOT_USED
-} rpi_pin;
+} gpio_function;
 
 /**
  * @brief The set of possible interrupts a GPIO pin can generate.
@@ -116,6 +88,36 @@ typedef enum
   SHARED_HANDLER,
   UNIQUE_HANDLER
 } gpio_handler_flag;
+
+  typedef struct
+  {
+    /* The bsp defined function code. */
+    uint32_t io_type;
+ 
+    void* pin_data;
+  } gpio_specific_data;
+  
+typedef struct
+{
+  /* I/O function code, specified by the BSP. */
+  uint32_t io_type;
+
+  /* Pointer to the function which setups this I/O type. */ //TODO: Function should return if the I/0 cannot be performed 
+  rtems_status_code (*config_io) (uint32_t bank, uint32_t pin, void* arg);
+} gpio_io_type;
+  
+typedef struct
+{
+  /* Total number of GPIO pins. */
+  uint32_t pin_count;
+
+  /* Number of pins per bank. The last bank may be smaller,
+   * depending on the total number of pins. */
+  uint32_t pins_per_bank;
+
+  /* List of bsp specific new functions. */
+  gpio_io_type* bsp_functions;
+} gpio_layout;
   
 /**
  * @brief Object containing relevant information to a list of user-defined
@@ -139,8 +141,11 @@ typedef struct _gpio_handler_list
  * Encapsulates relevant data about a GPIO pin.
  */
 typedef struct
-{ 
-  rpi_pin pin_type;
+{
+  uint32_t bank_number;
+  uint32_t pin_number;
+  
+  gpio_function pin_type;
 
   /* Type of event which will trigger an interrupt. */
   gpio_interrupt enabled_interrupt;
@@ -149,19 +154,28 @@ typedef struct
    * to call each handler sequentially. */
   rtems_id task_id;
 
+  /* ISR shared flag. */
   gpio_handler_flag handler_flag;
   
   /* Linked list of interrupt handlers. */
   gpio_handler_list *handler_list;
 
-  /* GPIO input pin mode. */
-  rpi_gpio_input_mode input_mode;
+  /* GPIO input (pull resistor) pin mode. */
+  gpio_pull_mode input_mode;
 
   /* Switch-deboucing information. */
   int debouncing_tick_count;
   rtems_interval last_isr_tick;
+
+  /* Struct with bsp specific data.
+   * If function == BSP_SPECIFIC this should have a pointer to
+   * a gpio_specific_data struct.
+   *
+   * If not this field may be NULL. This is passed to the bsp function so any bsp specific data
+   * can be passed to it through this pointer. */
+  void* bsp_specific;
   
-} rpi_gpio_pin;
+} gpio_pin;
  
 /** @} */
 
@@ -174,7 +188,7 @@ typedef struct
 /**
  * @brief Initializes the GPIO API.
  */
-extern void gpio_initialize(void);
+extern rtems_status_code gpio_initialize(void);
 
 /**
  * @brief Turns on the given pin.
@@ -194,34 +208,17 @@ extern int gpio_get_value(int pin);
 /**
  * @brief Selects a GPIO pin for a specific function.
  */
-extern rtems_status_code gpio_select_pin(int pin, rpi_pin type);
+extern rtems_status_code gpio_select_pin(int pin, gpio_function type);
 
-/**
- * @brief Setups a JTAG pin configuration.
- */
-extern rtems_status_code gpio_select_jtag(void);
-
-/**
- * @brief Setups the SPI interface on the RPI P1 GPIO header.
- */
-extern rtems_status_code gpio_select_spi_p1(void);
-
-/**
- * @brief Setups the I2C interface on the main (P1) GPIO pin header (rev2).
- */
-extern rtems_status_code gpio_select_i2c_p1_rev2(void); 
-
+extern rtems_status_code gpio_select_pin_group(int* pin_group, int pin_count, gpio_function type);
+  
 /**
  * @brief Configures a input GPIO pin pull-up resistor.
  */
-extern rtems_status_code gpio_input_mode(int pin, rpi_gpio_input_mode mode);
+extern rtems_status_code gpio_input_mode(int pin, gpio_pull_mode mode);
 
-/**
- * @brief Configures several input GPIO pins to the same pull-up resistor setup.
- */
-extern rtems_status_code 
-gpio_setup_input_mode(int *pin, int pin_count, rpi_gpio_input_mode mode);
-
+extern rtems_status_code gpio_input_pin_group(int* pin_group, int pin_count, gpio_pull_mode mode);
+  
 /**
  * @brief Discards any configuration made on this pin.
  */
@@ -270,15 +267,31 @@ void *arg
  */
 extern rtems_status_code gpio_disable_interrupt(int dev_pin);
 
+
+extern gpio_layout bsp_gpio_initialize(void);
+  
 /**
  * @brief Turns on the given pin. This must be implemented by each BSP.
  */
-extern void bsp_gpio_set(int pin);
+extern rtems_status_code bsp_gpio_set(int bank, int pin);
 
 /**
  * @brief Turns off the given pin. This must be implemented by each BSP.
  */
-extern void bsp_gpio_clear(int pin);
+extern rtems_status_code bsp_gpio_clear(int bank, int pin);
+
+extern int bsp_gpio_get_value(int bank, int pin);
+
+extern rtems_status_code bsp_gpio_select(int bank, int pin, gpio_function type);
+
+extern rtems_status_code bsp_gpio_set_input_mode(int bank, int pin, gpio_pull_mode mode);
+
+  // Should return a 32 bit bitmask, where a bit set indicates an active interrupt on that pin
+extern uint32_t bsp_gpio_interrupt_line(rtems_vector_number vector);
+
+  extern void bsp_gpio_clear_interrupt_line(rtems_vector_number vector, uint32_t event_status);
+
+extern rtems_vector_number bsp_gpio_get_vector(int bank);
   
 /**
  * @brief Disables the interrupt vector. This must be implemented by each BSP.
@@ -293,12 +306,12 @@ extern void interrupt_vector_enable(void);
 /**
  * @brief Enables interrupt on hardware. This must be implemented by each BSP.
  */
-extern void bsp_enable_interrupt(int dev_pin, gpio_interrupt interrupt);
+extern rtems_status_code bsp_enable_interrupt(int dev_pin, gpio_interrupt interrupt);
   
 /**
  * @brief Disables interrupt on hardware. This must be implemented by each BSP.
  */
-extern void bsp_disable_interrupt(int dev_pin, gpio_interrupt enabled_interrupt);
+extern rtems_status_code bsp_disable_interrupt(int dev_pin, gpio_interrupt enabled_interrupt);
   
 #ifdef __cplusplus
 }

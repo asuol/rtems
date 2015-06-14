@@ -16,6 +16,7 @@
 
 #include <bsp/raspberrypi.h>
 #include <bsp/gpio.h>
+#include <bsp/rpi-gpio.h>
 #include <bsp/i2c.h>
 
 static rtems_libi2c_bus_ops_t bcm2835_i2c_ops = {

@@ -45,6 +45,7 @@ include_bsp_HEADERS += include/mmu.h
 include_bsp_HEADERS += include/usart.h
 include_bsp_HEADERS += include/raspberrypi.h
 include_bsp_HEADERS += include/gpio.h
+include_bsp_HEADERS += include/rpi-gpio.h
 include_bsp_HEADERS += include/i2c.h
 
 include_libcpu_HEADERS = ../../../libcpu/arm/shared/include/cache_.h \
