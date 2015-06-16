@@ -40,6 +40,48 @@
 
 #define RELEASE_LOCK(m) assert( rtems_semaphore_release(m) == RTEMS_SUCCESSFUL )
 
+/**
+ * @brief Object containing information on a GPIO pin.
+ *
+ * Encapsulates relevant data about a GPIO pin.
+ */
+typedef struct
+{
+  uint32_t bank_number;
+  uint32_t pin_number;
+  
+  gpio_function pin_type;
+
+  /* Type of event which will trigger an interrupt. */
+  gpio_interrupt enabled_interrupt;
+
+  /* If more than one interrupt handler is to be used, a task will be created
+   * to call each handler sequentially. */
+  rtems_id task_id;
+
+  /* ISR shared flag. */
+  gpio_handler_flag handler_flag;
+  
+  /* Linked list of interrupt handlers. */
+  gpio_handler_list *handler_list;
+
+  /* GPIO input (pull resistor) pin mode. */
+  gpio_pull_mode input_mode;
+
+  /* Switch-deboucing information. */
+  int debouncing_tick_count;
+  rtems_interval last_isr_tick;
+
+  /* Struct with bsp specific data.
+   * If function == BSP_SPECIFIC this should have a pointer to
+   * a gpio_specific_data struct.
+   *
+   * If not this field may be NULL. This is passed to the bsp function so any bsp specific data
+   * can be passed to it through this pointer. */
+  void* bsp_specific;
+  
+} gpio_pin;
+
 static gpio_pin** gpio_pin_state;
 static bool is_initialized = false;
 static uint32_t gpio_count;
@@ -102,7 +144,7 @@ static rtems_task generic_handler_task(rtems_task_argument arg)
     rtems_event_receive(RTEMS_EVENT_1, RTEMS_EVENT_ALL | RTEMS_WAIT,
                         RTEMS_NO_TIMEOUT,
                         &out);
-    
+
     /* If this pin has the debouncing function attached, call it. */
     if ( gpio->debouncing_tick_count > 0 ) {
       rv = debounce_switch(gpio);
@@ -132,6 +174,28 @@ static rtems_task generic_handler_task(rtems_task_argument arg)
       bsp_interrupt_handler_default(bsp_gpio_get_vector(gpio->bank_number));
     }
   }
+}
+
+static rtems_status_code gpio_check_pin(int pin_number, bool check_used)
+{
+  uint32_t bank;
+  uint32_t pin;
+  
+  if ( pin_number < 0 || pin_number >= gpio_count ) {
+    return RTEMS_INVALID_ID;
+  }
+
+  if ( check_used == TRUE ) {
+    bank = get_bank_number(pin_number);
+    pin = get_pin_number(pin_number);
+
+    /* If the pin is already being used returns with an error. */
+    if ( gpio_pin_state[bank][pin].pin_type != NOT_USED ) {
+      return RTEMS_RESOURCE_IN_USE;
+    }
+  }
+
+  return RTEMS_SUCCESSFUL;
 }
 
 /**
@@ -202,6 +266,75 @@ rtems_status_code gpio_initialize(void)
     gpio_pin_state[bank][pin].handler_list = NULL;
     gpio_pin_state[bank][pin].debouncing_tick_count = 0;
     gpio_pin_state[bank][pin].last_isr_tick = 0;
+  }
+
+  return RTEMS_SUCCESSFUL;
+}
+
+rtems_status_code gpio_request_conf(gpio_pin_conf conf)
+{
+  gpio_interrupt_conf* interrupt_conf;
+  rtems_status_code sc;
+  bool new_request;
+  uint32_t bank;
+  uint32_t pin;
+
+  new_request = FALSE;
+  
+  sc = gpio_check_pin(conf.pin_number, TRUE);
+
+  if ( sc == RTEMS_SUCCESSFUL ) {    
+    sc = gpio_request_pin(conf.pin_number, conf.function, conf.bsp_specific);
+
+    if ( sc != RTEMS_SUCCESSFUL ) {
+      //TODO: print explanatory messages, and maybe return another code related to thsi particular function (apply to the rest of this function)
+      return sc;
+    }
+
+    new_request = TRUE;
+  }
+
+  else if ( sc == RTEMS_INVALID_ID ) {
+    return sc;
+  }
+  
+  sc = gpio_input_mode(conf.pin_number, conf.pull_mode);
+
+  if ( sc != RTEMS_SUCCESSFUL ) {
+    return sc;
+  }
+
+  interrupt_conf = (gpio_interrupt_conf*) conf.interrupt;
+
+  if ( interrupt_conf != NULL ) {
+    bank = get_bank_number(conf.pin_number);
+    pin = get_pin_number(conf.pin_number);
+
+    if ( interrupt_conf->enabled_interrupt != gpio_pin_state[bank][pin].enabled_interrupt ) {
+      if ( new_request == FALSE ) {
+	sc = gpio_disable_interrupt(conf.pin_number);
+
+	if ( sc != RTEMS_SUCCESSFUL ) {
+	  return sc;
+	}
+      }
+
+      sc = gpio_enable_interrupt(conf.pin_number,
+				 interrupt_conf->enabled_interrupt,
+				 interrupt_conf->handler_flag,
+				 interrupt_conf->handler,
+				 interrupt_conf->arg);
+
+      if ( sc != RTEMS_SUCCESSFUL ) {
+	return sc;
+      }
+      
+    }
+
+    if ( interrupt_conf->clock_tick_interval != gpio_pin_state[bank][pin].debouncing_tick_count ) {
+      gpio_pin_state[bank][pin].debouncing_tick_count = interrupt_conf->clock_tick_interval;
+      gpio_pin_state[bank][pin].last_isr_tick = 0;
+    }
   }
 
   return RTEMS_SUCCESSFUL;
@@ -302,9 +435,10 @@ int gpio_get_value(int pin_number)
  * @retval RTEMS_RESOURCE_IN_USE The received pin is already being used.
  * @retval RTEMS_UNSATISFIED Could not assign the GPIO function.
  */
-rtems_status_code gpio_select_pin(int pin_number, gpio_function function)
+rtems_status_code gpio_request_pin(int pin_number, gpio_function function, void* bsp_specific)
 {
-  rtems_status_code sc;
+  gpio_specific_data* bsp_data;
+  rtems_status_code sc = RTEMS_SUCCESSFUL;
   uint32_t bank;
   uint32_t pin;
   
@@ -320,7 +454,27 @@ rtems_status_code gpio_select_pin(int pin_number, gpio_function function)
     return RTEMS_RESOURCE_IN_USE;
   }
 
-  sc = bsp_gpio_select(bank, pin, function);
+  switch ( function ) {
+    case DIGITAL_INPUT:
+      sc = bsp_gpio_select_input(bank, pin, bsp_specific);
+      break;
+    case DIGITAL_OUTPUT:
+      sc = bsp_gpio_select_output(bank, pin, bsp_specific);
+      break;
+    case BSP_SPECIFIC:
+      bsp_data = (gpio_specific_data*) bsp_specific;
+
+      if ( bsp_data == NULL ) {
+	return RTEMS_UNSATISFIED;
+      }
+
+      sc = bsp_select_specific_io(bank, pin, bsp_data->io_function, bsp_data->pin_data);
+      break;
+    case NOT_USED:
+      return RTEMS_SUCCESSFUL;
+
+      //TODO: add default case?
+  }
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
@@ -330,77 +484,6 @@ rtems_status_code gpio_select_pin(int pin_number, gpio_function function)
    * record that information on the gpio_pin_state structure. */
   gpio_pin_state[bank][pin].pin_type = function;
 
-  return RTEMS_SUCCESSFUL;
-}
-
-rtems_status_code gpio_select_pin_group(int* pin_group, int pin_count, gpio_function function)
-{
-  rtems_status_code sc;
-  uint32_t bank;
-  uint32_t pin;
-  int i;
-
-  for ( i = 0; i < pin_count; ++i ) {
-    if ( pin_group[i] < 0 || pin_group[i] >= gpio_count ) {
-      return RTEMS_INVALID_ID;
-    }
-
-    bank = get_bank_number(pin_group[i]);
-    pin = get_pin_number(pin_group[i]);
-
-    /* If the pin is already being used returns with an error. */
-    if ( gpio_pin_state[bank][pin].pin_type != NOT_USED ) {
-      return RTEMS_RESOURCE_IN_USE;
-    }
-  }
-
-  for ( i = 0; i < pin_count; ++i ) {
-    bank = get_bank_number(pin_group[i]);
-    pin = get_pin_number(pin_group[i]);
-    
-    sc = bsp_gpio_select(bank, pin, function);
-
-    if ( sc != RTEMS_SUCCESSFUL ) { //TODO: rollback the previously selected pins, and warn which one failed?
-      return sc;
-    }
-  }
-  
-  return RTEMS_SUCCESSFUL;
-}
-
-rtems_status_code gpio_input_pin_group(int* pin_group, int pin_count, gpio_pull_mode mode)
-{
-  rtems_status_code sc;
-  uint32_t bank;
-  uint32_t pin;
-  int i;
-
-  for ( i = 0; i < pin_count; ++i ) {
-    if ( pin_group[i] < 0 || pin_group[i] >= gpio_count ) {
-      return RTEMS_INVALID_ID;
-    }
-    /* //TODO: ensure that only requested pins can be used
-    if ( pin_group[i].pin_type == NONE ) {
-      return RTEMS_NOT_CONFIGURED;          
-      }*/
-  }
-
-  for ( i = 0; i < pin_count; ++i ) {
-    bank = get_bank_number(pin_group[i]);
-    pin = get_pin_number(pin_group[i]);
-
-    /* If the desired actuation mode is already set, ignores. */
-    if ( gpio_pin_state[bank][pin].input_mode == mode && mode != NO_PULL_RESISTOR ) {
-      continue;
-    }
-    
-    sc = bsp_gpio_set_input_mode(bank, pin, mode);
-
-    if ( sc != RTEMS_SUCCESSFUL ) { //TODO: rollback the previously setup'd pins, and warn which one failed?
-      return sc;
-    }
-  }
-  
   return RTEMS_SUCCESSFUL;
 }
 
@@ -416,6 +499,7 @@ rtems_status_code gpio_input_pin_group(int* pin_group, int pin_count, gpio_pull_
  */
 rtems_status_code gpio_input_mode(int pin_number, gpio_pull_mode mode)
 {
+  rtems_status_code sc;
   uint32_t bank;
   uint32_t pin;
 
@@ -434,7 +518,15 @@ rtems_status_code gpio_input_mode(int pin_number, gpio_pull_mode mode)
     return RTEMS_SUCCESSFUL;
   }
 
-  return bsp_gpio_set_input_mode(bank, pin, mode);
+  sc = bsp_gpio_set_input_mode(bank, pin, mode);
+
+  if ( sc != RTEMS_SUCCESSFUL ) {
+    return sc;
+  }
+
+  gpio_pin_state[bank][pin].input_mode = mode;
+  
+  return RTEMS_SUCCESSFUL;
 }
 
 /**
@@ -499,7 +591,7 @@ static void generic_isr(void* arg)
 
   gpio = (gpio_pin *) arg;
 
-  // Get the bank/vector number of a pin (e.g.: 0) from this bank. 
+  /* Get the bank/vector number of a pin (e.g.: 0) from this bank. */
   bank_number = gpio[0].bank_number;
 
   vector = bank_number;
@@ -513,7 +605,7 @@ static void generic_isr(void* arg)
   }
 
   /* Prevents more interrupts from being generated on GPIO. */
-  interrupt_vector_disable();
+  bsp_interrupt_vector_disable(bsp_gpio_get_vector(bank_number));
 
   /* TODO: Insert Memory Barrier */
 
@@ -535,7 +627,7 @@ static void generic_isr(void* arg)
   
   /* TODO: Insert Memory Barrier to prevent the interrupts being enabled before updating the event register. */
 
-  interrupt_vector_enable();
+  bsp_interrupt_vector_enable(bsp_gpio_get_vector(bank_number));
 }
 
 /**
@@ -712,7 +804,7 @@ void *arg
       
     return RTEMS_UNSATISFIED;
   }
-
+  
   sc = rtems_task_start(gpio->task_id, generic_handler_task, (rtems_task_argument) gpio);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
@@ -732,8 +824,8 @@ void *arg
   sc = gpio_interrupt_handler_install(pin_number, handler, arg);
 
   assert( sc == RTEMS_SUCCESSFUL );
-  
-  interrupt_vector_disable(); //TODO: move this up?
+
+  bsp_interrupt_vector_disable(bsp_gpio_get_vector(bank));//TODO: move this up?
 
   /* If the generic ISR has not been yet installed for this bank, installs it.
    * This ISR will be responsible for calling the handler tasks,
@@ -748,7 +840,7 @@ void *arg
     if ( sc != RTEMS_SUCCESSFUL ) {
       RELEASE_LOCK(int_id);
 
-      interrupt_vector_enable();
+      bsp_interrupt_vector_enable(bsp_gpio_get_vector(bank));
       
       return RTEMS_UNSATISFIED;
     }
@@ -759,7 +851,7 @@ void *arg
   if ( sc != RTEMS_SUCCESSFUL ) {
     RELEASE_LOCK(int_id);
 
-    interrupt_vector_enable();
+    bsp_interrupt_vector_enable(bsp_gpio_get_vector(bank));
       
     return RTEMS_UNSATISFIED;
   }
@@ -767,8 +859,8 @@ void *arg
   ++interrupt_counter[bank];
 
   RELEASE_LOCK(int_id);
-  
-  interrupt_vector_enable();
+
+  bsp_interrupt_vector_enable(bsp_gpio_get_vector(bank));
   
   return RTEMS_SUCCESSFUL;
 }
@@ -876,7 +968,7 @@ rtems_status_code gpio_disable_interrupt(int pin_number)
     return RTEMS_SUCCESSFUL;
   }
 
-  interrupt_vector_disable();
+  bsp_interrupt_vector_disable(bsp_gpio_get_vector(bank));
 
   AQUIRE_LOCK(int_id);
 
@@ -885,7 +977,7 @@ rtems_status_code gpio_disable_interrupt(int pin_number)
   if ( sc != RTEMS_SUCCESSFUL ) {
     RELEASE_LOCK(int_id);
 
-    interrupt_vector_enable();
+    bsp_interrupt_vector_enable(bsp_gpio_get_vector(bank));
       
     return RTEMS_UNSATISFIED;
   }
@@ -915,15 +1007,15 @@ rtems_status_code gpio_disable_interrupt(int pin_number)
     if ( sc != RTEMS_SUCCESSFUL ) {
       RELEASE_LOCK(int_id);
 
-      interrupt_vector_enable();
+      bsp_interrupt_vector_enable(bsp_gpio_get_vector(bank));
       
       return RTEMS_UNSATISFIED;
     }
   }
 
   RELEASE_LOCK(int_id);
-  
-  interrupt_vector_enable();
+
+  bsp_interrupt_vector_enable(bsp_gpio_get_vector(bank));
   
   return RTEMS_SUCCESSFUL;
 }

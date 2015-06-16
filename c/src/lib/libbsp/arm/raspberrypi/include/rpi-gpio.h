@@ -29,13 +29,15 @@ extern "C" {
  *         and system GPIOs (only accessible to the system).
  */
 #define GPIO_COUNT 54
-  
-#define RPI_ALT_FUNC_0 0
-#define RPI_ALT_FUNC_1 1
-#define RPI_ALT_FUNC_2 2
-#define RPI_ALT_FUNC_3 3
-#define RPI_ALT_FUNC_4 4
-#define RPI_ALT_FUNC_5 5
+
+#define RPI_DIGITAL_IN  7
+#define RPI_DIGITAL_OUT 1
+#define RPI_ALT_FUNC_0  4
+#define RPI_ALT_FUNC_1  5
+#define RPI_ALT_FUNC_2  6
+#define RPI_ALT_FUNC_3  7
+#define RPI_ALT_FUNC_4  3
+#define RPI_ALT_FUNC_5  2
 
 extern rtems_status_code gpio_select_jtag(void);
 extern rtems_status_code gpio_select_spi_p1(void);
