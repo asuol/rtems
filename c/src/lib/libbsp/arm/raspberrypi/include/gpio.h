@@ -183,50 +183,50 @@ extern rtems_status_code gpio_initialize(void);
 /**
  * @brief Requests/configures a pin based on a gpio_pin_conf struct.
  */
-extern rtems_status_code gpio_request_conf(gpio_pin_conf conf);
+extern rtems_status_code gpio_request_conf(gpio_pin_conf* conf);
   
 /**
  * @brief Sets an output GPIO pin with the logical high.
  */
-extern rtems_status_code gpio_set(int pin);
+extern rtems_status_code gpio_set(uint32_t pin_number);
 
 /**
  * @brief Sets an output GPIO pin with the logical low.
  */
-extern rtems_status_code gpio_clear(int pin);
+extern rtems_status_code gpio_clear(uint32_t pin_number);
 
 /**
  * @brief Returns the value (level) of a GPIO input pin.
  */
-extern int gpio_get_value(int pin);
+extern int gpio_get_value(uint32_t pin_number);
 
 /**
  * @brief Assigns a certain function to a GPIO pin.
  */
-extern rtems_status_code gpio_request_pin(int pin, gpio_function type, void* bsp_specific);
+extern rtems_status_code gpio_request_pin(uint32_t pin_number, gpio_function type, void* bsp_specific);
   
 /**
  * @brief Configures a single GPIO pin pull resistor. 
  */
-extern rtems_status_code gpio_input_mode(int pin, gpio_pull_mode mode);
+extern rtems_status_code gpio_input_mode(uint32_t pin_number, gpio_pull_mode mode);
   
 /**
  * @brief Releases a GPIO pin from the API, making it available to be used 
  *        again.
  */
-extern rtems_status_code gpio_disable_pin(int dev_pin);
+extern rtems_status_code gpio_release_pin(uint32_t pin_number);
 
 /**
  * @brief Debouces a switch by requiring a number of clock ticks to 
  *        pass between interruts.
  */
-extern rtems_status_code gpio_debounce_switch(int pin, int ticks);
+extern rtems_status_code gpio_debounce_switch(uint32_t pin_number, int ticks);
 
 /**
  * @brief Connects a new user-defined interrupt handler to a given pin.
  */
 extern rtems_status_code gpio_interrupt_handler_install(
-int dev_pin,
+uint32_t pin_number,
 gpio_irq_state (*handler) (void *arg),
 void *arg
 );
@@ -236,7 +236,7 @@ void *arg
  *        When fired that interrupt will call the given handler.
  */
 extern rtems_status_code gpio_enable_interrupt(
-int dev_pin, 
+uint32_t pin_number, 
 gpio_interrupt interrupt,
 gpio_handler_flag flag,
 gpio_irq_state (*handler) (void *arg),
@@ -249,7 +249,7 @@ void *arg
  *        to the pin interrupts are disabled on the given pin.
  */
 rtems_status_code gpio_interrupt_handler_remove(
-int dev_pin,
+uint32_t pin_number,
 gpio_irq_state (*handler) (void *arg),
 void *arg
 );
@@ -257,7 +257,7 @@ void *arg
 /**
  * @brief Disables any interrupt enabled on the given GPIO pin.
  */
-extern rtems_status_code gpio_disable_interrupt(int dev_pin);
+extern rtems_status_code gpio_disable_interrupt(uint32_t pin_number);
 
 /**
  * @brief Defines the GPIO pin layout. This must be implemented by each BSP.
@@ -267,26 +267,26 @@ extern gpio_layout bsp_gpio_initialize(void);
 /**
  * @brief Sets an output GPIO pin with the logical high. This must be implemented by each BSP.
  */
-extern rtems_status_code bsp_gpio_set(int bank, int pin);
+extern rtems_status_code bsp_gpio_set(uint32_t bank, uint32_t pin);
 
 /**
  * @brief Sets an output GPIO pin with the logical low. This must be implemented by each BSP.
  */
-extern rtems_status_code bsp_gpio_clear(int bank, int pin);
+extern rtems_status_code bsp_gpio_clear(uint32_t bank, uint32_t pin);
 
 /**
  * @brief Returns the value (level) of a GPIO input pin. This must be implemented by each BSP.
  */
-extern int bsp_gpio_get_value(int bank, int pin);
+extern int bsp_gpio_get_value(uint32_t bank, uint32_t pin);
 
-extern rtems_status_code bsp_gpio_select_input(int bank, int pin, void* bsp_specific);
+extern rtems_status_code bsp_gpio_select_input(uint32_t bank, uint32_t pin, void* bsp_specific);
 
-extern rtems_status_code bsp_gpio_select_output(int bank, int pin, void* bsp_specific);
+extern rtems_status_code bsp_gpio_select_output(uint32_t bank, uint32_t pin, void* bsp_specific);
 
-extern rtems_status_code bsp_select_specific_io(int bank, int pin, uint32_t function, void* pin_data);
+extern rtems_status_code bsp_select_specific_io(uint32_t bank, uint32_t pin, uint32_t function, void* pin_data);
 
 // should return UNSTATISFIED IF FAILED
-extern rtems_status_code bsp_gpio_set_input_mode(int bank, int pin, gpio_pull_mode mode);
+extern rtems_status_code bsp_gpio_set_input_mode(uint32_t bank, uint32_t pin, gpio_pull_mode mode);
 
 /**
  * @brief Returns a bitmask (max 32-bit) representing a GPIO bank, where a bit set indicates an active interrupt on that pin. This must be implemented by each BSP.
@@ -295,17 +295,17 @@ extern uint32_t bsp_gpio_interrupt_line(rtems_vector_number vector);
 
 extern void bsp_gpio_clear_interrupt_line(rtems_vector_number vector, uint32_t event_status);
 
-extern rtems_vector_number bsp_gpio_get_vector(int bank);
+extern rtems_vector_number bsp_gpio_get_vector(uint32_t bank);
 
 /**
  * @brief Enables interrupt on hardware. This must be implemented by each BSP.
  */
-extern rtems_status_code bsp_enable_interrupt(int dev_pin, gpio_interrupt interrupt);
+extern rtems_status_code bsp_enable_interrupt(uint32_t pin, gpio_interrupt interrupt);
   
 /**
  * @brief Disables interrupt on hardware. This must be implemented by each BSP.
  */
-extern rtems_status_code bsp_disable_interrupt(int dev_pin, gpio_interrupt enabled_interrupt);
+extern rtems_status_code bsp_disable_interrupt(uint32_t pin, gpio_interrupt enabled_interrupt);
   
 #ifdef __cplusplus
 }
