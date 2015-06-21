@@ -47,9 +47,9 @@ static rtems_status_code rpi_select_pin_function(uint32_t bank, uint32_t pin, ui
   return RTEMS_SUCCESSFUL;
 }
 
-gpio_layout bsp_gpio_initialize()
+rtems_gpio_layout rtems_bsp_gpio_initialize()
 {
-  gpio_layout rpi_layout;
+  rtems_gpio_layout rpi_layout;
   
   rpi_layout.pin_count = 54;
   rpi_layout.pins_per_bank = 54;
@@ -57,40 +57,40 @@ gpio_layout bsp_gpio_initialize()
   return rpi_layout;
 }
 
-rtems_status_code bsp_gpio_multi_set(uint32_t bank, uint32_t bitmask)
+rtems_status_code rtems_bsp_gpio_multi_set(uint32_t bank, uint32_t bitmask)
 {
   BCM2835_REG(BCM2835_GPIO_GPSET0) |= bitmask;
 
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code bsp_gpio_multi_clear(uint32_t bank, uint32_t bitmask)
+rtems_status_code rtems_bsp_gpio_multi_clear(uint32_t bank, uint32_t bitmask)
 {
   BCM2835_REG(BCM2835_GPIO_GPCLR0) |= bitmask;
 
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code bsp_gpio_set(uint32_t bank, uint32_t pin)
+rtems_status_code rtems_bsp_gpio_set(uint32_t bank, uint32_t pin)
 {
   BCM2835_REG(BCM2835_GPIO_GPSET0) = (1 << pin);
 
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code bsp_gpio_clear(uint32_t bank, uint32_t pin)
+rtems_status_code rtems_bsp_gpio_clear(uint32_t bank, uint32_t pin)
 {
   BCM2835_REG(BCM2835_GPIO_GPCLR0) = (1 << pin);
 
   return RTEMS_SUCCESSFUL;
 }
 
-int bsp_gpio_get_value(uint32_t bank, uint32_t pin)
+int rtems_bsp_gpio_get_value(uint32_t bank, uint32_t pin)
 {
   return (BCM2835_REG(BCM2835_GPIO_GPLEV0) & (1 << pin));
 }
 
-rtems_status_code bsp_gpio_select_input(uint32_t bank, uint32_t pin, void* bsp_specific)
+rtems_status_code rtems_bsp_gpio_select_input(uint32_t bank, uint32_t pin, void* bsp_specific)
 {
   /* Calculate the pin function select register address. */
   volatile unsigned int *pin_addr = (unsigned int *)BCM2835_GPIO_REGS_BASE +
@@ -101,17 +101,17 @@ rtems_status_code bsp_gpio_select_input(uint32_t bank, uint32_t pin, void* bsp_s
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code bsp_gpio_select_output(uint32_t bank, uint32_t pin, void* bsp_specific)
+rtems_status_code rtems_bsp_gpio_select_output(uint32_t bank, uint32_t pin, void* bsp_specific)
 {
   return rpi_select_pin_function(bank, pin, RPI_DIGITAL_OUT);
 }
 
-rtems_status_code bsp_select_specific_io(uint32_t bank, uint32_t pin, uint32_t function, void* pin_data)
+rtems_status_code rtems_bsp_select_specific_io(uint32_t bank, uint32_t pin, uint32_t function, void* pin_data)
 {
   return rpi_select_pin_function(bank, pin, function);
 }
 
-rtems_status_code bsp_gpio_set_resistor_mode(uint32_t bank, uint32_t pin, gpio_pull_mode mode)
+rtems_status_code rtems_bsp_gpio_set_resistor_mode(uint32_t bank, uint32_t pin, rtems_gpio_pull_mode mode)
 {
   /* Set control signal. */
   switch ( mode ) {
@@ -145,22 +145,22 @@ rtems_status_code bsp_gpio_set_resistor_mode(uint32_t bank, uint32_t pin, gpio_p
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_vector_number bsp_gpio_get_vector(uint32_t bank)
+rtems_vector_number rtems_bsp_gpio_get_vector(uint32_t bank)
 {
   return BCM2835_IRQ_ID_GPIO_0;
 }
 
-uint32_t bsp_gpio_interrupt_line(rtems_vector_number vector)
+uint32_t rtems_bsp_gpio_interrupt_line(rtems_vector_number vector)
 {
   return BCM2835_REG(BCM2835_GPIO_GPEDS0);
 }
 
-void bsp_gpio_clear_interrupt_line(rtems_vector_number vector, uint32_t event_status)
+void rtems_bsp_gpio_clear_interrupt_line(rtems_vector_number vector, uint32_t event_status)
 {
   BCM2835_REG(BCM2835_GPIO_GPEDS0) = event_status;
 }
 
-rtems_status_code bsp_enable_interrupt(uint32_t bank, uint32_t pin, gpio_interrupt interrupt)
+rtems_status_code rtems_bsp_enable_interrupt(uint32_t bank, uint32_t pin, rtems_gpio_interrupt interrupt)
 {
   switch ( interrupt ) {
     case FALLING_EDGE:
@@ -201,7 +201,7 @@ rtems_status_code bsp_enable_interrupt(uint32_t bank, uint32_t pin, gpio_interru
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code bsp_disable_interrupt(uint32_t bank, uint32_t pin, gpio_interrupt enabled_interrupt)
+rtems_status_code rtems_bsp_disable_interrupt(uint32_t bank, uint32_t pin, rtems_gpio_interrupt enabled_interrupt)
 {
   switch ( enabled_interrupt ) {
     case FALLING_EDGE:
@@ -256,31 +256,31 @@ rtems_status_code gpio_select_jtag(void)
 {
   rtems_status_code sc;
 
-  sc = gpio_request_conf(&arm_tdi);
+  sc = rtems_gpio_request_conf(&arm_tdi);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = gpio_request_conf(&arm_trst);
+  sc = rtems_gpio_request_conf(&arm_trst);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = gpio_request_conf(&arm_tdo);
+  sc = rtems_gpio_request_conf(&arm_tdo);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = gpio_request_conf(&arm_tck);
+  sc = rtems_gpio_request_conf(&arm_tck);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = gpio_request_conf(&arm_tms);
+  sc = rtems_gpio_request_conf(&arm_tms);
 
   return sc;
 }
@@ -299,31 +299,31 @@ rtems_status_code gpio_select_spi_p1(void)
 {
   rtems_status_code sc;
   
-  sc = gpio_request_conf(&spi_p1_miso);
+  sc = rtems_gpio_request_conf(&spi_p1_miso);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = gpio_request_conf(&spi_p1_mosi);
+  sc = rtems_gpio_request_conf(&spi_p1_mosi);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = gpio_request_conf(&spi_p1_sclk);
+  sc = rtems_gpio_request_conf(&spi_p1_sclk);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = gpio_request_conf(&spi_p1_ce_0);
+  sc = rtems_gpio_request_conf(&spi_p1_ce_0);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = gpio_request_conf(&spi_p1_ce_1);
+  sc = rtems_gpio_request_conf(&spi_p1_ce_1);
 
   return sc;
 }
@@ -342,13 +342,13 @@ rtems_status_code gpio_select_i2c_p1_rev2(void)
 {
   rtems_status_code sc;
   
-  sc = gpio_request_conf(&i2c_p1_rev2_sda);
+  sc = rtems_gpio_request_conf(&i2c_p1_rev2_sda);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
   
-  sc = gpio_request_conf(&i2c_p1_rev2_scl);
+  sc = rtems_gpio_request_conf(&i2c_p1_rev2_scl);
 
   return sc;
 }

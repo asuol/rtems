@@ -14,7 +14,7 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
-gpio_specific_data alt_func_def[] = {
+rtems_gpio_specific_data alt_func_def[] = {
   {io_function: RPI_ALT_FUNC_0, pin_data: NULL},
   {io_function: RPI_ALT_FUNC_1, pin_data: NULL},
   {io_function: RPI_ALT_FUNC_2, pin_data: NULL},
@@ -23,7 +23,7 @@ gpio_specific_data alt_func_def[] = {
   {io_function: RPI_ALT_FUNC_5, pin_data: NULL}
 };
 
-gpio_pin_conf arm_tdi = {
+rtems_gpio_pin_conf arm_tdi = {
  pin_number: 4,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -33,7 +33,7 @@ gpio_pin_conf arm_tdi = {
  bsp_specific: &alt_func_def[5]
 };
 
-gpio_pin_conf arm_trst = {
+rtems_gpio_pin_conf arm_trst = {
  pin_number: 22,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -43,7 +43,7 @@ gpio_pin_conf arm_trst = {
  bsp_specific: &alt_func_def[4]
 };
 
-gpio_pin_conf arm_tdo = {
+rtems_gpio_pin_conf arm_tdo = {
  pin_number: 24,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -53,7 +53,7 @@ gpio_pin_conf arm_tdo = {
  bsp_specific: &alt_func_def[4]
 };
 
-gpio_pin_conf arm_tck = {
+rtems_gpio_pin_conf arm_tck = {
  pin_number: 25,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -63,7 +63,7 @@ gpio_pin_conf arm_tck = {
  bsp_specific: &alt_func_def[4]
 };
 
-gpio_pin_conf arm_tms = {
+rtems_gpio_pin_conf arm_tms = {
  pin_number: 27,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -73,7 +73,7 @@ gpio_pin_conf arm_tms = {
  bsp_specific: &alt_func_def[4]
 };
 
-gpio_pin_conf spi_p1_miso = {
+rtems_gpio_pin_conf spi_p1_miso = {
  pin_number: 7,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -83,7 +83,7 @@ gpio_pin_conf spi_p1_miso = {
  bsp_specific: &alt_func_def[0]
 };
 
-gpio_pin_conf spi_p1_mosi = {
+rtems_gpio_pin_conf spi_p1_mosi = {
  pin_number: 8,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -93,7 +93,7 @@ gpio_pin_conf spi_p1_mosi = {
  bsp_specific: &alt_func_def[0]
 };
 
-gpio_pin_conf spi_p1_sclk = {
+rtems_gpio_pin_conf spi_p1_sclk = {
  pin_number: 9,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -103,7 +103,7 @@ gpio_pin_conf spi_p1_sclk = {
  bsp_specific: &alt_func_def[0]
 };
 
-gpio_pin_conf spi_p1_ce_0 = {
+rtems_gpio_pin_conf spi_p1_ce_0 = {
  pin_number: 10,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -113,7 +113,7 @@ gpio_pin_conf spi_p1_ce_0 = {
  bsp_specific: &alt_func_def[0]
 };
 
-gpio_pin_conf spi_p1_ce_1 = {
+rtems_gpio_pin_conf spi_p1_ce_1 = {
  pin_number: 11,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -123,7 +123,7 @@ gpio_pin_conf spi_p1_ce_1 = {
  bsp_specific: &alt_func_def[0]
 };
 
-gpio_pin_conf i2c_p1_rev2_sda = {
+rtems_gpio_pin_conf i2c_p1_rev2_sda = {
  pin_number: 2,
  function: BSP_SPECIFIC,
  pull_mode: PULL_UP,
@@ -133,7 +133,7 @@ gpio_pin_conf i2c_p1_rev2_sda = {
  bsp_specific: &alt_func_def[0]
 };
 
-gpio_pin_conf i2c_p1_rev2_scl = {
+rtems_gpio_pin_conf i2c_p1_rev2_scl = {
  pin_number: 3,
  function: BSP_SPECIFIC,
  pull_mode: PULL_UP,

@@ -1,9 +1,9 @@
 /**
  * @file gpio.h
  *
- * @ingroup raspberrypi_gpio
+ * @ingroup rtems_gpio
  *
- * @brief Raspberry Pi specific GPIO definitions.
+ * @brief RTEMS GPIO API definition.
  */
 
 /*
@@ -14,8 +14,8 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
-#ifndef LIBBSP_ARM_RASPBERRYPI_GPIO_H
-#define LIBBSP_ARM_RASPBERRYPI_GPIO_H
+#ifndef LIBBSP_SHARED__GPIO_H
+#define LIBBSP_SHARED__GPIO_H
 
 #include <rtems.h>
 
@@ -40,7 +40,7 @@ typedef enum
   PULL_UP = 1,
   PULL_DOWN,
   NO_PULL_RESISTOR
-} gpio_pull_mode;
+} rtems_gpio_pull_mode;
 
 /**
  * @brief The set of possible functions a pin can have.
@@ -53,7 +53,7 @@ typedef enum
   DIGITAL_OUTPUT,
   BSP_SPECIFIC,
   NOT_USED
-} gpio_function;
+} rtems_gpio_function;
 
 /**
  * @brief The set of possible interrupts a GPIO pin can generate.
@@ -69,7 +69,7 @@ typedef enum
   BOTH_EDGES,
   BOTH_LEVELS,
   NONE
-} gpio_interrupt;
+} rtems_gpio_interrupt;
 
 /**
  * @brief The set of possible handled states an user-defined interrupt
@@ -81,7 +81,7 @@ typedef enum
 {
   IRQ_HANDLED,
   IRQ_NONE
-} gpio_irq_state;
+} rtems_gpio_irq_state;
 
 /**
  * @brief The set of flags to specify an user-defined interrupt handler
@@ -93,7 +93,7 @@ typedef enum
 {
   SHARED_HANDLER,
   UNIQUE_HANDLER
-} gpio_handler_flag;
+} rtems_gpio_handler_flag;
 
 /**
  * @brief Object containing relevant information for assigning a BSP specific
@@ -107,7 +107,7 @@ typedef struct
   uint32_t io_function;
  
   void* pin_data;
-} gpio_specific_data;
+} rtems_gpio_specific_data;
 
 /**
  * @brief Object containing relevant information about a BSP's GPIO layout.
@@ -120,7 +120,7 @@ typedef struct
   /* Number of pins per bank. The last bank may be smaller,
    * depending on the total number of pins. */
   uint32_t pins_per_bank;
-} gpio_layout;
+} rtems_gpio_layout;
 
 /**
  * @brief Object containing configuration information 
@@ -128,12 +128,12 @@ typedef struct
  */
 typedef struct
 {
-  gpio_interrupt enabled_interrupt;
+  rtems_gpio_interrupt enabled_interrupt;
  
-  gpio_handler_flag handler_flag;
+  rtems_gpio_handler_flag handler_flag;
 
   /* Interrupt handler function. */
-  gpio_irq_state (*handler) (void *arg);
+  rtems_gpio_irq_state (*handler) (void *arg);
   
   /* Interrupt handler function arguments. */
   void *arg;
@@ -142,7 +142,7 @@ typedef struct
    * ticks that must pass between interrupts to ensure that the interrupt
    * was not caused by a switch bounce. If set to 0 this feature is disabled . */
   uint32_t clock_tick_interval;
-} gpio_interrupt_conf;
+} rtems_gpio_interrupt_conf;
 
 /**
  * @brief Object containing configuration information 
@@ -151,10 +151,10 @@ typedef struct
 typedef struct
 {
   uint32_t pin_number;
-  gpio_function function;
+  rtems_gpio_function function;
  
   /* Pull resistor setting. */
-  gpio_pull_mode pull_mode;
+  rtems_gpio_pull_mode pull_mode;
 
   /* If digital out pin, set to TRUE to set the pin to logical high,
    * or FALSE for logical low. If not a digital out then this
@@ -163,16 +163,16 @@ typedef struct
   bool logic_invert;
 
   /* Pin interrupt configuration. Should be NULL if not used. */
-  gpio_interrupt_conf* interrupt;
+  rtems_gpio_interrupt_conf* interrupt;
   
   /* Struct with bsp specific data, to use during the pin request.
    * If function == BSP_SPECIFIC this should have a pointer to
-   * a gpio_specific_data struct.
+   * a rtems_gpio_specific_data struct.
    *
    * If not this field may be NULL. This is passed to the bsp function so any bsp specific data
    * can be passed to it through this pointer. */
   void* bsp_specific;
-} gpio_pin_conf;
+} rtems_gpio_pin_conf;
   
 /** @} */
 
@@ -188,20 +188,20 @@ typedef struct
  * @retval RTEMS_SUCCESSFUL API successfully initialized.
  * @retval * For other error code see @rtems_semaphore_create().
  */
-extern rtems_status_code gpio_initialize(void);
+extern rtems_status_code rtems_gpio_initialize(void);
 
 /**
  * @brief Requests a GPIO pin configuration from the API. 
  *        It may be used either to request a new pin, or to update the 
  *        configuration/functions of a pin currently in use.
  *
- * @param[in] conf gpio_pin_conf structure filled with the pin information
+ * @param[in] conf rtems_gpio_pin_conf structure filled with the pin information
  *                 and desired configurations.
  *
  * @retval RTEMS_SUCCESSFUL Pin was configured successfully.
  * @retval RTEMS_UNSATISFIED Could not request/update the pin's configuration.
  */
-extern rtems_status_code gpio_request_conf(gpio_pin_conf* conf);
+extern rtems_status_code rtems_gpio_request_conf(rtems_gpio_pin_conf* conf);
 
 /**
  * @brief Sets multiple output GPIO pins with the logical high.
@@ -215,7 +215,7 @@ extern rtems_status_code gpio_request_conf(gpio_pin_conf* conf);
  *                              is not configured as a digital output.
  * @retval RTEMS_UNSATISFIED Could not set the GPIO pins.
  */
-extern rtems_status_code gpio_multi_set(uint32_t count, ...);
+extern rtems_status_code rtems_gpio_multi_set(uint32_t count, ...);
 
 /**
  * @brief Sets multiple output GPIO pins with the logical low.
@@ -229,7 +229,7 @@ extern rtems_status_code gpio_multi_set(uint32_t count, ...);
  *                              is not configured as a digital output.
  * @retval RTEMS_UNSATISFIED Could not clear the GPIO pins.
  */
-extern rtems_status_code gpio_multi_clear(uint32_t count, ...);
+extern rtems_status_code rtems_gpio_multi_clear(uint32_t count, ...);
   
 /**
  * @brief Sets an output GPIO pin with the logical high.
@@ -242,7 +242,7 @@ extern rtems_status_code gpio_multi_clear(uint32_t count, ...);
  *                              as a digital output.
  * @retval RTEMS_UNSATISFIED Could not set the GPIO pin.
  */
-extern rtems_status_code gpio_set(uint32_t pin_number);
+extern rtems_status_code rtems_gpio_set(uint32_t pin_number);
   
 /**
  * @brief Sets an output GPIO pin with the logical low.
@@ -255,7 +255,7 @@ extern rtems_status_code gpio_set(uint32_t pin_number);
  *                              as a digital output.
  * @retval RTEMS_UNSATISFIED Could not clear the GPIO pin.
  */
-extern rtems_status_code gpio_clear(uint32_t pin_number);
+extern rtems_status_code rtems_gpio_clear(uint32_t pin_number);
 
 /**
  * @brief Returns the value (level) of a GPIO input pin.
@@ -266,7 +266,7 @@ extern rtems_status_code gpio_clear(uint32_t pin_number);
  *         logical value.
  * @retval -1 Pin number is invalid, or not a digital input pin.
  */
-extern int gpio_get_value(uint32_t pin_number);
+extern int rtems_gpio_get_value(uint32_t pin_number);
 
 /**
  * @brief Assigns a certain function to a GPIO pin.
@@ -287,7 +287,7 @@ extern int gpio_get_value(uint32_t pin_number);
  * @retval RTEMS_UNSATISFIED Could not assign the GPIO function.
  * @retval RTEMS_NOT_DEFINED GPIO function not defined, or NOT_USED.
  */
-extern rtems_status_code gpio_request_pin(uint32_t pin_number, gpio_function function, bool output_enable, bool logic_invert, void* bsp_specific);
+extern rtems_status_code rtems_gpio_request_pin(uint32_t pin_number, rtems_gpio_function function, bool output_enable, bool logic_invert, void* bsp_specific);
 
 /**
  * @brief Configures a single GPIO pin pull resistor. 
@@ -299,7 +299,7 @@ extern rtems_status_code gpio_request_pin(uint32_t pin_number, gpio_function fun
  * @retval RTEMS_INVALID_ID Pin number is invalid.
  * @retval RTEMS_UNSATISFIED Could not set the pull mode.
  */
-extern rtems_status_code gpio_resistor_mode(uint32_t pin_number, gpio_pull_mode mode);
+extern rtems_status_code rtems_gpio_resistor_mode(uint32_t pin_number, rtems_gpio_pull_mode mode);
   
 /**
  * @brief Releases a GPIO pin from the API, making it available to be used 
@@ -310,9 +310,9 @@ extern rtems_status_code gpio_resistor_mode(uint32_t pin_number, gpio_pull_mode 
  * @retval RTEMS_SUCCESSFUL Pin successfully disabled on the API.
  * @retval RTEMS_INVALID_ID Pin number is invalid.
  * @retval * Could not disable an ative interrupt on this pin, 
- *           @see gpio_disable_interrupt().
+ *           @see rtems_gpio_disable_interrupt().
  */
-extern rtems_status_code gpio_release_pin(uint32_t pin_number);
+extern rtems_status_code rtems_gpio_release_pin(uint32_t pin_number);
 
 /**
  * @brief Attaches a debouncing function to a given pin/switch.
@@ -331,7 +331,7 @@ extern rtems_status_code gpio_release_pin(uint32_t pin_number);
  * @retval RTEMS_NOT_CONFIGURED The current pin is not configured as a digital 
  *                              input, hence it can not be connected to a switch.
  */
-extern rtems_status_code gpio_debounce_switch(uint32_t pin_number, int ticks);
+extern rtems_status_code rtems_gpio_debounce_switch(uint32_t pin_number, int ticks);
 
 /**
  * @brief Connects a new user-defined interrupt handler to a given pin.
@@ -351,9 +351,9 @@ extern rtems_status_code gpio_debounce_switch(uint32_t pin_number, int ticks);
  * @retval RTEMS_RESOURCE_IN_USE The current user-defined handler for this pin
  *                               is unique.
  */
-extern rtems_status_code gpio_interrupt_handler_install(
+extern rtems_status_code rtems_gpio_interrupt_handler_install(
 uint32_t pin_number,
-gpio_irq_state (*handler) (void *arg),
+rtems_gpio_irq_state (*handler) (void *arg),
 void *arg
 );
   
@@ -375,11 +375,11 @@ void *arg
  * @retval RTEMS_INVALID_ID Pin number is invalid.
  * @retval RTEMS_RESOURCE_IN_USE The pin already has an enabled interrupt.
  */
-extern rtems_status_code gpio_enable_interrupt(
+extern rtems_status_code rtems_gpio_enable_interrupt(
 uint32_t pin_number, 
-gpio_interrupt interrupt,
-gpio_handler_flag flag,
-gpio_irq_state (*handler) (void *arg),
+rtems_gpio_interrupt interrupt,
+rtems_gpio_handler_flag flag,
+rtems_gpio_irq_state (*handler) (void *arg),
 void *arg
 );
 
@@ -394,11 +394,11 @@ void *arg
  *
  * @retval RTEMS_SUCCESSFUL Handler successfully disconnected from this pin.
  * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval * @see gpio_disable_interrupt()
+ * @retval * @see rtems_gpio_disable_interrupt()
  */
-rtems_status_code gpio_interrupt_handler_remove(
+rtems_status_code rtems_gpio_interrupt_handler_remove(
 uint32_t pin_number,
-gpio_irq_state (*handler) (void *arg),
+rtems_gpio_irq_state (*handler) (void *arg),
 void *arg
 );
   
@@ -415,12 +415,12 @@ void *arg
  *                           on this pin or could not disable interrupts on
  *                           this pin.
  */
-extern rtems_status_code gpio_disable_interrupt(uint32_t pin_number);
+extern rtems_status_code rtems_gpio_disable_interrupt(uint32_t pin_number);
 
 /**
  * @brief Defines the GPIO pin layout. This must be implemented by each BSP.
  */
-extern gpio_layout bsp_gpio_initialize(void);
+extern rtems_gpio_layout rtems_bsp_gpio_initialize(void);
 
 /**
  * @brief Sets multiple output GPIO pins with the logical high. This must be implemented 
@@ -432,7 +432,7 @@ extern gpio_layout bsp_gpio_initialize(void);
  * @retval RTEMS_SUCCESSFUL All pins were set successfully.
  * @retval RTEMS_UNSATISFIED Could not set at least one of the pins.
  */
-extern rtems_status_code bsp_gpio_multi_set(uint32_t bank, uint32_t bitmask);
+extern rtems_status_code rtems_bsp_gpio_multi_set(uint32_t bank, uint32_t bitmask);
 
 /**
  * @brief Sets multiple output GPIO pins with the logical low. This must be implemented 
@@ -444,7 +444,7 @@ extern rtems_status_code bsp_gpio_multi_set(uint32_t bank, uint32_t bitmask);
  * @retval RTEMS_SUCCESSFUL All pins were cleared successfully.
  * @retval RTEMS_UNSATISFIED Could not clear at least one of the pins.
  */
-extern rtems_status_code bsp_gpio_multi_clear(uint32_t bank, uint32_t bitmask);
+extern rtems_status_code rtems_bsp_gpio_multi_clear(uint32_t bank, uint32_t bitmask);
 
 /**
  * @brief Sets an output GPIO pin with the logical high. This must be implemented 
@@ -456,7 +456,7 @@ extern rtems_status_code bsp_gpio_multi_clear(uint32_t bank, uint32_t bitmask);
  * @retval RTEMS_SUCCESSFUL Pin was set successfully.
  * @retval RTEMS_UNSATISFIED Could not set the given pin.
  */
-extern rtems_status_code bsp_gpio_set(uint32_t bank, uint32_t pin);
+extern rtems_status_code rtems_bsp_gpio_set(uint32_t bank, uint32_t pin);
   
 /**
  * @brief Sets an output GPIO pin with the logical low. This must be implemented 
@@ -468,7 +468,7 @@ extern rtems_status_code bsp_gpio_set(uint32_t bank, uint32_t pin);
  * @retval RTEMS_SUCCESSFUL Pin was cleared successfully.
  * @retval RTEMS_UNSATISFIED Could not clear the given pin.
  */
-extern rtems_status_code bsp_gpio_clear(uint32_t bank, uint32_t pin);
+extern rtems_status_code rtems_bsp_gpio_clear(uint32_t bank, uint32_t pin);
 
 /**
  * @brief Returns the value (level) of a GPIO input pin. This must be implemented 
@@ -481,7 +481,7 @@ extern rtems_status_code bsp_gpio_clear(uint32_t bank, uint32_t pin);
  *         logical value.
  * @retval -1 Could not read the pin level.
  */
-extern int bsp_gpio_get_value(uint32_t bank, uint32_t pin);
+extern int rtems_bsp_gpio_get_value(uint32_t bank, uint32_t pin);
 
 /**
  * @brief Assigns the digital input function to the given pin. 
@@ -495,7 +495,7 @@ extern int bsp_gpio_get_value(uint32_t bank, uint32_t pin);
  * @retval RTEMS_SUCCESSFUL Function was asssigned successfully.
  * @retval RTEMS_UNSATISFIED Could not assign the function to the pin.
  */
-extern rtems_status_code bsp_gpio_select_input(uint32_t bank, uint32_t pin, void* bsp_specific);
+extern rtems_status_code rtems_bsp_gpio_select_input(uint32_t bank, uint32_t pin, void* bsp_specific);
 
 /**
  * @brief Assigns the digital output function to the given pin. 
@@ -509,7 +509,7 @@ extern rtems_status_code bsp_gpio_select_input(uint32_t bank, uint32_t pin, void
  * @retval RTEMS_SUCCESSFUL Function was asssigned successfully.
  * @retval RTEMS_UNSATISFIED Could not assign the function to the pin.
  */
-extern rtems_status_code bsp_gpio_select_output(uint32_t bank, uint32_t pin, void* bsp_specific);
+extern rtems_status_code rtems_bsp_gpio_select_output(uint32_t bank, uint32_t pin, void* bsp_specific);
 
 /**
  * @brief Assigns a bsp specific function to the given pin. 
@@ -524,7 +524,7 @@ extern rtems_status_code bsp_gpio_select_output(uint32_t bank, uint32_t pin, voi
  * @retval RTEMS_SUCCESSFUL Function was asssigned successfully.
  * @retval RTEMS_UNSATISFIED Could not assign the function to the pin.
  */
-extern rtems_status_code bsp_select_specific_io(uint32_t bank, uint32_t pin, uint32_t function, void* pin_data);
+extern rtems_status_code rtems_bsp_select_specific_io(uint32_t bank, uint32_t pin, uint32_t function, void* pin_data);
 
 /**
  * @brief Configures a single GPIO pin pull resistor.
@@ -537,7 +537,7 @@ extern rtems_status_code bsp_select_specific_io(uint32_t bank, uint32_t pin, uin
  * @retval RTEMS_SUCCESSFUL Pull resistor successfully configured.
  * @retval RTEMS_UNSATISFIED Could not set the pull mode.
  */
-extern rtems_status_code bsp_gpio_set_resistor_mode(uint32_t bank, uint32_t pin, gpio_pull_mode mode);
+extern rtems_status_code rtems_bsp_gpio_set_resistor_mode(uint32_t bank, uint32_t pin, rtems_gpio_pull_mode mode);
 
 /**
  * @brief Reads and returns a vector/bank interrupt event line.
@@ -548,7 +548,7 @@ extern rtems_status_code bsp_gpio_set_resistor_mode(uint32_t bank, uint32_t pin,
  * @retval Bitmask (max 32-bit) representing a GPIO bank, where a bit set 
  *         indicates an active interrupt on that pin.
  */
-extern uint32_t bsp_gpio_interrupt_line(rtems_vector_number vector);
+extern uint32_t rtems_bsp_gpio_interrupt_line(rtems_vector_number vector);
 
 /**
  * @brief Clears a vector/bank interrupt event line.
@@ -557,9 +557,9 @@ extern uint32_t bsp_gpio_interrupt_line(rtems_vector_number vector);
  * @param[in] vector GPIO vector/bank.
  * @param[in] event_status Bitmask with the processed interrupts on the given
  *                         vector. This bitmask is the same as calculated in
- *                         @see bsp_gpio_interrupt_line().
+ *                         @see rtems_bsp_gpio_interrupt_line().
  */
-extern void bsp_gpio_clear_interrupt_line(rtems_vector_number vector, uint32_t event_status);
+extern void rtems_bsp_gpio_clear_interrupt_line(rtems_vector_number vector, uint32_t event_status);
 
 /**
  * @brief Calculates a vector number for a given GPIO bank.
@@ -569,7 +569,7 @@ extern void bsp_gpio_clear_interrupt_line(rtems_vector_number vector, uint32_t e
  *
  * @retval The corresponding rtems_vector_number.
  */
-extern rtems_vector_number bsp_gpio_get_vector(uint32_t bank);
+extern rtems_vector_number rtems_bsp_gpio_get_vector(uint32_t bank);
 
 /**
  * @brief Enables interrupts to be generated on a given GPIO pin.
@@ -582,7 +582,7 @@ extern rtems_vector_number bsp_gpio_get_vector(uint32_t bank);
  * @retval RTEMS_SUCCESSFUL Interrupt successfully enabled for this pin.
  * @retval RTEMS_UNSATISFIED Could not enable the interrupt on the pin.
  */
-extern rtems_status_code bsp_enable_interrupt(uint32_t bank, uint32_t pin, gpio_interrupt interrupt);
+extern rtems_status_code rtems_bsp_enable_interrupt(uint32_t bank, uint32_t pin, rtems_gpio_interrupt interrupt);
   
 /**
  * @brief Disables interrupt on hardware. This must be implemented by each BSP.
@@ -599,7 +599,7 @@ extern rtems_status_code bsp_enable_interrupt(uint32_t bank, uint32_t pin, gpio_
  * @retval RTEMS_SUCCESSFUL Interrupt successfully disabled for this pin.
  * @retval RTEMS_UNSATISFIED Could not disable interrupts on this pin.
  */
-extern rtems_status_code bsp_disable_interrupt(uint32_t bank, uint32_t pin, gpio_interrupt enabled_interrupt);
+extern rtems_status_code rtems_bsp_disable_interrupt(uint32_t bank, uint32_t pin, rtems_gpio_interrupt enabled_interrupt);
 
 /** @} */
   
@@ -607,4 +607,4 @@ extern rtems_status_code bsp_disable_interrupt(uint32_t bank, uint32_t pin, gpio
 }
 #endif /* __cplusplus */
 
-#endif /* LIBBSP_ARM_RASPBERRYPI_GPIO_H */
+#endif /* LIBBSP_SHARED__GPIO_H */

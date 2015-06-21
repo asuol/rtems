@@ -130,10 +130,6 @@ $(PROJECT_INCLUDE)/bsp/raspberrypi.h: include/raspberrypi.h $(PROJECT_INCLUDE)/b
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/raspberrypi.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/raspberrypi.h
 
-$(PROJECT_INCLUDE)/bsp/gpio.h: include/gpio.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
-	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/gpio.h
-PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/gpio.h
-
 $(PROJECT_INCLUDE)/bsp/rpi-gpio.h: include/rpi-gpio.h $(PROJECT_INCLUDE)/bsp/$(dirstamp)
 	$(INSTALL_DATA) $< $(PROJECT_INCLUDE)/bsp/rpi-gpio.h
 PREINSTALL_FILES += $(PROJECT_INCLUDE)/bsp/rpi-gpio.h

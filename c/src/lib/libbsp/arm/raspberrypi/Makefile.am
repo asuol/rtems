@@ -44,7 +44,6 @@ include_bsp_HEADERS += include/irq.h
 include_bsp_HEADERS += include/mmu.h
 include_bsp_HEADERS += include/usart.h
 include_bsp_HEADERS += include/raspberrypi.h
-include_bsp_HEADERS += include/gpio.h
 include_bsp_HEADERS += include/rpi-gpio.h
 include_bsp_HEADERS += include/i2c.h
 
@@ -90,6 +89,7 @@ libbsp_a_SOURCES += ../../shared/sbrk.c
 libbsp_a_SOURCES += ../../shared/src/stackalloc.c
 libbsp_a_SOURCES += ../shared/startup/bsp-start-memcpy.S
 libbsp_a_SOURCES += ../shared/arm-cp15-set-ttb-entries.c
+libbsp_a_SOURCES += ../../shared/gpio.c
 
 # Startup
 libbsp_a_SOURCES += ../../shared/bspreset_loop.c
@@ -121,7 +121,6 @@ libbsp_a_SOURCES += misc/timer.c
 
 # GPIO
 
-libbsp_a_SOURCES += gpio/gpio.c
 libbsp_a_SOURCES += gpio/rpi-gpio.c
 
 # RTC
