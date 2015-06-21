@@ -29,7 +29,7 @@ gpio_pin_conf arm_tdi = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[5]
 };
 
@@ -39,7 +39,7 @@ gpio_pin_conf arm_trst = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[4]
 };
 
@@ -49,7 +49,7 @@ gpio_pin_conf arm_tdo = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[4]
 };
 
@@ -59,7 +59,7 @@ gpio_pin_conf arm_tck = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[4]
 };
 
@@ -69,7 +69,7 @@ gpio_pin_conf arm_tms = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[4]
 };
 
@@ -79,7 +79,7 @@ gpio_pin_conf spi_p1_miso = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[0]
 };
 
@@ -89,7 +89,7 @@ gpio_pin_conf spi_p1_mosi = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[0]
 };
 
@@ -99,7 +99,7 @@ gpio_pin_conf spi_p1_sclk = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[0]
 };
 
@@ -109,7 +109,7 @@ gpio_pin_conf spi_p1_ce_0 = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[0]
 };
 
@@ -119,7 +119,7 @@ gpio_pin_conf spi_p1_ce_1 = {
  pull_mode: NO_PULL_RESISTOR,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[0]
 };
 
@@ -129,7 +129,7 @@ gpio_pin_conf i2c_p1_rev2_sda = {
  pull_mode: PULL_UP,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[0]
 };
 
@@ -139,6 +139,6 @@ gpio_pin_conf i2c_p1_rev2_scl = {
  pull_mode: PULL_UP,
  interrupt: NULL,
  output_enabled: FALSE,
- invert_output: FALSE,
+ logic_invert: FALSE,
  bsp_specific: &alt_func_def[0]
 };

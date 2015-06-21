@@ -26,11 +26,7 @@
 /* Calculates a bitmask to assign an alternate function to a given pin. */
 #define SELECT_PIN_FUNCTION(fn, pn) (fn << ((pn % 10) * 3))
 
-/**
- * @brief Waits a number of CPU cycles.
- *
- * @param[in] cycles The number of CPU cycles to wait.
- */
+/* Waits a number of CPU cycles. */
 static void arm_delay (int cycles)
 {
   int i;
@@ -51,7 +47,6 @@ static rtems_status_code rpi_select_pin_function(uint32_t bank, uint32_t pin, ui
   return RTEMS_SUCCESSFUL;
 }
 
-//TODO: receive pointer, and fill struct??
 gpio_layout bsp_gpio_initialize()
 {
   gpio_layout rpi_layout;
@@ -60,6 +55,20 @@ gpio_layout bsp_gpio_initialize()
   rpi_layout.pins_per_bank = 54;
 
   return rpi_layout;
+}
+
+rtems_status_code bsp_gpio_multi_set(uint32_t bank, uint32_t bitmask)
+{
+  BCM2835_REG(BCM2835_GPIO_GPSET0) |= bitmask;
+
+  return RTEMS_SUCCESSFUL;
+}
+
+rtems_status_code bsp_gpio_multi_clear(uint32_t bank, uint32_t bitmask)
+{
+  BCM2835_REG(BCM2835_GPIO_GPCLR0) |= bitmask;
+
+  return RTEMS_SUCCESSFUL;
 }
 
 rtems_status_code bsp_gpio_set(uint32_t bank, uint32_t pin)
@@ -102,7 +111,7 @@ rtems_status_code bsp_select_specific_io(uint32_t bank, uint32_t pin, uint32_t f
   return rpi_select_pin_function(bank, pin, function);
 }
 
-rtems_status_code bsp_gpio_set_input_mode(uint32_t bank, uint32_t pin, gpio_pull_mode mode)
+rtems_status_code bsp_gpio_set_resistor_mode(uint32_t bank, uint32_t pin, gpio_pull_mode mode)
 {
   /* Set control signal. */
   switch ( mode ) {
@@ -151,7 +160,7 @@ void bsp_gpio_clear_interrupt_line(rtems_vector_number vector, uint32_t event_st
   BCM2835_REG(BCM2835_GPIO_GPEDS0) = event_status;
 }
 
-rtems_status_code bsp_enable_interrupt(uint32_t pin, gpio_interrupt interrupt)
+rtems_status_code bsp_enable_interrupt(uint32_t bank, uint32_t pin, gpio_interrupt interrupt)
 {
   switch ( interrupt ) {
     case FALLING_EDGE:
@@ -192,7 +201,7 @@ rtems_status_code bsp_enable_interrupt(uint32_t pin, gpio_interrupt interrupt)
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code bsp_disable_interrupt(uint32_t pin, gpio_interrupt enabled_interrupt)
+rtems_status_code bsp_disable_interrupt(uint32_t bank, uint32_t pin, gpio_interrupt enabled_interrupt)
 {
   switch ( enabled_interrupt ) {
     case FALLING_EDGE:

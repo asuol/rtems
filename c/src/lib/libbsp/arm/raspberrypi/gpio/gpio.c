@@ -40,23 +40,31 @@
 
 #define RELEASE_LOCK(m) assert( rtems_semaphore_release(m) == RTEMS_SUCCESSFUL )
 
-/**
- * @brief Object containing information on a GPIO pin.
- *
- * Encapsulates relevant data about a GPIO pin.
- */
+/*Encapsulates relevant data for a GPIO interrupt handler. */
+typedef struct _gpio_handler_list
+{
+  struct _gpio_handler_list *next_isr;
+
+  /* User-defined ISR routine. */
+  gpio_irq_state (*handler) (void *arg);
+
+  /* User-defined arguments for the ISR routine. */
+  void *arg;
+} gpio_handler_list;
+
+/* Encapsulates relevant data about a GPIO pin. */
 typedef struct
 {
   uint32_t bank_number;
   uint32_t pin_number;
   
-  gpio_function pin_type;
+  gpio_function pin_function;
 
   /* Type of event which will trigger an interrupt. */
   gpio_interrupt enabled_interrupt;
 
-  /* If more than one interrupt handler is to be used, a task will be created
-   * to call each handler sequentially. */
+  /* Id of the task that will be calling the user-defined ISR handlers
+   * for this pin. */
   rtems_id task_id;
 
   /* ISR shared flag. */
@@ -66,20 +74,14 @@ typedef struct
   gpio_handler_list *handler_list;
 
   /* GPIO input (pull resistor) pin mode. */
-  gpio_pull_mode input_mode;
+  gpio_pull_mode resistor_mode;
 
+  /* If true inverts digital in/out logic. */
+  int logic_invert;
+  
   /* Switch-deboucing information. */
   int debouncing_tick_count;
-  rtems_interval last_isr_tick;
-
-  /* Struct with bsp specific data.
-   * If function == BSP_SPECIFIC this should have a pointer to
-   * a gpio_specific_data struct.
-   *
-   * If not this field may be NULL. This is passed to the bsp function so any bsp specific data
-   * can be passed to it through this pointer. */
-  void* bsp_specific;
-  
+  rtems_interval last_isr_tick;  
 } gpio_pin;
 
 static gpio_pin** gpio_pin_state;
@@ -91,34 +93,16 @@ static uint32_t odd_bank_pins;
 static uint32_t* interrupt_counter;
 static rtems_id* bank_lock;
 
-static uint32_t get_bank_number(uint32_t pin_number)
-{
-  return pin_number / pins_per_bank;
-}
+#define BANK_NUMBER(pin_number) pin_number / pins_per_bank
+#define PIN_NUMBER(pin_number) pin_number % pins_per_bank
 
-static uint32_t get_pin_number(uint32_t pin_number)
-{
-  return pin_number % pins_per_bank;
-}
-
-/**
- * @brief De-bounces a switch by requiring a certain time to pass between 
- *        interrupts. Any interrupt fired too close to the last will be 
- *        ignored as it is probably the result of an involuntary switch/button
- *        bounce after being released.
- *
- * @param[in] gpio GPIO pin that is being debounced. 
- *
- * @retval 0 Interrupt is likely provoked by a user press on the switch.
- * @retval -1 Interrupt was generated too close to the last one. 
- *            Probably a switch bounce.
- */
 static int debounce_switch(gpio_pin* gpio)
 {
   rtems_interval time;
   
   time = rtems_clock_get_ticks_since_boot();
 
+  /* If not enough time has elapsed since last interrupt. */
   if ( (time - gpio->last_isr_tick) < gpio->debouncing_tick_count ) {
     return -1;
   }
@@ -144,6 +128,7 @@ static rtems_task generic_handler_task(rtems_task_argument arg)
   while ( true ) {
     handled_count = 0;
 
+    /* Wait for interrupt event. This is sent by the bank's generic_isr handler. */
     rtems_event_receive(RTEMS_EVENT_1, RTEMS_EVENT_ALL | RTEMS_WAIT,
                         RTEMS_NO_TIMEOUT,
                         &out);
@@ -167,8 +152,8 @@ static rtems_task generic_handler_task(rtems_task_argument arg)
   
     handler_list = gpio->handler_list;
 
+    /* Iterate the ISR list. */
     while ( handler_list != NULL ) {
-      /* Call the user's ISR. */
       if ( (handler_list->handler)(handler_list->arg) == IRQ_HANDLED ) {
         ++handled_count;
       }
@@ -185,34 +170,6 @@ static rtems_task generic_handler_task(rtems_task_argument arg)
   }
 }
 
-static rtems_status_code gpio_check_pin(int pin_number, bool check_used)
-{
-  uint32_t bank;
-  uint32_t pin;
-  
-  if ( pin_number < 0 || pin_number >= gpio_count ) {
-    return RTEMS_INVALID_ID;
-  }
-
-  if ( check_used == true ) {
-    bank = get_bank_number(pin_number);
-    pin = get_pin_number(pin_number);
-
-    /* If the pin is already being used returns with an error. */
-    if ( gpio_pin_state[bank][pin].pin_type != NOT_USED ) {
-      return RTEMS_RESOURCE_IN_USE;
-    }
-  }
-
-  return RTEMS_SUCCESSFUL;
-}
-
-/**
- * @brief Initializes the GPIO API and sets every pin as NOT_USED.
- *
- * @retval RTEMS_SUCCESSFUL API successfully initialized.
- * @retval * @rtems_semaphore_create().
- */
 rtems_status_code gpio_initialize(void)
 {
   rtems_status_code sc;
@@ -225,7 +182,7 @@ rtems_status_code gpio_initialize(void)
   if ( _Atomic_Flag_test_and_set(&init_flag, ATOMIC_ORDER_RELAXED) == true ) {
     return RTEMS_SUCCESSFUL;
   }
-  
+
   layout = bsp_gpio_initialize();
 
   gpio_count = layout.pin_count;
@@ -240,6 +197,7 @@ rtems_status_code gpio_initialize(void)
     ++bank_count;
   }
 
+  /* Create GPIO bank mutexes. */
   bank_lock = (rtems_id*) malloc(bank_count * sizeof(rtems_id));
 
   for ( i = 0; i < bank_count; ++i ) {    
@@ -250,6 +208,7 @@ rtems_status_code gpio_initialize(void)
     }
   }
 
+  /* Create GPIO pin state matrix. */
   gpio_pin_state = (gpio_pin**) malloc(bank_count * sizeof(gpio_pin*));
 
   for ( i = 0; i < bank_count; ++i ) {
@@ -263,15 +222,16 @@ rtems_status_code gpio_initialize(void)
     gpio_pin_state[i] = (gpio_pin*) malloc(bank_pins * sizeof(gpio_pin));
   }
 
+  /* Creates an interrupt counter per pin bank. */
   interrupt_counter = (uint32_t*) calloc(bank_count, sizeof(uint32_t));
   
   for ( i = 0; i < gpio_count; ++i ) {    
-    bank = i / pins_per_bank;
-    pin = i % pins_per_bank;
+    bank = BANK_NUMBER(i);
+    pin = PIN_NUMBER(i);
 
     gpio_pin_state[bank][pin].bank_number = bank;
     gpio_pin_state[bank][pin].pin_number = pin;
-    gpio_pin_state[bank][pin].pin_type = NOT_USED;
+    gpio_pin_state[bank][pin].pin_function = NOT_USED;
     gpio_pin_state[bank][pin].enabled_interrupt = NONE;
     gpio_pin_state[bank][pin].task_id = RTEMS_ID_NONE;
     gpio_pin_state[bank][pin].handler_list = NULL;
@@ -291,29 +251,24 @@ rtems_status_code gpio_request_conf(gpio_pin_conf* conf)
   uint32_t pin;
 
   new_request = false;
-  
-  sc = gpio_check_pin(conf->pin_number, true);
+   
+  sc = gpio_request_pin(conf->pin_number, conf->function, conf->output_enabled, conf->logic_invert, conf->bsp_specific);
 
-  if ( sc == RTEMS_SUCCESSFUL ) {    
-    sc = gpio_request_pin(conf->pin_number, conf->function, conf->bsp_specific);
-
-    if ( sc != RTEMS_SUCCESSFUL ) {
-      RTEMS_SYSLOG_ERROR("gpio_request_pin failed with status code %d\n", sc);
-      
-      return RTEMS_UNSATISFIED;
-    }
-
+  if ( sc == RTEMS_SUCCESSFUL ) {
     new_request = true;
   }
-
-  else if ( sc == RTEMS_INVALID_ID ) {
-    return sc;
+  /* If the pin is being used, then this function call is an update call.
+   * If not, an error occurred. */
+  else if ( sc != RTEMS_RESOURCE_IN_USE ) {
+    RTEMS_SYSLOG_ERROR("gpio_request_pin failed with status code %d\n", sc);
+      
+    return RTEMS_UNSATISFIED;
   }
   
-  sc = gpio_input_mode(conf->pin_number, conf->pull_mode);
+  sc = gpio_resistor_mode(conf->pin_number, conf->pull_mode);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
-    RTEMS_SYSLOG_ERROR("gpio_input_mode failed with status code %d\n", sc);
+    RTEMS_SYSLOG_ERROR("gpio_resistor_mode failed with status code %d\n", sc);
     
     return RTEMS_UNSATISFIED;
   }
@@ -321,8 +276,8 @@ rtems_status_code gpio_request_conf(gpio_pin_conf* conf)
   interrupt_conf = (gpio_interrupt_conf*) conf->interrupt;
 
   if ( interrupt_conf != NULL ) {
-    bank = get_bank_number(conf->pin_number);
-    pin = get_pin_number(conf->pin_number);
+    bank = BANK_NUMBER(conf->pin_number);
+    pin = PIN_NUMBER(conf->pin_number);
 
     AQUIRE_LOCK(bank_lock[bank]);
 
@@ -366,17 +321,121 @@ rtems_status_code gpio_request_conf(gpio_pin_conf* conf)
   return RTEMS_SUCCESSFUL;
 }
 
-/**
- * @brief Sets an output GPIO pin with the logical high.
- *
- * @param[in] pin_number GPIO pin number.
- *
- * @retval RTEMS_SUCCESSFUL Pin was set successfully.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_NOT_CONFIGURED The received pin is not configured 
- *                              as an digital output.
- * @retval RTEMS_UNSATISFIED Could not set the GPIO pin.
- */
+static uint32_t get_pin_bitmask(uint32_t count, va_list args, uint32_t* bank_number, rtems_status_code* sc)
+{
+  uint32_t bank;
+  uint32_t pin;
+  uint32_t bitmask;
+  uint32_t pin_number;
+  int i;
+
+  if ( count < 1 ) {
+    *sc = RTEMS_UNSATISFIED;
+
+    return 0;
+  }
+  
+  bitmask = 0;
+
+  for ( i = 0; i < count; ++i ) {
+    pin_number = va_arg(args, uint32_t);
+
+    if ( pin_number < 0 || pin_number >= gpio_count ) {
+      *sc = RTEMS_INVALID_ID;
+
+      return 0;
+    }
+
+    bank = BANK_NUMBER(pin_number);
+    pin = PIN_NUMBER(pin_number);
+
+    if ( i == 0 ) {
+      *bank_number = bank;
+
+      AQUIRE_LOCK(bank_lock[bank]);
+    }
+    else if ( bank != *bank_number ) {
+      *sc = RTEMS_UNSATISFIED;
+
+      RELEASE_LOCK(bank_lock[*bank_number]);
+      
+      return 0;
+    }
+
+    if ( gpio_pin_state[bank][pin].pin_function != DIGITAL_OUTPUT ) {
+      *sc = RTEMS_NOT_CONFIGURED;
+
+      RELEASE_LOCK(bank_lock[bank]);
+      
+      return 0;
+    }
+    
+    bitmask |= (1 << PIN_NUMBER(pin_number));
+  }
+  
+  *sc = RTEMS_SUCCESSFUL;
+
+  RELEASE_LOCK(bank_lock[bank]);
+
+  return bitmask;
+}
+
+rtems_status_code gpio_multi_set(uint32_t count, ...)
+{
+  rtems_status_code sc;
+  uint32_t bank;
+  uint32_t bitmask;
+  va_list ap;
+
+  va_start(ap, count);
+
+  bitmask = get_pin_bitmask(count, ap, &bank, &sc);
+
+  if ( sc != RTEMS_SUCCESSFUL ) {
+    RTEMS_SYSLOG_ERROR("error parsing function arguments\n");
+    
+    return sc;
+  }
+  
+  va_end(ap);
+
+  AQUIRE_LOCK(bank_lock[bank]);
+  
+  sc = bsp_gpio_multi_set(bank, bitmask);
+
+  RELEASE_LOCK(bank_lock[bank]);
+
+  return sc;
+}
+
+rtems_status_code gpio_multi_clear(uint32_t count, ...)
+{
+  rtems_status_code sc;
+  uint32_t bank;
+  uint32_t bitmask;
+  va_list ap;
+
+  va_start(ap, count);
+
+  bitmask = get_pin_bitmask(count, ap, &bank, &sc);
+
+  if ( sc != RTEMS_SUCCESSFUL ) {
+    RTEMS_SYSLOG_ERROR("error parsing function arguments\n");
+    
+    return sc;
+  }
+  
+  va_end(ap);
+
+  AQUIRE_LOCK(bank_lock[bank]);
+  
+  sc = bsp_gpio_multi_clear(bank, bitmask);
+
+  RELEASE_LOCK(bank_lock[bank]);
+
+  return sc;
+}
+
 rtems_status_code gpio_set(uint32_t pin_number)
 {
   rtems_status_code sc;
@@ -387,33 +446,31 @@ rtems_status_code gpio_set(uint32_t pin_number)
     return RTEMS_INVALID_ID;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
 
   AQUIRE_LOCK(bank_lock[bank]);
   
-  if ( gpio_pin_state[bank][pin].pin_type != DIGITAL_OUTPUT ) {
+  if ( gpio_pin_state[bank][pin].pin_function != DIGITAL_OUTPUT ) {
+    RELEASE_LOCK(bank_lock[bank]);
+
+    RTEMS_SYSLOG_ERROR("Can only set digital output pins\n");
+    
     return RTEMS_NOT_CONFIGURED;
   }
 
-  sc = bsp_gpio_set(bank, pin);
+  if ( gpio_pin_state[bank][pin].logic_invert ) {
+    sc = bsp_gpio_clear(bank, pin);
+  }
+  else {
+    sc = bsp_gpio_set(bank, pin);
+  }
   
   RELEASE_LOCK(bank_lock[bank]);
 
   return sc;
 }
 
-/**
- * @brief Sets an output GPIO pin with the logical low.
- *
- * @param[in] pin_number GPIO pin number.
- *
- * @retval RTEMS_SUCCESSFUL Pin was cleared successfully.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_NOT_CONFIGURED The received pin is not configured 
- *                              as an digital output.
- * @retval RTEMS_UNSATISFIED Could not clear the GPIO pin.
- */
 rtems_status_code gpio_clear(uint32_t pin_number)
 {
   rtems_status_code sc;
@@ -424,59 +481,68 @@ rtems_status_code gpio_clear(uint32_t pin_number)
     return RTEMS_INVALID_ID;
   }
   
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
 
   AQUIRE_LOCK(bank_lock[bank]);
   
-  if ( gpio_pin_state[bank][pin].pin_type != DIGITAL_OUTPUT ) {
+  if ( gpio_pin_state[bank][pin].pin_function != DIGITAL_OUTPUT ) {
+    RELEASE_LOCK(bank_lock[bank]);
+
+    RTEMS_SYSLOG_ERROR("Can only clear digital output pins\n");
+    
     return RTEMS_NOT_CONFIGURED;
   }
 
-  sc = bsp_gpio_clear(bank, pin);
+  if ( gpio_pin_state[bank][pin].logic_invert ) {
+    sc = bsp_gpio_set(bank, pin);
+  }
+  else {
+    sc = bsp_gpio_clear(bank, pin);
+  }
 
   RELEASE_LOCK(bank_lock[bank]);
   
   return sc;
 }
 
-/**
- * @brief Returns the value (level) of a GPIO input pin.
- *
- * @param[in] pin_number GPIO pin number.
- *
- * @retval The function returns 0 or 1 depending on the pin current 
- *         logical value.
- * @retval -1 Pin number is invalid.
- */
 int gpio_get_value(uint32_t pin_number)
 {
   uint32_t bank;
   uint32_t pin;
+  int rv;
   
   if ( pin_number < 0 || pin_number >= gpio_count ) {
     return -1;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
 
-  return bsp_gpio_get_value(bank, pin);
+  AQUIRE_LOCK(bank_lock[bank]);
+
+  if ( gpio_pin_state[bank][pin].pin_function != DIGITAL_INPUT) {
+    RELEASE_LOCK(bank_lock[bank]);
+
+    RTEMS_SYSLOG_ERROR("Can only read digital input pins\n");
+    
+    return -1;
+  }
+
+  rv = bsp_gpio_get_value(bank, pin);
+
+  if ( gpio_pin_state[bank][pin].logic_invert ) {
+    RELEASE_LOCK(bank_lock[bank]);
+    
+    return !rv;
+  }
+
+  RELEASE_LOCK(bank_lock[bank]);
+
+  return ( rv > 0 ) ? 1 : 0;
 }
 
-/**
- * @brief Assigns a certain function to a GPIO pin.
- *
- * @param[in] pin_number GPIO pin number.
- * @param[in] function The new function of the pin.
- *
- * @retval RTEMS_SUCCESSFUL Pin was configured successfully.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_RESOURCE_IN_USE The received pin is already being used.
- * @retval RTEMS_UNSATISFIED Could not assign the GPIO function.
- * @retval RTEMS_NOT_DEFINED GPIO function not defined, or NOT_USED.
- */
-rtems_status_code gpio_request_pin(uint32_t pin_number, gpio_function function, void* bsp_specific)
+rtems_status_code gpio_request_pin(uint32_t pin_number, gpio_function function, bool output_enabled, bool logic_invert, void* bsp_specific)
 {
   gpio_specific_data* bsp_data;
   rtems_status_code sc = RTEMS_SUCCESSFUL;
@@ -487,13 +553,13 @@ rtems_status_code gpio_request_pin(uint32_t pin_number, gpio_function function, 
     return RTEMS_INVALID_ID;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
 
   AQUIRE_LOCK(bank_lock[bank]);
 
   /* If the pin is already being used returns with an error. */
-  if ( gpio_pin_state[bank][pin].pin_type != NOT_USED ) {
+  if ( gpio_pin_state[bank][pin].pin_function != NOT_USED ) {
     RELEASE_LOCK(bank_lock[bank]);
     
     return RTEMS_RESOURCE_IN_USE;
@@ -532,24 +598,24 @@ rtems_status_code gpio_request_pin(uint32_t pin_number, gpio_function function, 
 
   /* If the function was successfuly assigned to the pin,
    * record that information on the gpio_pin_state structure. */
-  gpio_pin_state[bank][pin].pin_type = function;
+  gpio_pin_state[bank][pin].pin_function = function;
+  gpio_pin_state[bank][pin].logic_invert = logic_invert;
+
+  if ( function == DIGITAL_OUTPUT ) {
+    if ( output_enabled == true ) {
+      sc = bsp_gpio_set(bank, pin); 
+    }
+    else {
+      sc = bsp_gpio_clear(bank, pin); 
+    }
+  }
 
   RELEASE_LOCK(bank_lock[bank]);
   
-  return RTEMS_SUCCESSFUL;
+  return sc;
 }
 
-/**
- * @brief Configures a single GPIO pin pull resistor. 
- *
- * @param[in] pin_number GPIO pin number.
- * @param[in] mode The pull resistor mode.
- *
- * @retval RTEMS_SUCCESSFUL Pull resistor successfully configured.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_UNSATISFIED Could not set the pull mode.
- */
-rtems_status_code gpio_input_mode(uint32_t pin_number, gpio_pull_mode mode)
+rtems_status_code gpio_resistor_mode(uint32_t pin_number, gpio_pull_mode mode)
 {
   rtems_status_code sc;
   uint32_t bank;
@@ -559,8 +625,8 @@ rtems_status_code gpio_input_mode(uint32_t pin_number, gpio_pull_mode mode)
     return RTEMS_INVALID_ID;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
   
   AQUIRE_LOCK(bank_lock[bank]);
   
@@ -568,13 +634,13 @@ rtems_status_code gpio_input_mode(uint32_t pin_number, gpio_pull_mode mode)
    * The NO_PULL_RESISTOR is a special case, as some platforms have
    * pull-up resistors enabled on startup, so this state may have to
    * be reinforced in the hardware. */
-  if ( gpio_pin_state[bank][pin].input_mode == mode  && mode != NO_PULL_RESISTOR ) {
+  if ( gpio_pin_state[bank][pin].resistor_mode == mode  && mode != NO_PULL_RESISTOR ) {
     RELEASE_LOCK(bank_lock[bank]);
     
     return RTEMS_SUCCESSFUL;
   }
 
-  sc = bsp_gpio_set_input_mode(bank, pin, mode);
+  sc = bsp_gpio_set_resistor_mode(bank, pin, mode);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     RELEASE_LOCK(bank_lock[bank]);
@@ -582,24 +648,13 @@ rtems_status_code gpio_input_mode(uint32_t pin_number, gpio_pull_mode mode)
     return sc;
   }
 
-  gpio_pin_state[bank][pin].input_mode = mode;
+  gpio_pin_state[bank][pin].resistor_mode = mode;
 
   RELEASE_LOCK(bank_lock[bank]);
   
   return RTEMS_SUCCESSFUL;
 }
 
-/**
- * @brief Releases a GPIO pin from the API, making it available to be used 
- *        again.
- *
- * @param[in] pin_number GPIO pin number.
- *
- * @retval RTEMS_SUCCESSFUL Pin successfully disabled on the API.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_UNSATISFIED Could not disable an ative interrupt on this pin, 
- *                           @see gpio_disable_interrupt().
- */
 rtems_status_code gpio_release_pin(uint32_t pin_number)
 {
   rtems_status_code sc;
@@ -611,8 +666,8 @@ rtems_status_code gpio_release_pin(uint32_t pin_number)
     return RTEMS_INVALID_ID;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
 
   AQUIRE_LOCK(bank_lock[bank]);
 
@@ -630,7 +685,7 @@ rtems_status_code gpio_release_pin(uint32_t pin_number)
     }
   }
 
-  gpio->pin_type = NOT_USED;
+  gpio->pin_function = NOT_USED;
   gpio->task_id = RTEMS_ID_NONE;
   gpio->debouncing_tick_count = 0;
   gpio->last_isr_tick = 0;
@@ -640,12 +695,6 @@ rtems_status_code gpio_release_pin(uint32_t pin_number)
   return RTEMS_SUCCESSFUL;
 }
 
-/**
- * @brief Generic ISR that clears the event register on the Raspberry Pi and 
- *        calls an user defined ISR. 
- *
- * @param[in] arg Void pointer to a handler_arguments structure. 
- */
 static void generic_isr(void* arg)
 {
   rtems_vector_number vector;
@@ -654,7 +703,7 @@ static void generic_isr(void* arg)
   gpio_pin *gpio;
   uint32_t bank_number;
   int i;
-
+  
   gpio = (gpio_pin *) arg;
 
   /* Get the bank/vector number of a pin (e.g.: 0) from this bank. */
@@ -700,21 +749,6 @@ static void generic_isr(void* arg)
   bsp_interrupt_vector_enable(vector);
 }
 
-/**
- * @brief Defines for a GPIO input pin the number of clock ticks that must pass
- *        before an generated interrupt is guaranteed to be generated by the user
- *        and not by a bouncing switch/button.
- *
- * @param[in] pin_number GPIO pin number.
- * @param[in] ticks Minimum number of clock ticks that must pass between 
- *                  interrupts so it can be considered a legitimate
- *                  interrupt. 
- *
- * @retval RTEMS_SUCCESSFUL De-bounce function successfully attached to the pin.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_NOT_CONFIGURED The current pin is not configured as a digital 
- *                              input, hence it can not be connected to a switch.
- */
 rtems_status_code gpio_debounce_switch(uint32_t pin_number, int ticks)
 {
   uint32_t bank;
@@ -724,12 +758,12 @@ rtems_status_code gpio_debounce_switch(uint32_t pin_number, int ticks)
     return RTEMS_INVALID_ID;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
   
   AQUIRE_LOCK(bank_lock[bank]);
   
-  if ( gpio_pin_state[bank][pin].pin_type != DIGITAL_INPUT ) {
+  if ( gpio_pin_state[bank][pin].pin_function != DIGITAL_INPUT ) {
     RELEASE_LOCK(bank_lock[bank]);
     
     return RTEMS_NOT_CONFIGURED;
@@ -743,24 +777,6 @@ rtems_status_code gpio_debounce_switch(uint32_t pin_number, int ticks)
   return RTEMS_SUCCESSFUL;
 }
 
-/**
- * @brief Connects a new user-defined interrupt handler to a given pin.
- *
- * @param[in] pin_number GPIO pin number.
- * @param[in] handler Pointer to a function that will be called every time 
- *                    the enabled interrupt for the given pin is generated. 
- *                    This function must return information about its 
- *                    handled/unhandled state.
- * @param[in] arg Void pointer to the arguments of the user-defined handler.
- *
- * @retval RTEMS_SUCCESSFUL Handler successfully connected to this pin.
- * @retval RTEMS_NO_MEMORY Could not connect more user-defined handlers to 
- *                         the given pin.
- * @retval RTEMS_NOT_CONFIGURED The given pin has no interrupt configured.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_RESOURCE_IN_USE The current user-defined handler for this pin
- *                               is unique.
- */
 rtems_status_code gpio_interrupt_handler_install(
 uint32_t pin_number,
 gpio_irq_state (*handler) (void *arg),
@@ -776,13 +792,15 @@ void *arg
     return RTEMS_INVALID_ID;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
 
   AQUIRE_LOCK(bank_lock[bank]);
 
   gpio = &gpio_pin_state[bank][pin];
 
+  /* If the current pin has no interrupt enabled 
+   * then it does not need an handler. */
   if ( gpio->enabled_interrupt == NONE ) {
     RELEASE_LOCK(bank_lock[bank]);
     
@@ -795,7 +813,8 @@ void *arg
     
     return RTEMS_RESOURCE_IN_USE;
   }
-  
+
+  /* Update the pin's ISR list. */
   isr_node = (gpio_handler_list *) malloc(sizeof(gpio_handler_list));
 
   if ( isr_node == NULL ) {
@@ -821,27 +840,6 @@ void *arg
   return RTEMS_SUCCESSFUL;
 }
 
-/**
- * @brief Enables interrupts to be generated on a given GPIO pin.
- *        When fired that interrupt will call the given handler.
- *
- * @param[in] pin_number GPIO pin number.
- * @param[in] interrupt Type of interrupt to enable for the pin.
- * @param[in] handler Pointer to a function that will be called every time 
- *                    @var interrupt is generated. This function must return
- *                    information about its handled/unhandled state.
- * @param[in] arg Void pointer to the arguments of the user-defined handler.
- *
- * @retval RTEMS_SUCCESSFUL Interrupt successfully enabled for this pin.
- * @retval RTEMS_UNSATISFIED Could not install the GPIO ISR, create/start
- *                           the handler task, or enable the interrupt
- *                           on the pin.
- * @retval RTEMS_NOT_CONFIGURED The pin is not configured as a digital input,
- *                              hence interrupts are not taken into account.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_RESOURCE_IN_USE The current user-defined handler for this pin
- *                               is unique.
- */
 rtems_status_code gpio_enable_interrupt(
 uint32_t pin_number, 
 gpio_interrupt interrupt,
@@ -860,8 +858,8 @@ void *arg
     return RTEMS_INVALID_ID;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
 
   vector = bsp_gpio_get_vector(bank);
 
@@ -869,22 +867,22 @@ void *arg
   
   gpio = &gpio_pin_state[bank][pin];
 
-  if ( gpio->pin_type != DIGITAL_INPUT ) {
+  if ( gpio->pin_function != DIGITAL_INPUT ) {
     RELEASE_LOCK(bank_lock[bank]);
 
     return RTEMS_NOT_CONFIGURED;
   }
 
   /* If trying to enable the same type of interrupt on the same pin, or if the pin
-   * already has an enabled interrupt, silently exits. */
+   * already has an enabled interrupt. */
   if ( interrupt == gpio->enabled_interrupt || gpio->enabled_interrupt != NONE ) {
     RELEASE_LOCK(bank_lock[bank]);
 
-    return RTEMS_SUCCESSFUL;
+    return RTEMS_RESOURCE_IN_USE;
   }
   
   /* Creates and starts a new task which will call the corresponding 
-   * user-defined handlers. */
+   * user-defined handlers for this pin. */
   sc = rtems_task_create(rtems_build_name('G', 'P', 'I', 'O'),
                          5,
                          RTEMS_MINIMUM_STACK_SIZE * 2,
@@ -943,7 +941,7 @@ void *arg
     }
   }
   
-  sc = bsp_enable_interrupt(pin_number, interrupt);
+  sc = bsp_enable_interrupt(bank, pin, interrupt);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     RELEASE_LOCK(bank_lock[bank]);
@@ -958,19 +956,6 @@ void *arg
   return RTEMS_SUCCESSFUL;
 }
 
-/**
- * @brief Disconnects a new user-defined interrupt handler from the given pin.
- *        If in the end there are no more user-defined handler connected
- *        to the pin interrupts are disabled on the given pin.
- *
- * @param[in] pin_number GPIO pin number.
- * @param[in] handler Pointer to the user-defined handler
- * @param[in] arg Void pointer to the arguments of the user-defined handler.
- *
- * @retval RTEMS_SUCCESSFUL Handler successfully disconnected from this pin.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval * @see gpio_disable_interrupt()
- */
 rtems_status_code gpio_interrupt_handler_remove(
 uint32_t pin_number,
 gpio_irq_state (*handler) (void *arg),
@@ -986,8 +971,8 @@ void *arg
     return RTEMS_INVALID_ID;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
 
   AQUIRE_LOCK(bank_lock[bank]);
   
@@ -1027,19 +1012,6 @@ void *arg
   return RTEMS_SUCCESSFUL;
 }
 
-/**
- * @brief Stops interrupts from being generated from a given GPIO pin
- *        and removes the corresponding handler.
- *
- * @param[in] pin_number GPIO pin number.
- *
- * @retval RTEMS_SUCCESSFUL Interrupt successfully disabled for this pin.
- * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_UNSATISFIED Could not remove the current interrupt handler, 
- *                           could not recognise the current active interrupt 
- *                           on this pin or could not disable interrupts on
- *                           this pin.
- */
 rtems_status_code gpio_disable_interrupt(uint32_t pin_number)
 {
   gpio_handler_list *isr_node;
@@ -1053,8 +1025,8 @@ rtems_status_code gpio_disable_interrupt(uint32_t pin_number)
     return RTEMS_INVALID_ID;
   }
 
-  bank = get_bank_number(pin_number);
-  pin = get_pin_number(pin_number);
+  bank = BANK_NUMBER(pin_number);
+  pin = PIN_NUMBER(pin_number);
 
   vector = bsp_gpio_get_vector(bank);
 
@@ -1068,7 +1040,7 @@ rtems_status_code gpio_disable_interrupt(uint32_t pin_number)
     return RTEMS_SUCCESSFUL;
   }
 
-  sc = bsp_disable_interrupt(pin_number, gpio->enabled_interrupt);
+  sc = bsp_disable_interrupt(bank, pin, gpio->enabled_interrupt);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     RELEASE_LOCK(bank_lock[bank]);
