@@ -77,7 +77,6 @@ capture/Makefile
 LIBGPIO_TEST/Makefile
 LIBGPIO_TEST_IRQ/Makefile
 LIBGPIO_JTAG/Makefile
-SPI_23k256_TEST/Makefile
-I2C_MCP23008_TEST/Makefile
+LIBGPIO_MULTI_TEST/Makefile
 ])
 AC_OUTPUT
