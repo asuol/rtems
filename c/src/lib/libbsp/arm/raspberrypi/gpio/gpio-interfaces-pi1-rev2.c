@@ -14,15 +14,6 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
-rtems_gpio_specific_data alt_func_def[] = {
-  {io_function: RPI_ALT_FUNC_0, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_1, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_2, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_3, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_4, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_5, pin_data: NULL}
-};
-
 rtems_gpio_pin_conf arm_tdi = {
  pin_number: 4,
  function: BSP_SPECIFIC,
@@ -73,7 +64,7 @@ rtems_gpio_pin_conf arm_tms = {
  bsp_specific: &alt_func_def[4]
 };
 
-rtems_gpio_pin_conf spi_p1_miso = {
+rtems_gpio_pin_conf spi_miso = {
  pin_number: 7,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -83,7 +74,7 @@ rtems_gpio_pin_conf spi_p1_miso = {
  bsp_specific: &alt_func_def[0]
 };
 
-rtems_gpio_pin_conf spi_p1_mosi = {
+rtems_gpio_pin_conf spi_mosi = {
  pin_number: 8,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -93,7 +84,7 @@ rtems_gpio_pin_conf spi_p1_mosi = {
  bsp_specific: &alt_func_def[0]
 };
 
-rtems_gpio_pin_conf spi_p1_sclk = {
+rtems_gpio_pin_conf spi_sclk = {
  pin_number: 9,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -103,7 +94,7 @@ rtems_gpio_pin_conf spi_p1_sclk = {
  bsp_specific: &alt_func_def[0]
 };
 
-rtems_gpio_pin_conf spi_p1_ce_0 = {
+rtems_gpio_pin_conf spi_ce_0 = {
  pin_number: 10,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -113,7 +104,7 @@ rtems_gpio_pin_conf spi_p1_ce_0 = {
  bsp_specific: &alt_func_def[0]
 };
 
-rtems_gpio_pin_conf spi_p1_ce_1 = {
+rtems_gpio_pin_conf spi_ce_1 = {
  pin_number: 11,
  function: BSP_SPECIFIC,
  pull_mode: NO_PULL_RESISTOR,
@@ -123,7 +114,7 @@ rtems_gpio_pin_conf spi_p1_ce_1 = {
  bsp_specific: &alt_func_def[0]
 };
 
-rtems_gpio_pin_conf i2c_p1_rev2_sda = {
+rtems_gpio_pin_conf i2c_sda = {
  pin_number: 2,
  function: BSP_SPECIFIC,
  pull_mode: PULL_UP,
@@ -133,7 +124,7 @@ rtems_gpio_pin_conf i2c_p1_rev2_sda = {
  bsp_specific: &alt_func_def[0]
 };
 
-rtems_gpio_pin_conf i2c_p1_rev2_scl = {
+rtems_gpio_pin_conf i2c_scl = {
  pin_number: 3,
  function: BSP_SPECIFIC,
  pull_mode: PULL_UP,

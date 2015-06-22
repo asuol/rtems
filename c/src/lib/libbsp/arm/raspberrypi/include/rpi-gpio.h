@@ -30,6 +30,9 @@ extern "C" {
  */
 #define GPIO_COUNT 54
 
+/**
+ * @brief  Raspberry Pi GPIO functions.
+ */
 #define RPI_DIGITAL_IN  7
 #define RPI_DIGITAL_OUT 1
 #define RPI_ALT_FUNC_0  4
@@ -39,10 +42,33 @@ extern "C" {
 #define RPI_ALT_FUNC_4  3
 #define RPI_ALT_FUNC_5  2
 
-extern rtems_status_code gpio_select_jtag(void);
-extern rtems_status_code gpio_select_spi_p1(void);
-extern rtems_status_code gpio_select_i2c_p1_rev2(void);
-  
+/**
+ * @brief Setups a JTAG interface.
+ *
+ * @retval RTEMS_SUCCESSFUL JTAG interface successfully configured.
+ * @retval * At least one of the required pins is currently
+ *            occupied, @see rtems_gpio_request_conf().
+ */
+extern rtems_status_code rpi_gpio_select_jtag(void);
+
+/**
+ * @brief Setups a SPI interface.
+ *
+ * @retval RTEMS_SUCCESSFUL SPI interface successfully configured.
+ * @retval * At least one of the required pins is currently
+ *            occupied, @see rtems_gpio_request_conf().
+ */
+extern rtems_status_code rpi_gpio_select_spi(void);
+
+/**
+ * @brief Setups a I2C interface.
+ *
+ * @retval RTEMS_SUCCESSFUL I2C interface successfully configured.
+ * @retval * At least one of the required pins is currently
+ *            occupied, @see rtems_gpio_request_conf().
+ */
+extern rtems_status_code rpi_gpio_select_i2c(void);
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */

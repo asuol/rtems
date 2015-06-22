@@ -5,6 +5,7 @@
 #include <rtems/test.h>
 
 #include <bsp.h> /* for device driver prototypes */
+#include <bsp/gpio.h>
 #include <bsp/rpi-gpio.h>
 
 #include <assert.h>
@@ -27,7 +28,7 @@ rtems_task Init(
   rtems_gpio_initialize ();
 
   /* Setups the JTAG pin interface */
-  sc = gpio_select_jtag ();
+  sc = rpi_gpio_select_jtag ();
   assert(sc == RTEMS_SUCCESSFUL);
   
   rtems_test_end();

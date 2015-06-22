@@ -21,10 +21,20 @@
 
 #include <stdlib.h>
 
-#include "gpio-interfaces.c"
-
 /* Calculates a bitmask to assign an alternate function to a given pin. */
 #define SELECT_PIN_FUNCTION(fn, pn) (fn << ((pn % 10) * 3))
+
+rtems_gpio_specific_data alt_func_def[] = {
+  {io_function: RPI_ALT_FUNC_0, pin_data: NULL},
+  {io_function: RPI_ALT_FUNC_1, pin_data: NULL},
+  {io_function: RPI_ALT_FUNC_2, pin_data: NULL},
+  {io_function: RPI_ALT_FUNC_3, pin_data: NULL},
+  {io_function: RPI_ALT_FUNC_4, pin_data: NULL},
+  {io_function: RPI_ALT_FUNC_5, pin_data: NULL}
+};
+
+/* Raspberry Pi 1 Rev 2 gpio interface definitions. */
+#include "gpio-interfaces-pi1-rev2.c"
 
 /* Waits a number of CPU cycles. */
 static void arm_delay (int cycles)
@@ -50,9 +60,9 @@ static rtems_status_code rpi_select_pin_function(uint32_t bank, uint32_t pin, ui
 rtems_gpio_layout rtems_bsp_gpio_initialize()
 {
   rtems_gpio_layout rpi_layout;
-  
-  rpi_layout.pin_count = 54;
-  rpi_layout.pins_per_bank = 54;
+
+  rpi_layout.pin_count = GPIO_COUNT;
+  rpi_layout.pins_per_bank = GPIO_COUNT;
 
   return rpi_layout;
 }
@@ -242,17 +252,7 @@ rtems_status_code rtems_bsp_disable_interrupt(uint32_t bank, uint32_t pin, rtems
   return RTEMS_SUCCESSFUL;
 }
 
-/**
- * @brief Setups a JTAG interface using the P1 GPIO pin header
- *        for the models A/B and J8 header on the B+. 
- *        The following pins should be unused before calling this function:
- *        GPIO 4, 22, 24, 25 and 27.
- *
- * @retval RTEMS_SUCCESSFUL JTAG interface successfully configured.
- * @retval RTEMS_RESOURCE_IN_USE At least one of the required pins is currently
- *                               occupied, @see gpio_select_pin().
- */
-rtems_status_code gpio_select_jtag(void)
+rtems_status_code rpi_gpio_select_jtag(void)
 {
   rtems_status_code sc;
 
@@ -285,70 +285,50 @@ rtems_status_code gpio_select_jtag(void)
   return sc;
 }
 
-/**
- * @brief Setups a SPI interface using the P1 GPIO pin header
- *        for the models A/B and J8 header on the B+. 
- *        The following pins should be unused before calling this function:
- *        GPIO 7, 8, 9, 10 and 11. 
- *
- * @retval RTEMS_SUCCESSFUL SPI interface successfully configured.
- * @retval RTEMS_RESOURCE_IN_USE At least one of the required pins is currently
- *                               occupied, @see gpio_select_pin().
- */
-rtems_status_code gpio_select_spi_p1(void)
+rtems_status_code rpi_gpio_select_spi(void)
 {
   rtems_status_code sc;
-  
-  sc = rtems_gpio_request_conf(&spi_p1_miso);
+
+  sc = rtems_gpio_request_conf(&spi_miso);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = rtems_gpio_request_conf(&spi_p1_mosi);
+  sc = rtems_gpio_request_conf(&spi_mosi);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = rtems_gpio_request_conf(&spi_p1_sclk);
+  sc = rtems_gpio_request_conf(&spi_sclk);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = rtems_gpio_request_conf(&spi_p1_ce_0);
+  sc = rtems_gpio_request_conf(&spi_ce_0);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
-  sc = rtems_gpio_request_conf(&spi_p1_ce_1);
+  sc = rtems_gpio_request_conf(&spi_ce_1);
 
   return sc;
 }
 
-/**
- * @brief Setups a I2C interface using the P1 GPIO pin header
- *        for the models A/B and J8 header on the B+. 
- *        The following pins should be unused before calling this function:
- *        GPIO 2 and 3.
- *
- * @retval RTEMS_SUCCESSFUL I2C interface successfully configured.
- * @retval RTEMS_RESOURCE_IN_USE At least one of the required pins is currently
- *                               occupied, @see gpio_select_pin().
- */
-rtems_status_code gpio_select_i2c_p1_rev2(void)
+rtems_status_code rpi_gpio_select_i2c(void)
 {
   rtems_status_code sc;
-  
-  sc = rtems_gpio_request_conf(&i2c_p1_rev2_sda);
+
+  sc = rtems_gpio_request_conf(&i2c_sda);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
-  
-  sc = rtems_gpio_request_conf(&i2c_p1_rev2_scl);
+
+  sc = rtems_gpio_request_conf(&i2c_scl);
 
   return sc;
 }
