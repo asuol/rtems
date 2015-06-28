@@ -14,14 +14,35 @@
  *  http://www.rtems.org/license/LICENSE.
  */
 
-#ifndef LIBBSP_SHARED__GPIO_H
-#define LIBBSP_SHARED__GPIO_H
+#ifndef LIBBSP_SHARED_GPIO_H
+#define LIBBSP_SHARED_GPIO_H
 
+#include <bsp.h>
 #include <rtems.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */
+
+#if !defined(BSP_GPIO_PIN_COUNT) || !defined(BSP_GPIO_PINS_PER_BANK)
+  #error "BSP_GPIO_PIN_COUNT or BSP_GPIO_PINS_PER_BANK is not defined."
+#endif
+
+#if BSP_GPIO_PIN_COUNT <= 0 || BSP_GPIO_PINS_PER_BANK <= 0
+  #error "Invalid BSP_GPIO_PIN_COUNT or BSP_GPIO_PINS_PER_BANK. Must be greater than zero."
+#endif
+
+#if BSP_GPIO_PINS_PER_BANK > 32
+  #error "Invalid BSP_GPIO_PINS_PER_BANK. Must be between (and including) 1 and 32."
+#endif
+
+#define GPIO_LAST_BANK_PINS BSP_GPIO_PIN_COUNT % BSP_GPIO_PINS_PER_BANK
+
+#if GPIO_LAST_BANK_PINS > 0
+  #define GPIO_BANK_COUNT (BSP_GPIO_PIN_COUNT / BSP_GPIO_PINS_PER_BANK) + 1
+#else
+  #define GPIO_BANK_COUNT BSP_GPIO_PIN_COUNT / BSP_GPIO_PINS_PER_BANK
+#endif
 
 /**
  * @name GPIO data structures
@@ -110,25 +131,12 @@ typedef struct
 } rtems_gpio_specific_data;
 
 /**
- * @brief Object containing relevant information about a BSP's GPIO layout.
- */
-typedef struct
-{
-  /* Total number of GPIO pins. */
-  uint32_t pin_count;
-
-  /* Number of pins per bank. The last bank may be smaller,
-   * depending on the total number of pins. */
-  uint32_t pins_per_bank;
-} rtems_gpio_layout;
-
-/**
  * @brief Object containing configuration information
  *        regarding interrupts.
  */
 typedef struct
 {
-  rtems_gpio_interrupt enabled_interrupt;
+  rtems_gpio_interrupt active_interrupt;
 
   rtems_gpio_handler_flag handler_flag;
 
@@ -418,11 +426,6 @@ void *arg
 extern rtems_status_code rtems_gpio_disable_interrupt(uint32_t pin_number);
 
 /**
- * @brief Defines the GPIO pin layout. This must be implemented by each BSP.
- */
-extern rtems_gpio_layout rtems_bsp_gpio_initialize(void);
-
-/**
  * @brief Sets multiple output GPIO pins with the logical high. This must be implemented
  *        by each BSP.
  *
@@ -607,4 +610,4 @@ extern rtems_status_code rtems_bsp_disable_interrupt(uint32_t bank, uint32_t pin
 }
 #endif /* __cplusplus */
 
-#endif /* LIBBSP_SHARED__GPIO_H */
+#endif /* LIBBSP_SHARED_GPIO_H */

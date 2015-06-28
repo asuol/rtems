@@ -33,6 +33,7 @@ include_bsp_HEADERS += ../../shared/include/irq-generic.h
 include_bsp_HEADERS += ../../shared/include/irq-info.h
 include_bsp_HEADERS += ../../shared/include/stackalloc.h
 include_bsp_HEADERS += ../../shared/include/uart-output-char.h
+include_bsp_HEADERS += ../../shared/include/gpio.h
 include_bsp_HEADERS += ../shared/include/linker-symbols.h
 include_bsp_HEADERS += ../shared/include/start.h
 include_bsp_HEADERS += ../shared/include/arm-cp15-start.h
@@ -89,7 +90,6 @@ libbsp_a_SOURCES += ../../shared/sbrk.c
 libbsp_a_SOURCES += ../../shared/src/stackalloc.c
 libbsp_a_SOURCES += ../shared/startup/bsp-start-memcpy.S
 libbsp_a_SOURCES += ../shared/arm-cp15-set-ttb-entries.c
-libbsp_a_SOURCES += ../../shared/gpio.c
 
 # Startup
 libbsp_a_SOURCES += ../../shared/bspreset_loop.c
@@ -120,7 +120,7 @@ libbsp_a_SOURCES += clock/clockdrv.c ../../../shared/clockdrv_shell.h
 libbsp_a_SOURCES += misc/timer.c
 
 # GPIO
-
+libbsp_a_SOURCES += ../../shared/gpio.c
 libbsp_a_SOURCES += gpio/rpi-gpio.c
 
 # RTC

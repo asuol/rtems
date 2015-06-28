@@ -57,16 +57,6 @@ static rtems_status_code rpi_select_pin_function(uint32_t bank, uint32_t pin, ui
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_gpio_layout rtems_bsp_gpio_initialize()
-{
-  rtems_gpio_layout rpi_layout;
-
-  rpi_layout.pin_count = GPIO_COUNT;
-  rpi_layout.pins_per_bank = GPIO_COUNT;
-
-  return rpi_layout;
-}
-
 rtems_status_code rtems_bsp_gpio_multi_set(uint32_t bank, uint32_t bitmask)
 {
   BCM2835_REG(BCM2835_GPIO_GPSET0) |= bitmask;
