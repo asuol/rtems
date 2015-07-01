@@ -24,13 +24,6 @@ extern "C" {
 #endif /* __cplusplus */
 
 /**
- * @brief  Total number of GPIOs on the Raspberry Pi,
- *         including physical GPIO pins (available on the board hardware)
- *         and system GPIOs (only accessible to the system).
- */
-#define GPIO_COUNT 54
-
-/**
  * @brief  Raspberry Pi GPIO functions.
  */
 #define RPI_DIGITAL_IN  7
@@ -47,7 +40,7 @@ extern "C" {
  *
  * @retval RTEMS_SUCCESSFUL JTAG interface successfully configured.
  * @retval * At least one of the required pins is currently
- *            occupied, @see rtems_gpio_request_conf().
+ *            occupied, @see rtems_gpio_request_pin_group().
  */
 extern rtems_status_code rpi_gpio_select_jtag(void);
 
@@ -56,7 +49,7 @@ extern rtems_status_code rpi_gpio_select_jtag(void);
  *
  * @retval RTEMS_SUCCESSFUL SPI interface successfully configured.
  * @retval * At least one of the required pins is currently
- *            occupied, @see rtems_gpio_request_conf().
+ *            occupied, @see rtems_gpio_request_pin_group().
  */
 extern rtems_status_code rpi_gpio_select_spi(void);
 
@@ -65,7 +58,7 @@ extern rtems_status_code rpi_gpio_select_spi(void);
  *
  * @retval RTEMS_SUCCESSFUL I2C interface successfully configured.
  * @retval * At least one of the required pins is currently
- *            occupied, @see rtems_gpio_request_conf().
+ *            occupied, @see rtems_gpio_request_pin_group().
  */
 extern rtems_status_code rpi_gpio_select_i2c(void);
 

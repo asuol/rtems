@@ -25,31 +25,34 @@
 #define SELECT_PIN_FUNCTION(fn, pn) (fn << ((pn % 10) * 3))
 
 rtems_gpio_specific_data alt_func_def[] = {
-  {io_function: RPI_ALT_FUNC_0, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_1, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_2, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_3, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_4, pin_data: NULL},
-  {io_function: RPI_ALT_FUNC_5, pin_data: NULL}
+  {.io_function = RPI_ALT_FUNC_0, .pin_data = NULL},
+  {.io_function = RPI_ALT_FUNC_1, .pin_data = NULL},
+  {.io_function = RPI_ALT_FUNC_2, .pin_data = NULL},
+  {.io_function = RPI_ALT_FUNC_3, .pin_data = NULL},
+  {.io_function = RPI_ALT_FUNC_4, .pin_data = NULL},
+  {.io_function = RPI_ALT_FUNC_5, .pin_data = NULL}
 };
 
 /* Raspberry Pi 1 Rev 2 gpio interface definitions. */
 #include "gpio-interfaces-pi1-rev2.c"
 
 /* Waits a number of CPU cycles. */
-static void arm_delay (int cycles)
+static void arm_delay(int cycles)
 {
   int i;
 
   for ( i = 0; i < cycles; ++i ) {
-    asm volatile ("nop");
+    asm volatile("nop");
   }
 }
 
-static rtems_status_code rpi_select_pin_function(uint32_t bank, uint32_t pin, uint32_t type)
-{
+static rtems_status_code rpi_select_pin_function(
+  uint32_t bank,
+  uint32_t pin,
+  uint32_t type
+) {
   /* Calculate the pin function select register address. */
-  volatile unsigned int *pin_addr = (unsigned int *)BCM2835_GPIO_REGS_BASE +
+  volatile unsigned int *pin_addr = (unsigned int *) BCM2835_GPIO_REGS_BASE +
                                     (pin / 10);
 
   *(pin_addr) |= SELECT_PIN_FUNCTION(type, pin);
@@ -90,10 +93,13 @@ int rtems_bsp_gpio_get_value(uint32_t bank, uint32_t pin)
   return (BCM2835_REG(BCM2835_GPIO_GPLEV0) & (1 << pin));
 }
 
-rtems_status_code rtems_bsp_gpio_select_input(uint32_t bank, uint32_t pin, void* bsp_specific)
-{
+rtems_status_code rtems_bsp_gpio_select_input(
+  uint32_t bank,
+  uint32_t pin,
+  void *bsp_specific
+) {
   /* Calculate the pin function select register address. */
-  volatile unsigned int *pin_addr = (unsigned int *)BCM2835_GPIO_REGS_BASE +
+  volatile unsigned int *pin_addr = (unsigned int *) BCM2835_GPIO_REGS_BASE +
                                     (pin / 10);
 
   *(pin_addr) &= ~SELECT_PIN_FUNCTION(RPI_DIGITAL_IN, pin);
@@ -101,18 +107,28 @@ rtems_status_code rtems_bsp_gpio_select_input(uint32_t bank, uint32_t pin, void*
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code rtems_bsp_gpio_select_output(uint32_t bank, uint32_t pin, void* bsp_specific)
-{
+rtems_status_code rtems_bsp_gpio_select_output(
+  uint32_t bank,
+  uint32_t pin,
+  void *bsp_specific
+) {
   return rpi_select_pin_function(bank, pin, RPI_DIGITAL_OUT);
 }
 
-rtems_status_code rtems_bsp_select_specific_io(uint32_t bank, uint32_t pin, uint32_t function, void* pin_data)
-{
+rtems_status_code rtems_bsp_select_specific_io(
+  uint32_t bank,
+  uint32_t pin,
+  uint32_t function,
+  void *pin_data
+) {
   return rpi_select_pin_function(bank, pin, function);
 }
 
-rtems_status_code rtems_bsp_gpio_set_resistor_mode(uint32_t bank, uint32_t pin, rtems_gpio_pull_mode mode)
-{
+rtems_status_code rtems_bsp_gpio_set_resistor_mode(
+  uint32_t bank,
+  uint32_t pin,
+  rtems_gpio_pull_mode mode
+) {
   /* Set control signal. */
   switch ( mode ) {
     case PULL_UP:
@@ -155,13 +171,18 @@ uint32_t rtems_bsp_gpio_interrupt_line(rtems_vector_number vector)
   return BCM2835_REG(BCM2835_GPIO_GPEDS0);
 }
 
-void rtems_bsp_gpio_clear_interrupt_line(rtems_vector_number vector, uint32_t event_status)
-{
+void rtems_bsp_gpio_clear_interrupt_line(
+  rtems_vector_number vector,
+  uint32_t event_status
+) {
   BCM2835_REG(BCM2835_GPIO_GPEDS0) = event_status;
 }
 
-rtems_status_code rtems_bsp_enable_interrupt(uint32_t bank, uint32_t pin, rtems_gpio_interrupt interrupt)
-{
+rtems_status_code rtems_bsp_enable_interrupt(
+  uint32_t bank,
+  uint32_t pin,
+  rtems_gpio_interrupt interrupt
+) {
   switch ( interrupt ) {
     case FALLING_EDGE:
       /* Enables asynchronous falling edge detection. */
@@ -201,9 +222,12 @@ rtems_status_code rtems_bsp_enable_interrupt(uint32_t bank, uint32_t pin, rtems_
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code rtems_bsp_disable_interrupt(uint32_t bank, uint32_t pin, rtems_gpio_interrupt enabled_interrupt)
-{
-  switch ( enabled_interrupt ) {
+rtems_status_code rtems_bsp_disable_interrupt(
+  uint32_t bank,
+  uint32_t pin,
+  rtems_gpio_interrupt interrupt
+) {
+  switch ( interrupt ) {
     case FALLING_EDGE:
       /* Disables asynchronous falling edge detection. */
       BCM2835_REG(BCM2835_GPIO_GPAFEN0) &= ~(1 << pin);
@@ -244,81 +268,15 @@ rtems_status_code rtems_bsp_disable_interrupt(uint32_t bank, uint32_t pin, rtems
 
 rtems_status_code rpi_gpio_select_jtag(void)
 {
-  rtems_status_code sc;
-
-  sc = rtems_gpio_request_conf(&arm_tdi);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return sc;
-  }
-
-  sc = rtems_gpio_request_conf(&arm_trst);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return sc;
-  }
-
-  sc = rtems_gpio_request_conf(&arm_tdo);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return sc;
-  }
-
-  sc = rtems_gpio_request_conf(&arm_tck);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return sc;
-  }
-
-  sc = rtems_gpio_request_conf(&arm_tms);
-
-  return sc;
+  return rtems_gpio_request_pin_group(jtag_config, JTAG_PIN_COUNT);
 }
 
 rtems_status_code rpi_gpio_select_spi(void)
 {
-  rtems_status_code sc;
-
-  sc = rtems_gpio_request_conf(&spi_miso);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return sc;
-  }
-
-  sc = rtems_gpio_request_conf(&spi_mosi);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return sc;
-  }
-
-  sc = rtems_gpio_request_conf(&spi_sclk);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return sc;
-  }
-
-  sc = rtems_gpio_request_conf(&spi_ce_0);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return sc;
-  }
-
-  sc = rtems_gpio_request_conf(&spi_ce_1);
-
-  return sc;
+  return rtems_gpio_request_pin_group(spi_config, SPI_PIN_COUNT);
 }
 
 rtems_status_code rpi_gpio_select_i2c(void)
 {
-  rtems_status_code sc;
-
-  sc = rtems_gpio_request_conf(&i2c_sda);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    return sc;
-  }
-
-  sc = rtems_gpio_request_conf(&i2c_scl);
-
-  return sc;
+  return rtems_gpio_request_pin_group(i2c_config, I2C_PIN_COUNT);
 }
