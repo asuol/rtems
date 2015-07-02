@@ -60,40 +60,40 @@ static rtems_status_code rpi_select_pin_function(
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code rtems_bsp_gpio_multi_set(uint32_t bank, uint32_t bitmask)
+rtems_status_code rtems_gpio_bsp_multi_set(uint32_t bank, uint32_t bitmask)
 {
   BCM2835_REG(BCM2835_GPIO_GPSET0) |= bitmask;
 
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code rtems_bsp_gpio_multi_clear(uint32_t bank, uint32_t bitmask)
+rtems_status_code rtems_gpio_bsp_multi_clear(uint32_t bank, uint32_t bitmask)
 {
   BCM2835_REG(BCM2835_GPIO_GPCLR0) |= bitmask;
 
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code rtems_bsp_gpio_set(uint32_t bank, uint32_t pin)
+rtems_status_code rtems_gpio_bsp_set(uint32_t bank, uint32_t pin)
 {
   BCM2835_REG(BCM2835_GPIO_GPSET0) = (1 << pin);
 
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code rtems_bsp_gpio_clear(uint32_t bank, uint32_t pin)
+rtems_status_code rtems_gpio_bsp_clear(uint32_t bank, uint32_t pin)
 {
   BCM2835_REG(BCM2835_GPIO_GPCLR0) = (1 << pin);
 
   return RTEMS_SUCCESSFUL;
 }
 
-int rtems_bsp_gpio_get_value(uint32_t bank, uint32_t pin)
+int rtems_gpio_bsp_get_value(uint32_t bank, uint32_t pin)
 {
   return (BCM2835_REG(BCM2835_GPIO_GPLEV0) & (1 << pin));
 }
 
-rtems_status_code rtems_bsp_gpio_select_input(
+rtems_status_code rtems_gpio_bsp_select_input(
   uint32_t bank,
   uint32_t pin,
   void *bsp_specific
@@ -107,7 +107,7 @@ rtems_status_code rtems_bsp_gpio_select_input(
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_status_code rtems_bsp_gpio_select_output(
+rtems_status_code rtems_gpio_bsp_select_output(
   uint32_t bank,
   uint32_t pin,
   void *bsp_specific
@@ -124,7 +124,7 @@ rtems_status_code rtems_bsp_select_specific_io(
   return rpi_select_pin_function(bank, pin, function);
 }
 
-rtems_status_code rtems_bsp_gpio_set_resistor_mode(
+rtems_status_code rtems_gpio_bsp_set_resistor_mode(
   uint32_t bank,
   uint32_t pin,
   rtems_gpio_pull_mode mode
@@ -161,17 +161,17 @@ rtems_status_code rtems_bsp_gpio_set_resistor_mode(
   return RTEMS_SUCCESSFUL;
 }
 
-rtems_vector_number rtems_bsp_gpio_get_vector(uint32_t bank)
+rtems_vector_number rtems_gpio_bsp_get_vector(uint32_t bank)
 {
   return BCM2835_IRQ_ID_GPIO_0;
 }
 
-uint32_t rtems_bsp_gpio_interrupt_line(rtems_vector_number vector)
+uint32_t rtems_gpio_bsp_interrupt_line(rtems_vector_number vector)
 {
   return BCM2835_REG(BCM2835_GPIO_GPEDS0);
 }
 
-void rtems_bsp_gpio_clear_interrupt_line(
+void rtems_gpio_bsp_clear_interrupt_line(
   rtems_vector_number vector,
   uint32_t event_status
 ) {
