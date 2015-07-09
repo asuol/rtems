@@ -33,13 +33,13 @@ rtems_gpio_specific_data alt_func_def[] = {
   {.io_function = RPI_ALT_FUNC_5, .pin_data = NULL}
 };
 
-/* Raspberry Pi 1 Rev 2 gpio interface definitions. */
+/* Raspberry Pi 1 Revision 2 gpio interface definitions. */
 #include "gpio-interfaces-pi1-rev2.c"
 
 /* Waits a number of CPU cycles. */
-static void arm_delay(int cycles)
+static void arm_delay(uint8_t cycles)
 {
-  int i;
+  uint8_t i;
 
   for ( i = 0; i < cycles; ++i ) {
     asm volatile("nop");
@@ -55,7 +55,12 @@ static rtems_status_code rpi_select_pin_function(
   volatile unsigned int *pin_addr = (unsigned int *) BCM2835_GPIO_REGS_BASE +
                                     (pin / 10);
 
-  *(pin_addr) |= SELECT_PIN_FUNCTION(type, pin);
+  if ( type == RPI_DIGITAL_IN ) {
+    *(pin_addr) &= ~SELECT_PIN_FUNCTION(RPI_DIGITAL_IN, pin);
+  }
+  else {
+    *(pin_addr) |= SELECT_PIN_FUNCTION(type, pin);
+  }
 
   return RTEMS_SUCCESSFUL;
 }
@@ -72,6 +77,11 @@ rtems_status_code rtems_gpio_bsp_multi_clear(uint32_t bank, uint32_t bitmask)
   BCM2835_REG(BCM2835_GPIO_GPCLR0) |= bitmask;
 
   return RTEMS_SUCCESSFUL;
+}
+
+uint32_t rtems_gpio_bsp_multi_read(uint32_t bank, uint32_t bitmask)
+{
+  return (BCM2835_REG(BCM2835_GPIO_GPLEV0) & bitmask);
 }
 
 rtems_status_code rtems_gpio_bsp_set(uint32_t bank, uint32_t pin)
@@ -98,13 +108,7 @@ rtems_status_code rtems_gpio_bsp_select_input(
   uint32_t pin,
   void *bsp_specific
 ) {
-  /* Calculate the pin function select register address. */
-  volatile unsigned int *pin_addr = (unsigned int *) BCM2835_GPIO_REGS_BASE +
-                                    (pin / 10);
-
-  *(pin_addr) &= ~SELECT_PIN_FUNCTION(RPI_DIGITAL_IN, pin);
-
-  return RTEMS_SUCCESSFUL;
+  return rpi_select_pin_function(bank, pin, RPI_DIGITAL_IN);
 }
 
 rtems_status_code rtems_gpio_bsp_select_output(
@@ -268,15 +272,45 @@ rtems_status_code rtems_bsp_disable_interrupt(
 
 rtems_status_code rpi_gpio_select_jtag(void)
 {
-  return rtems_gpio_request_pin_group(jtag_config, JTAG_PIN_COUNT);
+  return rtems_gpio_multi_select(jtag_config, JTAG_PIN_COUNT);
 }
 
 rtems_status_code rpi_gpio_select_spi(void)
 {
-  return rtems_gpio_request_pin_group(spi_config, SPI_PIN_COUNT);
+  return rtems_gpio_multi_select(spi_config, SPI_PIN_COUNT);
 }
 
 rtems_status_code rpi_gpio_select_i2c(void)
 {
-  return rtems_gpio_request_pin_group(i2c_config, I2C_PIN_COUNT);
+  return rtems_gpio_multi_select(i2c_config, I2C_PIN_COUNT);
+}
+
+rtems_status_code rtems_gpio_bsp_multi_select(
+  rtems_gpio_multiple_pin_select *pins,
+  uint32_t pin_count,
+  uint32_t select_bank
+) {
+  uint32_t select_register;
+  uint8_t i;
+
+  select_register = BCM2835_REG(BCM2835_GPIO_REGS_BASE + select_bank);
+
+  for ( i = 0; i < pin_count; ++i ) {
+    if ( pins[i].function == DIGITAL_INPUT ) {
+      select_register &=
+        ~SELECT_PIN_FUNCTION(RPI_DIGITAL_IN, pins[i].pin_number);
+    }
+    else if ( pins[i].function == DIGITAL_OUTPUT ) {
+      select_register |=
+        SELECT_PIN_FUNCTION(RPI_DIGITAL_OUT, pins[i].pin_number);
+    }
+    else { /* BSP_SPECIFIC function. */
+      select_register |=
+        SELECT_PIN_FUNCTION(pins[i].io_function, pins[i].pin_number);
+    }
+  }
+
+  BCM2835_REG(BCM2835_GPIO_REGS_BASE + select_bank) = select_register;
+
+  return RTEMS_SUCCESSFUL;
 }
