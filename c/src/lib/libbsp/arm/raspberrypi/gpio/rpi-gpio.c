@@ -67,14 +67,14 @@ static rtems_status_code rpi_select_pin_function(
 
 rtems_status_code rtems_gpio_bsp_multi_set(uint32_t bank, uint32_t bitmask)
 {
-  BCM2835_REG(BCM2835_GPIO_GPSET0) |= bitmask;
+  BCM2835_REG(BCM2835_GPIO_GPSET0) = bitmask;
 
   return RTEMS_SUCCESSFUL;
 }
 
 rtems_status_code rtems_gpio_bsp_multi_clear(uint32_t bank, uint32_t bitmask)
 {
-  BCM2835_REG(BCM2835_GPIO_GPCLR0) |= bitmask;
+  BCM2835_REG(BCM2835_GPIO_GPCLR0) = bitmask;
 
   return RTEMS_SUCCESSFUL;
 }
@@ -98,7 +98,7 @@ rtems_status_code rtems_gpio_bsp_clear(uint32_t bank, uint32_t pin)
   return RTEMS_SUCCESSFUL;
 }
 
-int rtems_gpio_bsp_get_value(uint32_t bank, uint32_t pin)
+uint8_t rtems_gpio_bsp_get_value(uint32_t bank, uint32_t pin)
 {
   return (BCM2835_REG(BCM2835_GPIO_GPLEV0) & (1 << pin));
 }
@@ -290,10 +290,13 @@ rtems_status_code rtems_gpio_bsp_multi_select(
   uint32_t pin_count,
   uint32_t select_bank
 ) {
+  uint32_t register_address;
   uint32_t select_register;
   uint8_t i;
 
-  select_register = BCM2835_REG(BCM2835_GPIO_REGS_BASE + select_bank);
+  register_address = BCM2835_GPIO_REGS_BASE + (select_bank * 0x04);
+
+  select_register = BCM2835_REG(register_address);
 
   for ( i = 0; i < pin_count; ++i ) {
     if ( pins[i].function == DIGITAL_INPUT ) {
@@ -310,7 +313,16 @@ rtems_status_code rtems_gpio_bsp_multi_select(
     }
   }
 
-  BCM2835_REG(BCM2835_GPIO_REGS_BASE + select_bank) = select_register;
+  BCM2835_REG(register_address) = select_register;
 
   return RTEMS_SUCCESSFUL;
+}
+
+rtems_status_code rtems_gpio_bsp_specific_group_operation(
+  uint32_t bank,
+  uint32_t *pins,
+  uint32_t pin_count,
+  void *arg
+) {
+  return RTEMS_NOT_DEFINED;
 }

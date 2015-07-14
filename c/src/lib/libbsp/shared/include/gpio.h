@@ -167,6 +167,7 @@ typedef struct
  */
 typedef struct
 {
+  /* Processor pin number. */
   uint32_t pin_number;
   rtems_gpio_function function;
 
@@ -177,14 +178,16 @@ typedef struct
    * or FALSE for logical low. If not a digital out then this
    * is ignored. */
   bool output_enabled;
+
+  /* If true inverts digital in/out applicational logic. */
   bool logic_invert;
 
   /* Pin interrupt configuration. Should be NULL if not used. */
   rtems_gpio_interrupt_configuration *interrupt;
 
-  /* Struct with BSP specific data, to use during the pin request.
+  /* Structure with BSP specific data, to use during the pin request.
    * If function == BSP_SPECIFIC this should have a pointer to
-   * a rtems_gpio_specific_data struct.
+   * a rtems_gpio_specific_data structure.
    *
    * If not this field may be NULL. This is passed to the BSP function
    * so any BSP specific data can be passed to it through this pointer. */
@@ -227,6 +230,9 @@ typedef struct
   uint32_t bsp_specific_pin_count;
 } rtems_gpio_group_definition;
 
+/**
+ * @brief Opaque type for a GPIO pin group.
+ */
 typedef struct rtems_gpio_group rtems_gpio_group;
 
 /** @} */
@@ -241,9 +247,17 @@ typedef struct rtems_gpio_group rtems_gpio_group;
  * @brief Initializes the GPIO API.
  *
  * @retval RTEMS_SUCCESSFUL API successfully initialized.
- * @retval * For other error code see @rtems_semaphore_create().
+ * @retval * @see rtems_semaphore_create().
  */
 extern rtems_status_code rtems_gpio_initialize(void);
+
+/**
+ * @brief Instantiates a GPIO pin group variable.
+ *        To define the group @see rtems_gpio_define_pin_group().
+ *
+ * @retval rtems_gpio_group.
+ */
+extern rtems_gpio_group *rtems_gpio_create_pin_group(void);
 
 /**
  * @brief Requests a GPIO pin group configuration.
@@ -253,9 +267,14 @@ extern rtems_status_code rtems_gpio_initialize(void);
  * @param[out] group Reference to the created group.
  *
  * @retval RTEMS_SUCCESSFUL Pin group was configured successfully.
- * @retval RTEMS_UNSATISFIED @var group_definition or @var group is NULL.
+ * @retval RTEMS_UNSATISFIED @var group_definition or @var group is NULL,
+ *                           the @var pins are not from the same bank,
+ *                           no pins were defined or could not satisfy at
+ *                           least one given configuration.
+ * @retval RTEMS_RESOURCE_IN_USE At least one pin is already being used.
+ * @retval * @see rtems_semaphore_create().
  */
-extern rtems_status_code rtems_gpio_pin_group(
+extern rtems_status_code rtems_gpio_define_pin_group(
   const rtems_gpio_group_definition *group_definition,
   rtems_gpio_group *group
 );
@@ -266,9 +285,11 @@ extern rtems_status_code rtems_gpio_pin_group(
  *
  * @param[in] group Reference to the group.
  *
- * @retval 32-bit integer value.
+ * @retval The function returns a 32-bit bitmask with the group's input pins
+ *         current logical values.
+ * @retval 0xDEADBEEF Group has no input pins.
  */
-extern uint32_t rtems_gpio_read_group(rtems_gpio_group group);
+extern uint32_t rtems_gpio_read_group(rtems_gpio_group *group);
 
 /**
  * @brief Writes a value to the group's digital outputs. The pins order
@@ -278,12 +299,30 @@ extern uint32_t rtems_gpio_read_group(rtems_gpio_group group);
  * @param[in] group Reference to the group.
  *
  * @retval RTEMS_SUCCESSFUL Data successfully written.
- * @retval * @see rtems_gpio_bsp_multi_set() or
- *           @see rtems_gpio_bsp_multi_clear().
+ * @retval RTEMS_NOT_DEFINED Group has no output pins.
+ * @retval RTEMS_UNSATISFIED Could not operate on at least one of the pins.
  */
 extern rtems_status_code rtems_gpio_write_group(
   uint32_t data,
-  rtems_gpio_group group
+  rtems_gpio_group *group
+);
+
+/**
+ * @brief Performs a BSP specific operation on a group of pins. The pins order
+ *        is as defined in the group definition.
+ *
+ * @param[in] group Reference to the group.
+ * @param[in] arg Pointer to a BSP defined structure with BSP-specific
+ *                data. This field is handled by the BSP.
+ *
+ * @retval RTEMS_SUCCESSFUL Operation completed with success.
+ * @retval RTEMS_NOT_DEFINED Group has no BSP specific pins, or the BSP does not
+ *                           support BSP specific operations for groups.
+ * @retval RTEMS_UNSATISFIED Could not operate on at least one of the pins.
+ */
+extern rtems_status_code rtems_gpio_group_bsp_specific_operation(
+  rtems_gpio_group *group,
+  void *arg
 );
 
 /**
@@ -293,7 +332,7 @@ extern rtems_status_code rtems_gpio_write_group(
  *                 and desired configurations.
  *
  * @retval RTEMS_SUCCESSFUL Pin was configured successfully.
- * @retval RTEMS_UNSATISFIED Could not safisfy the given configuration.
+ * @retval RTEMS_UNSATISFIED Could not satisfy the given configuration.
  */
 extern rtems_status_code rtems_gpio_request_configuration(
   const rtems_gpio_pin_conf *conf
@@ -332,7 +371,7 @@ extern rtems_status_code rtems_gpio_multi_set(
 /**
  * @brief Sets multiple output GPIO pins with the logical low.
  *
- * @param[in] pin_numbers Array with the GPIO pin numbers to set.
+ * @param[in] pin_numbers Array with the GPIO pin numbers to clear.
  * @param[in] count Number of GPIO pins to clear.
  *
  * @retval RTEMS_SUCCESSFUL All pins were cleared successfully.
@@ -342,6 +381,21 @@ extern rtems_status_code rtems_gpio_multi_set(
  * @retval RTEMS_UNSATISFIED Could not clear the GPIO pins.
  */
 extern rtems_status_code rtems_gpio_multi_clear(
+  uint32_t *pin_numbers,
+  uint32_t pin_count
+);
+
+/**
+ * @brief Returns the value (level) of multiple GPIO input pins.
+ *
+ * @param[in] pin_numbers Array with the GPIO pin numbers to read.
+ * @param[in] count Number of GPIO pins to read.
+ *
+ * @retval Bitmask with the values of the corresponding pins.
+ *         0 for logical low and 1 for logical high.
+ * @retval 0xDEADBEEF Could not read at least one pin level.
+ */
+extern uint32_t rtems_gpio_multi_read(
   uint32_t *pin_numbers,
   uint32_t pin_count
 );
@@ -381,12 +435,12 @@ extern rtems_status_code rtems_gpio_clear(uint32_t pin_number);
  *         logical value.
  * @retval -1 Pin number is invalid, or not a digital input pin.
  */
-extern int rtems_gpio_get_value(uint32_t pin_number);
+extern uint8_t rtems_gpio_get_value(uint32_t pin_number);
 
 /**
  * @brief Requests multiple GPIO pin configurations. If the BSP provides
  *        support for parallel selection each call to this function will
- *        result in a single call to the GPIO harware, else each pin
+ *        result in a single call to the GPIO hardware, else each pin
  *        configuration will be done in individual and sequential calls.
  *        All pins must belong to the same GPIO bank.
  *
@@ -399,11 +453,11 @@ extern int rtems_gpio_get_value(uint32_t pin_number);
  * @retval RTEMS_INVALID_ID At least one pin number in the @var pins array
  *                          is invalid.
  * @retval RTEMS_RESOURCE_IN_USE At least one pin is already being used.
- * @retval RTEMS_UNSATISFIED Could not safisfy at least one given configuration.
+ * @retval RTEMS_UNSATISFIED Could not satisfy at least one given configuration.
  */
 extern rtems_status_code rtems_gpio_multi_select(
   const rtems_gpio_pin_conf *pins,
-  uint32_t pin_count
+  uint8_t pin_count
 );
 
 /**
@@ -417,7 +471,7 @@ extern rtems_status_code rtems_gpio_multi_select(
  * @param[in] logic_invert Reverses the digital I/O logic for DIGITAL_INPUT
  *                         and DIGITAL_OUTPUT pins.
  * @param[in] bsp_specific Pointer to a BSP defined structure with BSP-specific
- *                         data. This field is not handled by the API.
+ *                         data. This field is handled by the BSP.
  *
  * @retval RTEMS_SUCCESSFUL Pin was configured successfully.
  * @retval RTEMS_INVALID_ID Pin number is invalid.
@@ -459,6 +513,47 @@ extern rtems_status_code rtems_gpio_resistor_mode(
  *           @see rtems_gpio_disable_interrupt().
  */
 extern rtems_status_code rtems_gpio_release_pin(uint32_t pin_number);
+
+/**
+ * @brief Releases a GPIO pin, making it available to be used again.
+ *
+ * @param[in] conf GPIO pin configuration to be released.
+ *
+ * @retval RTEMS_SUCCESSFUL Pin successfully disabled.
+ * @retval RTEMS_UNSATISFIED Pin configuration is NULL.
+ * @retval * @see rtems_gpio_release_pin().
+ */
+extern rtems_status_code rtems_gpio_release_configuration(
+  const rtems_gpio_pin_conf *conf
+);
+
+/**
+ * @brief Releases multiple GPIO pins, making them available to be used again.
+ *
+ * @param[in] pins Array of rtems_gpio_pin_conf structures.
+ * @param[in] pin_count Number of pin configurations in the @var pins array.
+ *
+ * @retval RTEMS_SUCCESSFUL Pins successfully disabled.
+ * @retval RTEMS_UNSATISFIED @var pins array is NULL.
+ * @retval * @see rtems_gpio_release_pin().
+ */
+extern rtems_status_code rtems_gpio_release_multiple_pins(
+  const rtems_gpio_pin_conf *pins,
+  uint32_t pin_count
+);
+
+/**
+ * @brief Releases a GPIO pin group, making the pins used available to be
+ *        repurposed.
+ *
+ * @param[in] conf GPIO pin configuration to be released.
+ *
+ * @retval RTEMS_SUCCESSFUL Pins successfully disabled.
+ * @retval * @see rtems_gpio_release_pin().
+ */
+extern rtems_status_code rtems_gpio_release_pin_group(
+  rtems_gpio_group *group
+);
 
 /**
  * @brief Attaches a debouncing function to a given pin/switch.
@@ -608,14 +703,35 @@ extern rtems_status_code rtems_gpio_bsp_multi_clear(
  *
  * @retval The function must return a bitmask with the values of the
  *         corresponding pins. 0 for logical low and 1 for logical high.
- * @retval -1 Could not read at least one pin level.
+ * @retval 0xDEADBEEF Could not read at least one pin level.
  */
 extern uint32_t rtems_gpio_bsp_multi_read(uint32_t bank, uint32_t bitmask);
 
 /**
- * @brief Assigns GPIO functions to all the given pins.
- *        The implementation for this function may be ommitted if the target
- *        does not support the feature.
+ * @brief Performs a BSP specific operation on a group of pins.
+ *        The implementation for this function may be omitted if the target
+ *        does not support the feature, by returning RTEMS_NOT_DEFINED.
+ *
+ * @param[in] bank GPIO bank number.
+ * @param[in] bitmask Bitmask of GPIO pins to clear in the given bank.
+ *
+ * @retval RTEMS_SUCCESSFUL All pins were cleared successfully.
+ * @retval RTEMS_NOT_DEFINED The BSP does not support BSP specific operations
+ *                           for groups.
+ * @retval RTEMS_UNSATISFIED Could not clear at least one of the pins.
+ */
+extern rtems_status_code rtems_gpio_bsp_specific_group_operation(
+  uint32_t bank,
+  uint32_t *pins,
+  uint32_t pin_count,
+  void *arg
+);
+
+/**
+ * @brief Assigns GPIO functions to all the given pins in a single register
+ *        operation.
+ *        The implementation for this function may be omitted if the target
+ *        does not support the feature, by returning RTEMS_NOT_DEFINED.
  *
  * @param[in] pins Array of rtems_gpio_multiple_pin_select structures filled
  *                 with the pins desired functions. All pins belong to the
@@ -624,6 +740,8 @@ extern uint32_t rtems_gpio_bsp_multi_read(uint32_t bank, uint32_t bitmask);
  * @param[in] select_bank Select bank number of the received pins.
  *
  * @retval RTEMS_SUCCESSFUL Functions were assigned successfully.
+ * @retval RTEMS_NOT_DEFINED The BSP does not support multiple pin function
+ *                           assignment.
  * @retval RTEMS_UNSATISFIED Could not assign the functions to the pins.
  */
 extern rtems_status_code rtems_gpio_bsp_multi_select(
@@ -667,7 +785,7 @@ extern rtems_status_code rtems_gpio_bsp_clear(uint32_t bank, uint32_t pin);
  *         logical value.
  * @retval -1 Could not read the pin level.
  */
-extern int rtems_gpio_bsp_get_value(uint32_t bank, uint32_t pin);
+extern uint8_t rtems_gpio_bsp_get_value(uint32_t bank, uint32_t pin);
 
 /**
  * @brief Assigns the digital input function to the given pin.
@@ -696,7 +814,7 @@ extern rtems_status_code rtems_gpio_bsp_select_input(
  * @param[in] bsp_specific Pointer to a BSP defined structure with BSP-specific
  *                         data.
  *
- * @retval RTEMS_SUCCESSFUL Function was asssigned successfully.
+ * @retval RTEMS_SUCCESSFUL Function was assigned successfully.
  * @retval RTEMS_UNSATISFIED Could not assign the function to the pin.
  */
 extern rtems_status_code rtems_gpio_bsp_select_output(
