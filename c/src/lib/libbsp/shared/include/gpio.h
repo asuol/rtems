@@ -52,6 +52,11 @@ extern "C" {
     BSP_GPIO_PINS_PER_BANK / BSP_GPIO_PINS_PER_SELECT_BANK
 #endif
 
+#define INTERRUPT_SERVER_PRIORITY 1
+#define INTERRUPT_SERVER_STACK_SIZE 2 * RTEMS_MINIMUM_STACK_SIZE
+#define INTERRUPT_SERVER_MODES RTEMS_TIMESLICE | RTEMS_PREEMPT
+#define INTERRUPT_SERVER_ATTRIBUTES RTEMS_DEFAULT_ATTRIBUTES
+
 /**
  * @name GPIO data structures
  *
@@ -147,6 +152,8 @@ typedef struct
   rtems_gpio_interrupt active_interrupt;
 
   rtems_gpio_handler_flag handler_flag;
+
+  bool threaded_interrupts;
 
   /* Interrupt handler function. */
   rtems_gpio_irq_state (*handler) (void *arg);
@@ -252,10 +259,10 @@ typedef struct rtems_gpio_group rtems_gpio_group;
 extern rtems_status_code rtems_gpio_initialize(void);
 
 /**
- * @brief Instantiates a GPIO pin group variable.
+ * @brief Instantiates a GPIO pin group.
  *        To define the group @see rtems_gpio_define_pin_group().
  *
- * @retval rtems_gpio_group.
+ * @retval rtems_gpio_group pointer.
  */
 extern rtems_gpio_group *rtems_gpio_create_pin_group(void);
 
@@ -280,18 +287,6 @@ extern rtems_status_code rtems_gpio_define_pin_group(
 );
 
 /**
- * @brief Reads the value/level of the group's digital inputs. The pins order
- *        is as defined in the group definition.
- *
- * @param[in] group Reference to the group.
- *
- * @retval The function returns a 32-bit bitmask with the group's input pins
- *         current logical values.
- * @retval 0xDEADBEEF Group has no input pins.
- */
-extern uint32_t rtems_gpio_read_group(rtems_gpio_group *group);
-
-/**
  * @brief Writes a value to the group's digital outputs. The pins order
  *        is as defined in the group definition.
  *
@@ -306,6 +301,18 @@ extern rtems_status_code rtems_gpio_write_group(
   uint32_t data,
   rtems_gpio_group *group
 );
+
+/**
+ * @brief Reads the value/level of the group's digital inputs. The pins order
+ *        is as defined in the group definition.
+ *
+ * @param[in] group Reference to the group.
+ *
+ * @retval The function returns a 32-bit bitmask with the group's input pins
+ *         current logical values.
+ * @retval 0xDEADBEEF Group has no input pins.
+ */
+extern uint32_t rtems_gpio_read_group(rtems_gpio_group *group);
 
 /**
  * @brief Performs a BSP specific operation on a group of pins. The pins order
@@ -345,6 +352,8 @@ extern rtems_status_code rtems_gpio_request_configuration(
  *                 and desired configurations.
  *
  * @retval RTEMS_SUCCESSFUL Pin configuration was updated successfully.
+ * @retval RTEMS_INVALID_ID Pin number is invalid.
+ * @retval RTEMS_NOT_CONFIGURED The pin is not being used.
  * @retval RTEMS_UNSATISFIED Could not update the pin's configuration.
  */
 extern rtems_status_code rtems_gpio_update_configuration(
@@ -549,7 +558,7 @@ extern rtems_status_code rtems_gpio_release_multiple_pins(
  * @param[in] conf GPIO pin configuration to be released.
  *
  * @retval RTEMS_SUCCESSFUL Pins successfully disabled.
- * @retval * @see rtems_gpio_release_pin().
+ * @retval * @see rtems_gpio_release_pin() or @see rtems_semaphore_delete().
  */
 extern rtems_status_code rtems_gpio_release_pin_group(
   rtems_gpio_group *group
@@ -609,6 +618,9 @@ extern rtems_status_code rtems_gpio_interrupt_handler_install(
  *
  * @param[in] pin_number GPIO pin number.
  * @param[in] interrupt Type of interrupt to enable for the pin.
+ * @param[in] flag Defines the uniqueness of the interrupt handler for the pin.
+ * @param[in] threaded_handling Defines if the handler should be called from a
+ *                              thread/task or from normal ISR contex.
  * @param[in] handler Pointer to a function that will be called every time
  *                    @var interrupt is generated. This function must return
  *                    information about its handled/unhandled state.
@@ -619,12 +631,19 @@ extern rtems_status_code rtems_gpio_interrupt_handler_install(
  *                           the handler task, or enable the interrupt
  *                           on the pin.
  * @retval RTEMS_INVALID_ID Pin number is invalid.
- * @retval RTEMS_RESOURCE_IN_USE The pin already has an enabled interrupt.
+ * @retval RTEMS_NOT_CONFIGURED The received pin is not configured
+ *                              as a digital input, the pin is on a
+ *                              pin grouping.
+ * @retval RTEMS_RESOURCE_IN_USE The pin already has an enabled interrupt,
+ *                               or the handler threading policy does not match
+ *                               the bank's policy.
+ * @retval RTEMS_NO_MEMORY Could not store the pin's interrupt configuration.
  */
 extern rtems_status_code rtems_gpio_enable_interrupt(
   uint32_t pin_number,
   rtems_gpio_interrupt interrupt,
   rtems_gpio_handler_flag flag,
+  bool threaded_handling,
   rtems_gpio_irq_state (*handler) (void *arg),
   void *arg
 );
@@ -640,6 +659,7 @@ extern rtems_status_code rtems_gpio_enable_interrupt(
  *
  * @retval RTEMS_SUCCESSFUL Handler successfully disconnected from this pin.
  * @retval RTEMS_INVALID_ID Pin number is invalid.
+ * @retval RTEMS_NOT_CONFIGURED Pin has no active interrupts.
  * @retval * @see rtems_gpio_disable_interrupt()
  */
 extern rtems_status_code rtems_gpio_interrupt_handler_remove(
@@ -862,6 +882,9 @@ extern rtems_status_code rtems_gpio_bsp_set_resistor_mode(
 
 /**
  * @brief Reads and returns a vector/bank interrupt event line.
+ *        The bitmask should indicate with a 1 if the corresponding pin
+ *        as a pending interrupt, or 0 if otherwise. The function
+ *        should clear the interrupt event line before returning.
  *        This must be implemented by each BSP.
  *
  * @param[in] vector GPIO vector/bank.
@@ -870,20 +893,6 @@ extern rtems_status_code rtems_gpio_bsp_set_resistor_mode(
  *         indicates an active interrupt on that pin.
  */
 extern uint32_t rtems_gpio_bsp_interrupt_line(rtems_vector_number vector);
-
-/**
- * @brief Clears a vector/bank interrupt event line.
- *        This must be implemented by each BSP.
- *
- * @param[in] vector GPIO vector/bank.
- * @param[in] event_status Bitmask with the processed interrupts on the given
- *                         vector. This bitmask is the same as calculated in
- *                         @see rtems_gpio_bsp_interrupt_line().
- */
-extern void rtems_gpio_bsp_clear_interrupt_line(
-  rtems_vector_number vector,
-  uint32_t event_status
-);
 
 /**
  * @brief Calculates a vector number for a given GPIO bank.

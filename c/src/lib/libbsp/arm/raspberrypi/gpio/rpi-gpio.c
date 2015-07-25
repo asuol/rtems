@@ -172,14 +172,15 @@ rtems_vector_number rtems_gpio_bsp_get_vector(uint32_t bank)
 
 uint32_t rtems_gpio_bsp_interrupt_line(rtems_vector_number vector)
 {
-  return BCM2835_REG(BCM2835_GPIO_GPEDS0);
-}
+  uint32_t event_status;
 
-void rtems_gpio_bsp_clear_interrupt_line(
-  rtems_vector_number vector,
-  uint32_t event_status
-) {
+  /* Retrieve the interrupt event status. */
+  event_status = BCM2835_REG(BCM2835_GPIO_GPEDS0);
+
+  /* Clear the interrupt line. */
   BCM2835_REG(BCM2835_GPIO_GPEDS0) = event_status;
+
+  return event_status;
 }
 
 rtems_status_code rtems_bsp_enable_interrupt(

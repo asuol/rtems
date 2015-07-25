@@ -32,22 +32,20 @@
   | RTEMS_NO_PRIORITY_CEILING  \
 )
 
-#define CREATE_LOCK(name, lock_id) rtems_semaphore_create(  \
- name,                                                      \
- 1,                                                         \
- MUTEX_ATTRIBUTES,                                          \
- 0,                                                         \
- lock_id                                                    \
+#define CREATE_LOCK(name, lock_id) rtems_semaphore_create(   \
+  name,                                                      \
+  1,                                                         \
+  MUTEX_ATTRIBUTES,                                          \
+  0,                                                         \
+  lock_id                                                    \
 )
 
-#define ACQUIRE_LOCK(m) assert( rtems_semaphore_obtain(m,               \
-                                                       RTEMS_WAIT,      \
-                                                       RTEMS_NO_TIMEOUT \
-                                                       ) == RTEMS_SUCCESSFUL )
+#define ACQUIRE_LOCK(m) assert ( rtems_semaphore_obtain(m,               \
+                                                        RTEMS_WAIT,      \
+                                                        RTEMS_NO_TIMEOUT \
+                                                        ) == RTEMS_SUCCESSFUL )
 
-#define RELEASE_LOCK(m) assert( rtems_semaphore_release(m) == RTEMS_SUCCESSFUL )
-
-#define GPIO_INTERRUPT_EVENT RTEMS_EVENT_1
+#define RELEASE_LOCK(m) assert ( rtems_semaphore_release(m) == RTEMS_SUCCESSFUL )
 
 /**
  * @brief Object containing relevant information about a GPIO group.
@@ -98,15 +96,8 @@ typedef struct
  */
 typedef struct
 {
-  /* GPIO pin's bank. */
-  uint32_t bank_number;
-
   /* Currently active interrupt. */
   rtems_gpio_interrupt active_interrupt;
-
-  /* Id of the task that will be calling the user-defined ISR handlers
-   * for this pin. */
-  rtems_id handler_task_id;
 
   /* ISR shared flag. */
   rtems_gpio_handler_flag handler_flag;
@@ -152,11 +143,17 @@ typedef struct
   uint32_t bank_number;
   uint32_t interrupt_counter;
   rtems_id lock;
+
+  /* If TRUE the interrupts on the bank will be called
+   * by a rtems interrupt server, otherwise they will be handled
+   * in the normal ISR context. */
+  bool threaded_interrupts;
 } gpio_bank;
 
 static gpio_pin gpio_pin_state[BSP_GPIO_PIN_COUNT];
 static Atomic_Flag init_flag = ATOMIC_INITIALIZER_FLAG;
 static gpio_bank gpio_bank_state[GPIO_BANK_COUNT];
+static Atomic_Uint threaded_interrupt_counter = ATOMIC_INITIALIZER_UINT(0);
 static rtems_chain_control gpio_group;
 
 #define BANK_NUMBER(pin_number) pin_number / BSP_GPIO_PINS_PER_BANK
@@ -181,77 +178,6 @@ static int debounce_switch(gpio_pin_interrupt_state *interrupt_state)
   return 0;
 }
 
-static rtems_task generic_handler_task(rtems_task_argument arg)
-{
-  gpio_pin_interrupt_state *interrupt_state;
-  rtems_chain_control *handler_list;
-  rtems_chain_node *node;
-  rtems_chain_node *next_node;
-  gpio_handler_node *isr_node;
-  rtems_event_set out;
-  uint32_t bank;
-  int handled_count;
-  uint8_t rv;
-
-  interrupt_state = (gpio_pin_interrupt_state *) arg;
-
-  assert ( interrupt_state != NULL );
-
-  bank = interrupt_state->bank_number;
-
-  while ( true ) {
-    handled_count = 0;
-
-    /* Wait for interrupt event.
-     * This is sent by the bank's generic_isr handler. */
-    rtems_event_receive(
-      GPIO_INTERRUPT_EVENT,
-      RTEMS_EVENT_ALL | RTEMS_WAIT,
-      RTEMS_NO_TIMEOUT,
-      &out
-    );
-
-    ACQUIRE_LOCK(gpio_bank_state[bank].lock);
-
-    /* If this pin has the debouncing function attached, call it. */
-    if ( interrupt_state->debouncing_tick_count > 0 ) {
-      rv = debounce_switch(interrupt_state);
-
-      /* If the handler call was caused by a switch bounce,
-       * ignores and move on. */
-      if ( rv < 0 ) {
-        RELEASE_LOCK(gpio_bank_state[bank].lock);
-
-        continue;
-      }
-    }
-
-    handler_list = &interrupt_state->handler_chain;
-
-    node = rtems_chain_first(handler_list);
-
-    /* Iterate the ISR list. */
-    while ( !rtems_chain_is_tail(handler_list, node) ) {
-      isr_node = (gpio_handler_node *) node;
-
-      next_node = node->next;
-
-      if ( (isr_node->handler)(isr_node->arg) == IRQ_HANDLED ) {
-        ++handled_count;
-      }
-
-      node = next_node;
-    }
-
-    /* If no handler assumed the interrupt, treat it as a spurious interrupt. */
-    if ( handled_count == 0 ) {
-      bsp_interrupt_handler_default(rtems_gpio_bsp_get_vector(bank));
-    }
-
-    RELEASE_LOCK(gpio_bank_state[bank].lock);
-  }
-}
-
 /* Returns the amount of pins in a bank. */
 static uint32_t get_bank_pin_count(uint32_t bank)
 {
@@ -263,12 +189,22 @@ static uint32_t get_bank_pin_count(uint32_t bank)
   return BSP_GPIO_PINS_PER_BANK;
 }
 
-static void generic_isr(void *arg)
+/* GPIO generic bank ISR. This may be called directly as response to an 
+ * interrupt, or by the rtems interrupt server task if the GPIO bank
+ * uses threading interrupt handling. */
+static void generic_bank_isr(void *arg)
 {
+  gpio_pin_interrupt_state *interrupt_state;
+  rtems_chain_control *handler_list;
+  rtems_chain_node *node;
+  rtems_chain_node *next_node;
+  gpio_handler_node *isr_node;
   rtems_vector_number vector;
   uint32_t event_status;
   uint32_t bank_number;
-  uint32_t bank;
+  uint32_t bank_start_pin;
+  uint8_t handled_count;
+  uint8_t rv;
   uint8_t i;
 
   bank_number = *((uint32_t*) arg);
@@ -276,16 +212,14 @@ static void generic_isr(void *arg)
   assert ( bank_number >= 0 && bank_number < GPIO_BANK_COUNT );
 
   /* Calculate bank start address in the pin_state array. */
-  bank = bank_number * BSP_GPIO_PINS_PER_BANK;
+  bank_start_pin = bank_number * BSP_GPIO_PINS_PER_BANK;
 
   vector = rtems_gpio_bsp_get_vector(bank_number);
 
-  /* Prevents more interrupts from being generated on GPIO. */
-  bsp_interrupt_vector_disable(vector);
-
-  /* Ensure that interrupts are disabled in this vector, before checking
-   * the interrupt line. */
-  RTEMS_COMPILER_MEMORY_BARRIER(); // TODO: move to bsp_interrupt_vector_disable?
+  if ( _ISR_Is_in_progress () ) {
+    /* Prevents more interrupts from being generated on GPIO. */
+    bsp_interrupt_vector_disable(vector);
+  }
 
   /* Obtains a 32-bit bitmask, with the pins currently reporting interrupts
    * signaled with 1. */
@@ -296,21 +230,63 @@ static void generic_isr(void *arg)
   for ( i = 0; i < get_bank_pin_count(bank_number); ++i ) {
     /* If active, wake the corresponding pin's ISR task. */
     if ( event_status & (1 << i) ) {
-      rtems_event_send(
-        gpio_pin_state[bank + i].interrupt_state->handler_task_id,
-        GPIO_INTERRUPT_EVENT
-      );
+      interrupt_state = gpio_pin_state[bank_start_pin + i].interrupt_state;
+
+      assert ( interrupt_state != NULL );
+
+      handled_count = 0;
+
+      if ( _ISR_Is_in_progress () == false ) {
+        ACQUIRE_LOCK(gpio_bank_state[bank_number].lock);
+      }
+
+      /* If this pin has the debouncing function attached, call it. */
+      if ( interrupt_state->debouncing_tick_count > 0 ) {
+        rv = debounce_switch(interrupt_state);
+
+        /* If the handler call was caused by a switch bounce,
+         * ignores and move on. */
+        if ( rv < 0 ) {
+          if ( _ISR_Is_in_progress () == false ) {
+            RELEASE_LOCK(gpio_bank_state[bank_number].lock);
+          }
+
+          continue;
+        }
+      }
+
+      handler_list = &interrupt_state->handler_chain;
+
+      node = rtems_chain_first(handler_list);
+
+      /* Iterate the ISR list. */
+      while ( !rtems_chain_is_tail(handler_list, node) ) {
+        isr_node = (gpio_handler_node *) node;
+
+        next_node = node->next;
+
+        if ( (isr_node->handler)(isr_node->arg) == IRQ_HANDLED ) {
+          ++handled_count;
+        }
+
+        node = next_node;
+      }
+
+      /* If no handler assumed the interrupt,
+       * treat it as a spurious interrupt. */
+      if ( handled_count == 0 ) {
+        bsp_interrupt_handler_default(rtems_gpio_bsp_get_vector(bank_number));
+      }
+
+      if ( _ISR_Is_in_progress () == false ) {
+        RELEASE_LOCK(gpio_bank_state[bank_number].lock);
+      }
     }
   }
 
-  /* Clear all active events. */
-  rtems_gpio_bsp_clear_interrupt_line(vector, event_status);
-
-  /* Ensure that the interrupt line is cleared before re-activating
-   * the interrupts on this vector. */
-  RTEMS_COMPILER_MEMORY_BARRIER(); // TODO: move to bsp_interrupt_vector_enable?
-
-  bsp_interrupt_vector_enable(vector);
+  if ( _ISR_Is_in_progress () ) {
+    bsp_interrupt_vector_enable(vector);
+  }
 }
 
 /* Verifies if all pins in the received pin array are from the same bank and
@@ -437,6 +413,7 @@ static rtems_status_code setup_resistor_and_interrupt_configuration(
            pin_number,
            interrupt_conf->active_interrupt,
            interrupt_conf->handler_flag,
+           interrupt_conf->threading_conf,
            interrupt_conf->handler,
            interrupt_conf->arg
          );
@@ -672,6 +649,9 @@ rtems_status_code rtems_gpio_initialize(void)
 
     gpio_bank_state[i].bank_number = i;
     gpio_bank_state[i].interrupt_counter = 0;
+
+    /* The threaded_interrupts field is initialized during
+     * rtems_gpio_enable_interrupt(), as its value is never used before. */
   }
 
   for ( i = 0; i < BSP_GPIO_PIN_COUNT; ++i ) {
@@ -807,7 +787,7 @@ rtems_status_code rtems_gpio_define_pin_group(
            group_definition->input_count
          );
 
-    assert( sc == RTEMS_SUCCESSFUL );
+    assert ( sc == RTEMS_SUCCESSFUL );
 
     return RTEMS_UNSATISFIED;
   }
@@ -824,14 +804,14 @@ rtems_status_code rtems_gpio_define_pin_group(
            group_definition->input_count
          );
 
-    assert( sc == RTEMS_SUCCESSFUL );
+    assert ( sc == RTEMS_SUCCESSFUL );
 
     sc = rtems_gpio_release_multiple_pins(
            group_definition->digital_outputs,
            group_definition->output_count
          );
 
-    assert( sc == RTEMS_SUCCESSFUL );
+    assert ( sc == RTEMS_SUCCESSFUL );
 
     return RTEMS_UNSATISFIED;
   }
@@ -1066,6 +1046,7 @@ rtems_status_code rtems_gpio_update_configuration(
            conf->pin_number,
            interrupt_conf->active_interrupt,
            interrupt_conf->handler_flag,
+           interrupt_conf->threading_conf,
            interrupt_conf->handler,
            interrupt_conf->arg
          );
@@ -1496,13 +1477,6 @@ rtems_status_code rtems_gpio_release_pin_group(
   rtems_status_code sc;
   uint8_t i;
 
-  /* Guarantees that any thread using the group lock terminates. */
-  sc = rtems_semaphore_flush(group->group_lock);
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-      return sc;
-  }
-
   /* Deletes the group lock. */
   sc = rtems_semaphore_delete(group->group_lock);
 
@@ -1656,6 +1630,7 @@ rtems_status_code rtems_gpio_enable_interrupt(
   uint32_t pin_number,
   rtems_gpio_interrupt interrupt,
   rtems_gpio_handler_flag flag,
+  bool threaded_handling,
   rtems_gpio_irq_state (*handler) (void *arg),
   void *arg
 ) {
@@ -1685,6 +1660,18 @@ rtems_status_code rtems_gpio_enable_interrupt(
     return RTEMS_NOT_CONFIGURED;
   }
 
+  /* If the bank already has at least one interrupt enabled on a pin,
+   * then new interrupts on this bank must follow the current
+   * threading policy. */
+  if (
+      gpio_bank_state[bank].interrupt_counter > 0 &&
+      gpio_bank_state[bank].threaded_interrupts != threaded_handling
+  ) {
+    RELEASE_LOCK(gpio_bank_state[bank].lock);
+
+    return RTEMS_RESOURCE_IN_USE;
+  }
+
   interrupt_state = gpio_pin_state[pin_number].interrupt_state;
 
   /* If an interrupt configuration is already in place for this pin. */
@@ -1701,9 +1688,7 @@ rtems_status_code rtems_gpio_enable_interrupt(
     return RTEMS_NO_MEMORY;
   }
 
-  gpio_pin_state[pin_number].interrupt_state->bank_number = bank;
   gpio_pin_state[pin_number].interrupt_state->active_interrupt = NONE;
-  gpio_pin_state[pin_number].interrupt_state->handler_task_id = RTEMS_ID_NONE;
   gpio_pin_state[pin_number].interrupt_state->debouncing_tick_count = 0;
   gpio_pin_state[pin_number].interrupt_state->last_isr_tick = 0;
 
@@ -1713,64 +1698,67 @@ rtems_status_code rtems_gpio_enable_interrupt(
 
   interrupt_state = gpio_pin_state[pin_number].interrupt_state;
 
-  /* Creates and starts a new task which will call the corresponding
-   * user-defined handlers for this pin. */
-  sc = rtems_task_create(
-         rtems_build_name('G', 'P', 'I', 'O'),
-         5,
-         RTEMS_MINIMUM_STACK_SIZE * 2,
-         RTEMS_NO_TIMESLICE,
-         RTEMS_DEFAULT_ATTRIBUTES,
-         &interrupt_state->handler_task_id
-       );
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    RELEASE_LOCK(gpio_bank_state[bank].lock);
-
-    return RTEMS_UNSATISFIED;
-  }
-
-  sc = rtems_task_start(
-         interrupt_state->handler_task_id,
-         generic_handler_task,
-         (rtems_task_argument) interrupt_state
-       );
-
-  if ( sc != RTEMS_SUCCESSFUL ) {
-    RELEASE_LOCK(gpio_bank_state[bank].lock);
-
-    sc = rtems_task_delete(interrupt_state->handler_task_id);
-
-    assert( sc == RTEMS_SUCCESSFUL );
-
-    return RTEMS_UNSATISFIED;
-  }
-
   interrupt_state->active_interrupt = interrupt;
   interrupt_state->handler_flag = flag;
 
-  /* Installs the interrupt handler. */
+  /* Installs the interrupt handler on the GPIO pin
+   * tracking structure. */
   sc = rtems_gpio_interrupt_handler_install(pin_number, handler, arg);
 
   if ( sc != RTEMS_SUCCESSFUL ) {
     RELEASE_LOCK(gpio_bank_state[bank].lock);
 
-    sc = rtems_task_delete(interrupt_state->handler_task_id);
-
-    assert( sc == RTEMS_SUCCESSFUL );
-
     return RTEMS_UNSATISFIED;
   }
 
-  /* If the generic ISR has not been yet installed for this bank, installs it.
-   * This ISR will be responsible for calling the handler tasks,
-   * which in turn will call the user-defined interrupt handlers.*/
-  if ( gpio_bank_state[bank].interrupt_counter == 0 ) {
+  if ( threaded_handling ) {
+    if (
+        _Atomic_Load_uint(&threaded_interrupt_counter, ATOMIC_ORDER_RELAXED) == 0
+    ) {
+      sc = rtems_interrupt_server_initialize(
+             INTERRUPT_SERVER_PRIORITY,
+             INTERRUPT_SERVER_STACK_SIZE,
+             INTERRUPT_SERVER_MODES,
+             INTERRUPT_SERVER_ATTRIBUTES,
+             NULL
+           );
+
+      if ( sc != RTEMS_SUCCESSFUL ) {
+        RELEASE_LOCK(gpio_bank_state[bank].lock);
+
+        return RTEMS_UNSATISFIED;
+      }
+    }
+
+    if ( gpio_bank_state[bank].interrupt_counter == 0 ) {
+      sc = rtems_interrupt_server_handler_install(
+             RTEMS_ID_NONE,
+             vector,
+             "GPIO_HANDLER",
+             RTEMS_INTERRUPT_UNIQUE,
+             (rtems_interrupt_handler) generic_bank_isr,
+             &gpio_bank_state[bank].bank_number
+           );
+
+      if ( sc != RTEMS_SUCCESSFUL ) {
+        RELEASE_LOCK(gpio_bank_state[bank].lock);
+
+        return RTEMS_UNSATISFIED;
+      }
+
+      _Atomic_Fetch_add_uint(
+        &threaded_interrupt_counter,
+        1,
+        ATOMIC_ORDER_RELAXED
+      );
+    }
+  }
+  else if ( gpio_bank_state[bank].interrupt_counter == 0 ) {
     sc = rtems_interrupt_handler_install(
            vector,
            "GPIO_HANDLER",
            RTEMS_INTERRUPT_UNIQUE,
-           (rtems_interrupt_handler) generic_isr,
+           (rtems_interrupt_handler) generic_bank_isr,
            &gpio_bank_state[bank].bank_number
          );
 
@@ -1787,6 +1775,12 @@ rtems_status_code rtems_gpio_enable_interrupt(
     RELEASE_LOCK(gpio_bank_state[bank].lock);
 
     return RTEMS_UNSATISFIED;
+  }
+
+  /* If this was the first interrupt enabled on this GPIO bank,
+   * record the threading policy. */
+  if ( gpio_bank_state[bank].interrupt_counter == 0 ) {
+    gpio_bank_state[bank].threaded_interrupts = threaded_handling;
   }
 
   ++gpio_bank_state[bank].interrupt_counter;
@@ -1912,28 +1906,39 @@ rtems_status_code rtems_gpio_disable_interrupt(uint32_t pin_number)
     node = next_node;
   }
 
-  sc = rtems_task_delete(interrupt_state->handler_task_id);
-
-  assert( sc == RTEMS_SUCCESSFUL );
-
-  /* Free the pin's interrupt state structure. */
-  free(interrupt_state);
-
-  --gpio_bank_state[bank].interrupt_counter;
-
-  /* If no GPIO interrupts are left in this bank, removes the handler. */
-  if ( gpio_bank_state[bank].interrupt_counter == 0 ) {
-    sc = rtems_interrupt_handler_remove(
-           vector,
-           (rtems_interrupt_handler) generic_isr,
-           &gpio_bank_state[bank].bank_number
-         );
+  /* If this is the last GPIO interrupt are left in this bank,
+   * removes the handler. */
+  if ( gpio_bank_state[bank].interrupt_counter == 1 ) {
+    if ( gpio_bank_state[bank].threaded_interrupts ) {
+      sc = rtems_interrupt_server_handler_remove(
+             RTEMS_ID_NONE,
+             vector,
+             (rtems_interrupt_handler) generic_bank_isr,
+             &gpio_bank_state[bank].bank_number
+           );
+    }
+    else {
+      sc = rtems_interrupt_handler_remove(
+             vector,
+             (rtems_interrupt_handler) generic_bank_isr,
+             &gpio_bank_state[bank].bank_number
+           );
+    }
 
     if ( sc != RTEMS_SUCCESSFUL ) {
       RELEASE_LOCK(gpio_bank_state[bank].lock);
 
       return RTEMS_UNSATISFIED;
     }
+  }
+
+  /* Free the pin's interrupt state structure. */
+  free(interrupt_state);
+
+  --gpio_bank_state[bank].interrupt_counter;
+
+  if ( gpio_bank_state[bank].threaded_interrupts ) {
+    _Atomic_Fetch_sub_uint(&threaded_interrupt_counter, 1, ATOMIC_ORDER_RELAXED);
   }
 
   RELEASE_LOCK(gpio_bank_state[bank].lock);
