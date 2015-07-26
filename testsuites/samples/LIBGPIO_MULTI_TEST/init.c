@@ -23,47 +23,38 @@ rtems_task Init(
 {
   rtems_status_code sc;
   int val;
-  
+
   rtems_test_begin ();
-  
+
   /* Initializes the GPIO API */
   rtems_gpio_initialize ();
-  
-  sc = rtems_gpio_request_conf(&led1);
-  assert(sc == RTEMS_SUCCESSFUL);
 
-  sc = rtems_gpio_request_conf(&led2);
-  assert(sc == RTEMS_SUCCESSFUL);
-
-  sc = rtems_gpio_request_conf(&sw1);
-  assert(sc == RTEMS_SUCCESSFUL);
-
-  sc = rtems_gpio_request_conf(&sw2);
+  sc = rtems_gpio_multi_select(test, 4);
   assert(sc == RTEMS_SUCCESSFUL);
 
   /* Polls the two switches. */
   while ( 1 ) {
-    val = rtems_gpio_get_value(sw1.pin_number);
+    val = rtems_gpio_get_value(sw1_pin);
 
      if ( val == 0 ) {
-      sc = rtems_gpio_set(led2.pin_number);
+      sc = rtems_gpio_set(led2_pin);
       assert(sc == RTEMS_SUCCESSFUL);
     }
 
     else {
-      sc = rtems_gpio_clear(led2.pin_number);
+      sc = rtems_gpio_clear(led2_pin);
       assert(sc == RTEMS_SUCCESSFUL);
     }
 
-    val = rtems_gpio_get_value(sw2.pin_number);
+     val = rtems_gpio_get_value(sw2_pin);
 
     if ( val == 0 ) {
-      sc = rtems_gpio_set(led1.pin_number);
+      sc = rtems_gpio_set(led1_pin);
       assert(sc == RTEMS_SUCCESSFUL);
     }
 
     else {
-      sc = rtems_gpio_clear(led1.pin_number);
+      sc = rtems_gpio_clear(led1_pin);
       assert(sc == RTEMS_SUCCESSFUL);
     }
   }

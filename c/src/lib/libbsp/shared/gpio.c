@@ -189,7 +189,7 @@ static uint32_t get_bank_pin_count(uint32_t bank)
   return BSP_GPIO_PINS_PER_BANK;
 }
 
-/* GPIO generic bank ISR. This may be called directly as response to an 
+/* GPIO generic bank ISR. This may be called directly as response to an
  * interrupt, or by the rtems interrupt server task if the GPIO bank
  * uses threading interrupt handling. */
 static void generic_bank_isr(void *arg)
@@ -216,7 +216,9 @@ static void generic_bank_isr(void *arg)
 
   vector = rtems_gpio_bsp_get_vector(bank_number);
 
-  if ( _ISR_Is_in_progress () ) {
+  /* If this bank does not use threaded interrupts we have to
+   * disable the vector. Otherwise the interrupt server does it. */
+  if ( gpio_bank_state[bank_number].threaded_interrupts == false ) {
     /* Prevents more interrupts from being generated on GPIO. */
     bsp_interrupt_vector_disable(vector);
   }
@@ -236,7 +238,7 @@ static void generic_bank_isr(void *arg)
 
       handled_count = 0;
 
-      if ( _ISR_Is_in_progress () == false ) {
+      if ( gpio_bank_state[bank_number].threaded_interrupts ) {
         ACQUIRE_LOCK(gpio_bank_state[bank_number].lock);
       }
 
@@ -247,7 +249,7 @@ static void generic_bank_isr(void *arg)
         /* If the handler call was caused by a switch bounce,
          * ignores and move on. */
         if ( rv < 0 ) {
-          if ( _ISR_Is_in_progress () == false ) {
+          if ( gpio_bank_state[bank_number].threaded_interrupts ) {
             RELEASE_LOCK(gpio_bank_state[bank_number].lock);
           }
 
@@ -278,13 +280,13 @@ static void generic_bank_isr(void *arg)
         bsp_interrupt_handler_default(rtems_gpio_bsp_get_vector(bank_number));
       }
 
-      if ( _ISR_Is_in_progress () == false ) {
+      if ( gpio_bank_state[bank_number].threaded_interrupts ) {
         RELEASE_LOCK(gpio_bank_state[bank_number].lock);
       }
     }
   }
 
-  if ( _ISR_Is_in_progress () ) {
+  if ( gpio_bank_state[bank_number].threaded_interrupts == false ) {
     bsp_interrupt_vector_enable(vector);
   }
 }
@@ -413,7 +415,7 @@ static rtems_status_code setup_resistor_and_interrupt_configuration(
            pin_number,
            interrupt_conf->active_interrupt,
            interrupt_conf->handler_flag,
-           interrupt_conf->threading_conf,
+           interrupt_conf->threaded_interrupts,
            interrupt_conf->handler,
            interrupt_conf->arg
          );
@@ -538,6 +540,7 @@ static rtems_status_code gpio_multi_select(
 
     ++select_bank_counter[select_bank];
   }
+
   for ( i = 0; i < GPIO_SELECT_BANK_COUNT; ++i ) {
     if ( select_bank_counter[i] == 0 ) {
       continue;
@@ -556,8 +559,15 @@ static rtems_status_code gpio_multi_select(
   }
 
   for ( i = 0; i < pin_count; ++i ) {
+    pin_number = pins[i].pin_number;
+
+    /* Fill other pin state information. */
+    gpio_pin_state[pin_number].pin_function = pins[i].function;
+    gpio_pin_state[pin_number].logic_invert = pins[i].logic_invert;
+    gpio_pin_state[pin_number].on_group = on_group;
+
     sc = setup_resistor_and_interrupt_configuration(
-           pins[i].pin_number,
+           pin_number,
            pins[i].pull_mode,
            pins[i].interrupt
          );
@@ -568,15 +578,8 @@ static rtems_status_code gpio_multi_select(
       return sc;
     }
 
-    pin_number = pins[i].pin_number;
-
     bank = BANK_NUMBER(pin_number);
     pin = PIN_NUMBER(pin_number);
-
-    /* Fill other pin state information. */
-    gpio_pin_state[pin_number].pin_function = pins[i].function;
-    gpio_pin_state[pin_number].logic_invert = pins[i].logic_invert;
-    gpio_pin_state[pin_number].on_group = on_group;
 
     if ( pins[i].function == DIGITAL_OUTPUT ) {
       if ( pins[i].output_enabled == true ) {
@@ -584,6 +587,12 @@ static rtems_status_code gpio_multi_select(
       }
       else {
         sc = rtems_gpio_bsp_clear(bank, pin);
+      }
+
+      if ( sc != RTEMS_SUCCESSFUL ) {
+        RELEASE_LOCK(gpio_bank_state[bank_number].lock);
+
+        return sc;
       }
     }
   }
@@ -868,8 +877,10 @@ rtems_status_code rtems_gpio_write_group(uint32_t data, rtems_gpio_group *group)
     sc = rtems_gpio_bsp_multi_set(bank, set_bitmask);
 
     if ( sc != RTEMS_SUCCESSFUL ) {
-      RELEASE_LOCK(gpio_bank_state[bank].lock);
       RELEASE_LOCK(group->group_lock);
+      RELEASE_LOCK(gpio_bank_state[bank].lock);
+
+      return sc;
     }
   }
 
@@ -877,11 +888,18 @@ rtems_status_code rtems_gpio_write_group(uint32_t data, rtems_gpio_group *group)
   if ( clear_bitmask > 0 ) {
     sc = rtems_gpio_bsp_multi_clear(bank, clear_bitmask);
 
-    RELEASE_LOCK(gpio_bank_state[bank].lock);
-    RELEASE_LOCK(group->group_lock);
+    if ( sc != RTEMS_SUCCESSFUL ) {
+      RELEASE_LOCK(group->group_lock);
+      RELEASE_LOCK(gpio_bank_state[bank].lock);
+
+      return sc;
+    }
   }
 
-  return sc;
+  RELEASE_LOCK(group->group_lock);
+  RELEASE_LOCK(gpio_bank_state[bank].lock);
+
+  return RTEMS_SUCCESSFUL;
 }
 
 uint32_t rtems_gpio_read_group(rtems_gpio_group *group)
@@ -1046,7 +1064,7 @@ rtems_status_code rtems_gpio_update_configuration(
            conf->pin_number,
            interrupt_conf->active_interrupt,
            interrupt_conf->handler_flag,
-           interrupt_conf->threading_conf,
+           interrupt_conf->threaded_interrupts,
            interrupt_conf->handler,
            interrupt_conf->arg
          );
@@ -1476,6 +1494,18 @@ rtems_status_code rtems_gpio_release_pin_group(
 ) {
   rtems_status_code sc;
   uint8_t i;
+
+  ACQUIRE_LOCK(group->group_lock);
+
+  sc = rtems_semaphore_flush(group->group_lock);
+
+  if ( sc != RTEMS_SUCCESSFUL ) {
+    RELEASE_LOCK(group->group_lock);
+
+    return sc;
+  }
+
+  RELEASE_LOCK(group->group_lock);
 
   /* Deletes the group lock. */
   sc = rtems_semaphore_delete(group->group_lock);

@@ -558,7 +558,8 @@ extern rtems_status_code rtems_gpio_release_multiple_pins(
  * @param[in] conf GPIO pin configuration to be released.
  *
  * @retval RTEMS_SUCCESSFUL Pins successfully disabled.
- * @retval * @see rtems_gpio_release_pin() or @see rtems_semaphore_delete().
+ * @retval * @see rtems_gpio_release_pin(), @see rtems_semaphore_delete() or
+ *           @see rtems_semaphore_flush().
  */
 extern rtems_status_code rtems_gpio_release_pin_group(
   rtems_gpio_group *group
