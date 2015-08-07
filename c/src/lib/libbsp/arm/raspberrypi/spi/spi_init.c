@@ -1,13 +1,13 @@
 /**
  * @file spi_init.c
  *
- * @ingroup raspberrypi_i2c
+ * @ingroup raspberrypi_spi
  *
  * @brief Raspberry Pi SPI bus initialization.
  */
 
 /*
- *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2014-2015 Andre Marques <andre.lousa.marques at gmail.com>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -17,7 +17,8 @@
 #include <bsp/raspberrypi.h>
 #include <bsp/gpio.h>
 #include <bsp/rpi-gpio.h>
-#include <bsp/i2c.h>
+#include <bsp/spi.h>
+#include <assert.h>
 
 static rtems_libi2c_bus_ops_t bcm2835_spi_ops = {
   init:        bcm2835_spi_init,
@@ -39,33 +40,17 @@ static bcm2835_spi_desc_t bcm2835_spi_bus_desc = {
   }
 };
 
-/* Register drivers here for all the devices 
- * which require access to the SPI bus.
- *
- * The libi2c function "rtems_libi2c_register_drv" must be used to 
- * register each device driver, using the received spi bus number. 
- *
- * This function returns 0 on success. */
-int BSP_spi_register_drivers(int spi_bus_number)
-{
-  int rv = 0;
-
-  return rv;
-}
-
-int BSP_spi_init(void)
+void rpi_spi_init(void)
 {
   int rv;
 
   /* Initialize the libi2c API. */
   rtems_libi2c_initialize ();
 
-  /* Enable the SPI interface on the Raspberry Pi P1 GPIO header. */
-  gpio_initialize ();
+  /* Enable the SPI interface on the Raspberry Pi. */
+  rtems_gpio_initialize ();
 
-  if ( gpio_select_spi_p1() < 0 ) {
-    return RTEMS_RESOURCE_IN_USE;
-  }
+  assert ( rpi_gpio_select_spi() == RTEMS_SUCCESSFUL );
 
   /* Clear SPI control register and clear SPI FIFOs. */
   BCM2835_REG(BCM2835_SPI_CS) = 0x0000030;
@@ -73,14 +58,7 @@ int BSP_spi_init(void)
   /* Register the SPI bus. */
   rv = rtems_libi2c_register_bus("/dev/spi", &(bcm2835_spi_bus_desc.bus_desc));
 
-  if ( rv < 0 ) {
-    return rv;
-  }
-  
-  /* Register SPI device drivers. */
-  rv =  BSP_spi_register_drivers(rv);
-
-  return rv;
+  assert ( rv == 0 );
 }
 
 

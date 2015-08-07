@@ -8,14 +8,14 @@
  */
 
 /*
- *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2014-2015 Andre Marques <andre.lousa.marques at gmail.com>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
  *  http://www.rtems.org/license/LICENSE.
  */
 
-/* 
+/*
  * STATUS:
  * - Bi-directional mode untested
  * - Write-only devices not supported
@@ -23,9 +23,9 @@
 
 #include <bsp.h>
 #include <bsp/raspberrypi.h>
-#include <bsp/gpio.h>
+//#include <bsp/gpio.h>
 #include <bsp/irq.h>
-#include <bsp/i2c.h>
+#include <bsp/spi.h>
 #include <assert.h>
 
 /**
@@ -38,12 +38,13 @@
  *
  * @retval RTEMS_SUCCESSFUL Successfully calculated a valid clock divider.
  * @retval RTEMS_INVALID_NUMBER The resulting clock divider is invalid, due to
- *                              an invalid GPU_CORE_CLOCK_RATE 
+ *                              an invalid GPU_CORE_CLOCK_RATE
  *                              or clock_hz value.
  */
-static rtems_status_code 
-bcm2835_spi_calculate_clock_divider(uint32_t clock_hz, uint16_t *clock_divider)
-{
+static rtems_status_code bcm2835_spi_calculate_clock_divider(
+  uint32_t clock_hz,
+  uint16_t *clock_divider
+) {
   uint16_t divider;
   uint32_t clock_rate;
 
@@ -52,7 +53,7 @@ bcm2835_spi_calculate_clock_divider(uint32_t clock_hz, uint16_t *clock_divider)
   /* Calculates an initial clock divider. */
   divider = GPU_CORE_CLOCK_RATE / clock_hz;
 
-  /* Because the divider must be a power of two (as per the BCM2835 datasheet), 
+  /* Because the divider must be a power of two (as per the BCM2835 datasheet),
    * calculate the next greater power of two. */
   --divider;
 
@@ -65,7 +66,7 @@ bcm2835_spi_calculate_clock_divider(uint32_t clock_hz, uint16_t *clock_divider)
 
   clock_rate = GPU_CORE_CLOCK_RATE / divider;
 
-  /* If the resulting clock rate is greater than the desired frequency, 
+  /* If the resulting clock rate is greater than the desired frequency,
    * try the next greater power of two divider. */
   while ( clock_rate > clock_hz ) {
     divider = (divider << 1);
@@ -91,10 +92,9 @@ bcm2835_spi_calculate_clock_divider(uint32_t clock_hz, uint16_t *clock_divider)
  *                              2. @see bcm2835_spi_calculate_clock_divider()
  */
 static rtems_status_code bcm2835_spi_set_tfr_mode(
-rtems_libi2c_bus_t *bushdl, 
-const rtems_libi2c_tfr_mode_t *tfr_mode
-)
-{
+  rtems_libi2c_bus_t *bushdl,
+  const rtems_libi2c_tfr_mode_t *tfr_mode
+) {
   bcm2835_spi_softc_t *softc_ptr = &(((bcm2835_spi_desc_t *)(bushdl))->softc);
   rtems_status_code sc = RTEMS_SUCCESSFUL;
   uint16_t clock_divider;
@@ -104,14 +104,14 @@ const rtems_libi2c_tfr_mode_t *tfr_mode
 
   /* Calculate the most appropriate clock divider. */
   sc = bcm2835_spi_calculate_clock_divider(tfr_mode->baudrate, &clock_divider);
-  
+
   if ( sc != RTEMS_SUCCESSFUL ) {
     return sc;
   }
 
   /* Set the bus clock divider. */
   BCM2835_REG(BCM2835_SPI_CLK) = clock_divider;
-   
+
   /* Calculate how many bytes each character has.
    * Only multiples of 8 bits are accepted for the transaction. */
   switch ( tfr_mode->bits_per_char ) {
@@ -121,12 +121,12 @@ const rtems_libi2c_tfr_mode_t *tfr_mode
     case 32:
       softc_ptr->bytes_per_char = tfr_mode->bits_per_char / 8;
       break;
-   
+
     default:
       return RTEMS_INVALID_NUMBER;
   }
 
-  /* Check the data mode (most or least significant bit first) and calculate 
+  /* Check the data mode (most or least significant bit first) and calculate
    * the correcting bit shift value to apply on the data before sending. */
   if ( tfr_mode->lsb_first ) {
     softc_ptr->bit_shift = 32 - tfr_mode->bits_per_char;
@@ -148,7 +148,7 @@ const rtems_libi2c_tfr_mode_t *tfr_mode
   }
 
   /* Set SPI clock phase.
-   * If clock_phs is true, clock starts toggling 
+   * If clock_phs is true, clock starts toggling
    * at the start of the data transfer. */
   if ( tfr_mode->clock_phs ) {
     /* First SCLK transition at beginning of data bit. */
@@ -166,9 +166,9 @@ const rtems_libi2c_tfr_mode_t *tfr_mode
  * @brief Reads/writes to/from the SPI bus.
  *
  * @param[in] bushdl Pointer to the libi2c API bus driver data structure.
- * @param[in] rd_buf Read buffer. If not NULL the function will read from 
+ * @param[in] rd_buf Read buffer. If not NULL the function will read from
  *                   the bus and store the read on this buffer.
- * @param[in] wr_buf Write buffer. If not NULL the function will write the 
+ * @param[in] wr_buf Write buffer. If not NULL the function will write the
  *                   contents of this buffer to the bus.
  * @param[in] buffer_size Size of the non-NULL buffer.
  *
@@ -176,14 +176,13 @@ const rtems_libi2c_tfr_mode_t *tfr_mode
  * @retval >=0 The number of bytes read/written.
  */
 static int bcm2835_spi_read_write(
-rtems_libi2c_bus_t * bushdl, 
-unsigned char *rd_buf, 
-const unsigned char *wr_buf, 
-int buffer_size
-)
-{
+  rtems_libi2c_bus_t * bushdl,
+  unsigned char *rd_buf,
+  const unsigned char *wr_buf,
+  int buffer_size
+) {
   bcm2835_spi_softc_t *softc_ptr = &(((bcm2835_spi_desc_t *)(bushdl))->softc);
-  
+
   uint8_t bytes_per_char = softc_ptr->bytes_per_char;
   uint8_t bit_shift =  softc_ptr->bit_shift;
   uint32_t dummy_char = softc_ptr->dummy_char;
@@ -203,16 +202,16 @@ int buffer_size
 
     BCM2835_REG(BCM2835_SPI_CS) |= (1 << 9);
 
-    if ( 
-      rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) != 
-      RTEMS_SUCCESSFUL 
+    if (
+      rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) !=
+      RTEMS_SUCCESSFUL
     ) {
       return -1;
     }
   }
   /* If using the bus in polling mode. */
   else {
-    /* Poll TXD bit until there is space to write at least one byte 
+    /* Poll TXD bit until there is space to write at least one byte
      * on the TX FIFO. */
     while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 18)) == 0 ) {
       ;
@@ -252,7 +251,7 @@ int buffer_size
 
       buffer_size -= bytes_per_char;
     }
-    
+
     /* If using bi-directional SPI. */
     if ( softc_ptr->bidirectional == 1 ) {
       /* Change bus direction to read from the slave device. */
@@ -265,9 +264,9 @@ int buffer_size
 
       BCM2835_REG(BCM2835_SPI_CS) |= (1 << 9);
 
-      if ( 
-        rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) != 
-        RTEMS_SUCCESSFUL 
+      if (
+        rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) !=
+        RTEMS_SUCCESSFUL
       ) {
         return -1;
       }
@@ -278,8 +277,8 @@ int buffer_size
       while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 16)) == 0 ) {
         ;
       }
-        
-      /* Poll the RXD bit until there is at least one byte 
+
+      /* Poll the RXD bit until there is at least one byte
        * on the RX FIFO to be read. */
       while ( (BCM2835_REG(BCM2835_SPI_CS) & (1 << 17)) == 0 ) {
         ;
@@ -288,10 +287,10 @@ int buffer_size
 
     /* If writing to the bus, read the dummy char sent by the slave device. */
     if ( rd_buf == NULL ) {
-      fifo_data = BCM2835_REG(BCM2835_SPI_FIFO) & 0xFF; 
+      fifo_data = BCM2835_REG(BCM2835_SPI_FIFO) & 0xFF;
     }
 
-    /* If reading from the bus, retrieve data from the RX FIFO and 
+    /* If reading from the bus, retrieve data from the RX FIFO and
      * store it on the buffer. */
     if ( rd_buf != NULL ) {
       switch ( bytes_per_char ) {
@@ -337,9 +336,9 @@ int buffer_size
 
     BCM2835_REG(BCM2835_SPI_CS) |= (1 << 9);
 
-    if ( 
-      rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) != 
-      RTEMS_SUCCESSFUL 
+    if (
+      rtems_semaphore_obtain(softc_ptr->irq_sema_id, RTEMS_WAIT, 50) !=
+      RTEMS_SUCCESSFUL
     ) {
       return -1;
     }
@@ -353,15 +352,15 @@ int buffer_size
   }
 
   bytes_sent -= buffer_size;
-  
+
   return bytes_sent;
 }
 
 /**
- * @brief Handler function that is called on any SPI interrupt. 
+ * @brief Handler function that is called on any SPI interrupt.
  *
  *        There are 2 situations that can generate an interrupt:
- *        
+ *
  *        1. Transfer (read/write) complete;
  *        2. RX FIFO full.
  *
@@ -369,24 +368,24 @@ int buffer_size
  *        the only interrupt that is generated and handled is the
  *        transfer complete interrupt.
  *
- *        The objective of the handler is then, depending on the transfer 
- *        context (reading or writing on the bus), to check if there is enough 
- *        space available on the TX FIFO to send data over the bus (if writing) 
+ *        The objective of the handler is then, depending on the transfer
+ *        context (reading or writing on the bus), to check if there is enough
+ *        space available on the TX FIFO to send data over the bus (if writing)
  *        or if the slave device has sent enough data to be fetched from the
  *        RX FIFO (if reading).
  *
- *        When any of these two conditions occur, disables further interrupts 
- *        to be generated and releases a irq semaphore which will allow the 
+ *        When any of these two conditions occur, disables further interrupts
+ *        to be generated and releases a irq semaphore which will allow the
  *        following transfer to proceed.
  *
- * @param[in] arg Void pointer to the bus data structure. 
+ * @param[in] arg Void pointer to the bus data structure.
  */
 static void spi_handler(void* arg)
 {
   bcm2835_spi_softc_t *softc_ptr = (bcm2835_spi_softc_t *) arg;
 
   /* If waiting to write to the bus, expect the TXD bit to be set, or
-   * if waiting to read from the bus, expect the RXD bit to be set 
+   * if waiting to read from the bus, expect the RXD bit to be set
    * before releasing the irq semaphore. */
   if (
     ( softc_ptr->irq_write == 1 && (BCM2835_REG(BCM2835_SPI_CS) & (1 << 18)) != 0 ) ||
@@ -401,13 +400,13 @@ static void spi_handler(void* arg)
 }
 
 /**
- * @brief Low level function to initialize the SPI bus. 
+ * @brief Low level function to initialize the SPI bus.
  *        This function is used by the libi2c API.
  *
  * @param[in] bushdl Pointer to the libi2c API bus driver data structure.
  *
  * @retval RTEMS_SUCCESSFUL SPI bus successfully initialized.
- * @retval Any other status code @see rtems_semaphore_create() and 
+ * @retval Any other status code @see rtems_semaphore_create() and
  *         @see rtems_interrupt_handler_install().
  */
 rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl)
@@ -422,30 +421,32 @@ rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl)
   softc_ptr->initialized = 1;
 
   /* TODO: This should be set on the device driver itself and configured
-   * during the bus transfer mode setup or another ioctl request. */ 
+   * during the bus transfer mode setup or another ioctl request. */
   softc_ptr->bidirectional = 0;
 
   /* If using the SPI bus in interrupt-driven mode. */
   if ( SPI_IO_MODE == 1 ) {
-    sc = rtems_semaphore_create(rtems_build_name('s','p','i','s'), 
-                                0, 
-                                RTEMS_FIFO | RTEMS_SIMPLE_BINARY_SEMAPHORE, 
-                                0, 
-                                &softc_ptr->irq_sema_id
-                               );
+    sc = rtems_semaphore_create(
+           rtems_build_name('s','p','i','s'),
+           0,
+           RTEMS_FIFO | RTEMS_SIMPLE_BINARY_SEMAPHORE,
+           0,
+           &softc_ptr->irq_sema_id
+         );
 
     if ( sc != RTEMS_SUCCESSFUL ) {
       return sc;
     }
 
-    sc = rtems_interrupt_handler_install(BCM2835_IRQ_ID_SPI, 
-                                         NULL, 
-                                         RTEMS_INTERRUPT_UNIQUE, 
-                                         (rtems_interrupt_handler) spi_handler, 
-                                         softc_ptr
-                                        );
+    sc = rtems_interrupt_handler_install(
+           BCM2835_IRQ_ID_SPI,
+           NULL,
+           RTEMS_INTERRUPT_UNIQUE,
+           (rtems_interrupt_handler) spi_handler,
+           softc_ptr
+         );
   }
-  
+
   return sc;
 }
 
@@ -510,16 +511,16 @@ rtems_status_code bcm2835_spi_stop(rtems_libi2c_bus_t * bushdl)
  * @retval RTEMS_SUCCESSFUL The slave device has been successfully addressed.
  * @retval RTEMS_INVALID_ADDRESS The received address is neither 0 or 1.
  */
-rtems_status_code 
+rtems_status_code
 bcm2835_spi_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t addr, int rw)
 {
   bcm2835_spi_softc_t *softc_ptr = &(((bcm2835_spi_desc_t *)(bushdl))->softc);
 
-  /* Calculates the bit corresponding to the received address 
+  /* Calculates the bit corresponding to the received address
    * on the SPI control register. */
-  uint32_t chip_select_bit = 21 + addr; 
+  uint32_t chip_select_bit = 21 + addr;
 
-  /* Save which slave will be currently addressed, 
+  /* Save which slave will be currently addressed,
    * so it can be unselected later. */
   softc_ptr->current_slave_addr = addr;
 
@@ -529,16 +530,16 @@ bcm2835_spi_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t addr, int rw)
     case 1:
       BCM2835_REG(BCM2835_SPI_CS) &= ~(1 << chip_select_bit);
       break;
-   
+
     default:
       return RTEMS_INVALID_ADDRESS;
   }
-  
+
   return RTEMS_SUCCESSFUL;
 }
 
 /**
- * @brief Low level function that reads a number of bytes from the SPI bus 
+ * @brief Low level function that reads a number of bytes from the SPI bus
  *        on to a buffer.
  *        This function is used by the libi2c API.
  *
@@ -549,11 +550,10 @@ bcm2835_spi_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t addr, int rw)
  * @retval @see bcm2835_spi_read_write().
  */
 int bcm2835_spi_read_bytes(
-rtems_libi2c_bus_t * bushdl, 
-unsigned char *bytes, 
-int nbytes
-)
-{
+  rtems_libi2c_bus_t * bushdl,
+  unsigned char *bytes,
+  int nbytes
+) {
   return bcm2835_spi_read_write(bushdl, bytes, NULL, nbytes);
 }
 
@@ -564,22 +564,21 @@ int nbytes
  *
  * @param[in] bushdl Pointer to the libi2c API bus driver data structure.
  * @param[in] bytes Buffer with data to send over the SPI bus.
- * @param[in] nbytes Number of bytes to be written from the bytes buffer 
+ * @param[in] nbytes Number of bytes to be written from the bytes buffer
                      to the bus.
  *
  * @retval @see bcm2835_spi_read_write().
  */
 int bcm2835_spi_write_bytes(
-rtems_libi2c_bus_t * bushdl, 
-unsigned char *bytes, 
-int nbytes
-)
-{
+  rtems_libi2c_bus_t * bushdl,
+  unsigned char *bytes,
+  int nbytes
+) {
   return bcm2835_spi_read_write(bushdl, NULL, bytes, nbytes);
 }
 
 /**
- * @brief Low level function that is used to perform ioctl 
+ * @brief Low level function that is used to perform ioctl
  *        operations on the bus. Currently only setups
  *        the bus transfer mode.
  *        This function is used by the libi2c API.
@@ -596,7 +595,7 @@ int bcm2835_spi_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg)
   switch ( cmd ) {
     case RTEMS_LIBI2C_IOCTL_SET_TFRMODE:
 
-      return bcm2835_spi_set_tfr_mode(bushdl, 
+      return bcm2835_spi_set_tfr_mode(bushdl,
                                       (const rtems_libi2c_tfr_mode_t *)arg
                                      );
 

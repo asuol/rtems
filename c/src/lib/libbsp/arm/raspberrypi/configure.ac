@@ -30,10 +30,10 @@ RTEMS_BSPOPTS_HELP([I2C_IO_MODE],[Define to 1 to use interrupt-driven I/O with t
 RTEMS_BSPOPTS_SET([SPI_IO_MODE],[*],[1])
 RTEMS_BSPOPTS_HELP([SPI_IO_MODE],[Define to 1 to use interrupt-driven I/O with the Raspberry Pi SPI bus. If defined to other value the access will be polled-driven.])
 
-RTEMS_BSPOPTS_SET([BSP_ENABLE_SPI],[*],[0])
+RTEMS_BSPOPTS_SET([BSP_ENABLE_SPI],[*],[1])
 RTEMS_BSPOPTS_HELP([BSP_ENABLE_SPI],[Define to 1 to use the SPI bus. This will register the bus in /dev/spi and also any device driver mentioned in i2c/spi_init.c .])
 
-RTEMS_BSPOPTS_SET([BSP_ENABLE_I2C],[*],[0])
+RTEMS_BSPOPTS_SET([BSP_ENABLE_I2C],[*],[1])
 RTEMS_BSPOPTS_HELP([BSP_ENABLE_I2C],[Define to 1 to use the I2C bus. This will register the bus in /dev/i2c and also any device driver mentioned in i2c/i2c_init.c .])
 
 # Is this a Raspberry Pi 2?

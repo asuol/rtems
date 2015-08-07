@@ -3,11 +3,11 @@
  *
  * @ingroup raspberrypi_i2c
  *
- * @brief Raspberry Pi specific I2C and SPI definitions.
+ * @brief Raspberry Pi specific I2C definitions.
  */
 
 /*
- *  Copyright (c) 2014 Andre Marques <andre.lousa.marques at gmail.com>
+ *  Copyright (c) 2014-2015 Andre Marques <andre.lousa.marques at gmail.com>
  *
  *  The license and distribution terms for this file may be
  *  found in the file LICENSE in this distribution or at
@@ -17,131 +17,31 @@
 #ifndef LIBBSP_ARM_RASPBERRYPI_I2C_H
 #define LIBBSP_ARM_RASPBERRYPI_I2C_H
 
-#include <rtems/libi2c.h>
+#include <dev/i2c/i2c.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 /**
- * @name SPI constants.
+ * @name I2C constants.
  *
  * @{
  */
 
 /**
- * @brief  GPU processor core clock rate in Hz. 
- *
- * Unless configured otherwise on a "config.txt" file present on the SD card 
- * the GPU defaults to 250 MHz. Currently only 250 MHz is supported.
- */
-
-/* TODO: It would be nice if this value could be probed at startup, probably 
- *       using the Mailbox interface since the usual way of setting this on 
- *       the hardware is through a "config.txt" text file on the SD card.
- *       Having this setup on the configure.ac script would require changing
- *       the same setting on two different places. */
-#define GPU_CORE_CLOCK_RATE 250000000
-
-/** @} */
-
-/**
- * @name  SPI data structures.
- *
- * @{
- */
-
-/**
- * @brief Object containing the SPI bus configuration settings.
- *
- * Encapsulates the current SPI bus configuration.
- */
-typedef struct {
-  int                 initialized;
-  uint8_t             bytes_per_char;
-
-  /* Shift to be applied on data transfers with
-   * least significative bit first (LSB) devices. */
-  uint8_t             bit_shift; 
-  uint32_t            dummy_char;
-
-  /* If set to 0 uses 3-wire SPI, with 2 separate data lines (MOSI and MISO),
-   * if set to 1 uses 2-wire SPI, where the MOSI data line doubles as the
-   * slave out (SO) and slave in (SI) data lines. */
-  int                 bidirectional; 
-  uint32_t            current_slave_addr;
-  rtems_id            irq_sema_id;
-  int                 irq_write;
-} bcm2835_spi_softc_t;
-
-typedef struct {
-  rtems_libi2c_bus_t  bus_desc;
-  bcm2835_spi_softc_t softc;
-} bcm2835_spi_desc_t;
-
-/** @} */
-
-/**
- * @name  SPI directives.
- *
- * @{
- */
-
-rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t * bushdl);
-
-rtems_status_code bcm2835_spi_send_start(rtems_libi2c_bus_t * bushdl);
-
-rtems_status_code bcm2835_spi_stop(rtems_libi2c_bus_t * bushdl);
-
-rtems_status_code 
-bcm2835_spi_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t addr, int rw);
-
-int bcm2835_spi_read_bytes(
-rtems_libi2c_bus_t * bushdl, 
-unsigned char *bytes, 
-int nbytes
-);
-
-int bcm2835_spi_write_bytes(
-rtems_libi2c_bus_t * bushdl, 
-unsigned char *bytes, 
-int nbytes);
-
-int bcm2835_spi_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg);
-
-int BSP_spi_register_drivers(int spi_bus_number);
-
-int BSP_spi_init(void);
-
-/** @} */
-
-/**
- * @name  I2C constants.
- *
- * @{
- */
-
-
-/**
- * @brief  BSC controller core clock rate in Hz. 
+ * @brief BSC controller core clock rate in Hz.
  *
  * This is set to 150 MHz as per the BCM2835 datasheet.
  */
 #define BSC_CORE_CLK_HZ 150000000
 
-/** @} */
-
 /**
- * @name  I2C data structures.
+ * @brief Default bus clock.
  *
- * @{
+ * This sets the bus with a 100 kHz clock speed.
  */
-
-typedef struct {
-  int                 initialized;
-  rtems_id            irq_sema_id;
-} bcm2835_i2c_softc_t;
-
-typedef struct {
-  rtems_libi2c_bus_t  bus_desc;
-  bcm2835_i2c_softc_t softc;
-} bcm2835_i2c_desc_t;
+#define DEFAULT_BUS_CLOCK 100000
 
 /** @} */
 
@@ -151,33 +51,45 @@ typedef struct {
  * @{
  */
 
-rtems_status_code bcm2835_i2c_init(rtems_libi2c_bus_t * bushdl);
+/**
+ * @brief Setups the Raspberry Pi GPIO header to activate the BSC I2C bus.
+ */
+extern void rpi_i2c_init(void);
 
-rtems_status_code bcm2835_i2c_send_start(rtems_libi2c_bus_t * bushdl);
-
-rtems_status_code bcm2835_i2c_stop(rtems_libi2c_bus_t * bushdl);
-
-rtems_status_code 
-bcm2835_i2c_send_addr(rtems_libi2c_bus_t * bushdl, uint32_t addr, int rw);
-
-int bcm2835_i2c_read_bytes(
-rtems_libi2c_bus_t * bushdl, 
-unsigned char *bytes, 
-int nbytes
+/**
+ * @brief Registers the Raspberry Pi BSC I2C bus with the
+ *        Linux I2C User-Space API.
+ *
+ * @param[in] bus_path Path to the bus device file.
+ * @param[in] bus_clock Bus clock in Hz.
+ *
+ * @retval 0 Bus registered successfully.
+ * @retval <0 Could not register the bus. The return value is a negative
+ *            errno code.
+ */
+extern int rpi_i2c_register_bus(
+  const char *bus_path,
+  uint32_t bus_clock
 );
 
-int bcm2835_i2c_write_bytes(
-rtems_libi2c_bus_t * bushdl, 
-unsigned char *bytes, 
-int nbytes
-);
+/**
+ * @brief Setups the Raspberry Pi BSC I2C bus (located on the GPIO header)
+ *        on the "/dev/i2c" device file, using the default bus clock.
+ *
+ * @retval 0 Bus configured and registered successfully.
+ * @retval <0 See @see rpi_i2c_register_bus().
+ */
+static inline int rpi_setup_i2c_bus(void)
+{
+  rpi_i2c_init();
 
-int bcm2835_i2c_ioctl(rtems_libi2c_bus_t * bushdl, int cmd, void *arg);
-
-int BSP_i2c_register_drivers(int i2c_bus_number);
-
-int BSP_i2c_init(void);
+  return rpi_i2c_register_bus("/dev/i2c", DEFAULT_BUS_CLOCK);
+}
 
 /** @} */
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* LIBBSP_ARM_RASPBERRYPI_I2C_H */
