@@ -46,73 +46,29 @@ extern "C" {
 /** @} */
 
 /**
- * @name SPI data structures.
- *
- * @{
- */
-
-/**
- * @brief Object containing the SPI bus configuration settings.
- *
- * Encapsulates the current SPI bus configuration.
- */
-typedef struct
-{
-  int initialized;
-  uint8_t bytes_per_char;
-
-  /* Shift to be applied on data transfers with
-   * least significative bit first (LSB) devices. */
-  uint8_t bit_shift;
-  uint32_t dummy_char;
-
-  /* If set to 0 uses 3-wire SPI, with 2 separate data lines (MOSI and MISO),
-   * if set to 1 uses 2-wire SPI, where the MOSI data line doubles as the
-   * slave out (SO) and slave in (SI) data lines. */
-  int bidirectional;
-  uint32_t current_slave_addr;
-  rtems_id irq_sema_id;
-  int irq_write;
-} bcm2835_spi_softc_t;
-
-typedef struct
-{
-  rtems_libi2c_bus_t bus_desc;
-  bcm2835_spi_softc_t softc;
-} bcm2835_spi_desc_t;
-
-/** @} */
-
-/**
  * @name SPI directives.
  *
  * @{
  */
 
-rtems_status_code bcm2835_spi_init(rtems_libi2c_bus_t *bushdl);
+/**
+ * @brief Setups the Raspberry Pi SPI bus (located on the GPIO header)
+ *        on the "/dev/spi" device file, and registers the bus on the
+ *        libi2c API.
+ *
+ * @retval Returns libi2c bus number.
+ * @retval <0 Could not register the bus. See @see rtems_libi2c_register_bus().
+ */
+extern int rpi_spi_init(void);
 
-rtems_status_code bcm2835_spi_send_start(rtems_libi2c_bus_t *bushdl);
-
-rtems_status_code bcm2835_spi_stop(rtems_libi2c_bus_t *bushdl);
-
-rtems_status_code
-bcm2835_spi_send_addr(rtems_libi2c_bus_t *bushdl, uint32_t addr, int rw);
-
-int bcm2835_spi_read_bytes(
-  rtems_libi2c_bus_t *bushdl,
-  unsigned char *bytes,
-  int nbytes
-);
-
-int bcm2835_spi_write_bytes(
-  rtems_libi2c_bus_t *bushdl,
-  unsigned char *bytes,
-  int nbytes
-);
-
-int bcm2835_spi_ioctl(rtems_libi2c_bus_t *bushdl, int cmd, void *arg);
-
-void rpi_spi_init(void);
+/**
+ * @brief If called sets the SPI bus to use 2-wire SPI, where the MOSI data line
+ *        doubles as the slave out (SO) and slave in (SI) data lines.
+ *        If not called the bus defaults to the usual 3-wire SPI, with 2
+ *        separate data lines (MOSI and MISO). It should be called after
+ *        @see rpi_spi_init().
+ */
+extern void rpi_spi_set_bidirectional(void);
 
 /** @} */
 
