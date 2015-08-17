@@ -16,9 +16,8 @@
  */
 
 /*
- * TODO:
- * - Test with a 10-bit address slave device.
- * - Test with PI2.
+ * STATUS:
+ * - 10-bit slave addressing untested
  */
 
 #include <bsp.h>
@@ -211,7 +210,7 @@ static int rpi_i2c_setup_transfer(rpi_i2c_bus *bus)
  *   which will allow the transfer process to continue
  *   (by writing to the TX FIFO);
  *
- * - When the transfer is done on Raspberry side, the 1. interrupt is
+ * - When the transfer is done on the Raspberry side, the 1. interrupt is
  *   enabled for the device to signal it has finished the transfer as
  *   well. When caught the handler disables that interrupt from being
  *   generated and sends a waking event to the transfer task, marking

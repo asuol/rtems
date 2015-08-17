@@ -56,19 +56,17 @@ extern "C" {
  *        on the "/dev/spi" device file, and registers the bus on the
  *        libi2c API.
  *
+ * @param[in] bidirectional_mode If TRUE sets the SPI bus to use 2-wire SPI,
+ *                               where the MOSI data line doubles as the
+ *                               slave out (SO) and slave in (SI) data lines.
+ *                               If FALSE the bus defaults to the usual
+ *                               3-wire SPI, with 2 separate data lines
+ *                               (MOSI and MISO).
+ *
  * @retval Returns libi2c bus number.
  * @retval <0 Could not register the bus. See @see rtems_libi2c_register_bus().
  */
-extern int rpi_spi_init(void);
-
-/**
- * @brief If called sets the SPI bus to use 2-wire SPI, where the MOSI data line
- *        doubles as the slave out (SO) and slave in (SI) data lines.
- *        If not called the bus defaults to the usual 3-wire SPI, with 2
- *        separate data lines (MOSI and MISO). It should be called after
- *        @see rpi_spi_init().
- */
-extern void rpi_spi_set_bidirectional(void);
+extern int rpi_spi_init(bool bidirectional_mode);
 
 /** @} */
 

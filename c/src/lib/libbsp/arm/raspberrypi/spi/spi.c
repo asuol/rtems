@@ -637,7 +637,7 @@ static rpi_spi_desc_t rpi_spi_bus_desc = {
   }
 };
 
-int rpi_spi_init(void)
+int rpi_spi_init(bool bidirectional_mode)
 {
   /* Initialize the libi2c API. */
   rtems_libi2c_initialize();
@@ -647,14 +647,11 @@ int rpi_spi_init(void)
 
   assert ( rpi_gpio_select_spi() == RTEMS_SUCCESSFUL );
 
+  bidirectional = bidirectional_mode;
+
   /* Clear SPI control register and clear SPI FIFOs. */
-  BCM2835_REG(BCM2835_SPI_CS) = 0x0000030;
+  BCM2835_REG(BCM2835_SPI_CS) = (3 << 4);
 
   /* Register the SPI bus. */
   return rtems_libi2c_register_bus("/dev/spi", &(rpi_spi_bus_desc.bus_desc));
-}
-
-void rpi_spi_set_bidirectional(void)
-{
-  bidirectional = true;
 }
